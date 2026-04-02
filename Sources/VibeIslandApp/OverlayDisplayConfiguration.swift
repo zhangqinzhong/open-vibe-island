@@ -57,7 +57,7 @@ struct OverlayPlacementDiagnostics {
 }
 
 enum OverlayDisplayResolver {
-    static let defaultPanelSize = NSSize(width: 860, height: 340)
+    static let defaultPanelSize = NSSize(width: 708, height: 514)
 
     static func availableDisplayOptions() -> [OverlayDisplayOption] {
         let automatic = OverlayDisplayOption(

@@ -59,18 +59,12 @@ struct IslandPanelView: View {
         max(0, closedNotchHeight - 12) + 10
     }
 
-    private var openedPanelHeight: CGFloat {
-        500
-    }
-
     var body: some View {
         GeometryReader { geometry in
-            let screenWidth = geometry.size.width
-
             ZStack(alignment: .top) {
                 Color.clear
 
-                notchContent(screenWidth: screenWidth)
+                notchContent(availableSize: geometry.size)
                     .frame(maxWidth: .infinity, alignment: .top)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -79,11 +73,13 @@ struct IslandPanelView: View {
     }
 
     @ViewBuilder
-    private func notchContent(screenWidth: CGFloat) -> some View {
-        let openedWidth = min(max(screenWidth * 0.68, 760), screenWidth - 36)
-        let closedWidth = closedNotchWidth + expansionWidth + (isPopping ? 18 : 0)
+    private func notchContent(availableSize: CGSize) -> some View {
+        let outerHorizontalPadding: CGFloat = isOpened ? 28 : 0
+        let outerBottomPadding: CGFloat = isOpened ? 14 : 0
+        let openedWidth = max(0, availableSize.width - outerHorizontalPadding)
+        let closedWidth = availableSize.width
         let currentWidth = isOpened ? openedWidth : closedWidth
-        let currentHeight = isOpened ? openedPanelHeight : closedNotchHeight
+        let currentHeight = isOpened ? max(closedNotchHeight, availableSize.height - outerBottomPadding) : availableSize.height
 
         VStack(spacing: 0) {
             headerRow
@@ -92,7 +88,7 @@ struct IslandPanelView: View {
             if isOpened {
                 openedContent
                     .frame(width: openedWidth - 24)
-                    .frame(maxHeight: openedPanelHeight - closedNotchHeight - 12, alignment: .top)
+                    .frame(maxHeight: currentHeight - closedNotchHeight - 12, alignment: .top)
                     .transition(
                         .asymmetric(
                             insertion: .scale(scale: 0.8, anchor: .top)

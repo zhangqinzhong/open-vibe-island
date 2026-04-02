@@ -455,15 +455,9 @@ final class AppModel {
     }
 
     func refreshOverlayPlacement() {
-        if isOverlayVisible {
-            overlayPlacementDiagnostics = overlayPanelController.reposition(
-                preferredScreenID: preferredOverlayScreenID
-            )
-        } else {
-            overlayPlacementDiagnostics = overlayPanelController.placementDiagnostics(
-                preferredScreenID: preferredOverlayScreenID
-            )
-        }
+        overlayPlacementDiagnostics = overlayPanelController.reposition(
+            preferredScreenID: preferredOverlayScreenID
+        )
     }
 
     func showControlCenter() {

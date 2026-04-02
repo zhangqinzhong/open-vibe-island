@@ -4,7 +4,9 @@ import SwiftUI
 
 @MainActor
 final class OverlayPanelController {
-    private static let windowHeight: CGFloat = 750
+    private static let minimumOpenedPanelWidth: CGFloat = 680
+    private static let maximumOpenedPanelWidth: CGFloat = 740
+    private static let openedPanelWidthFactor: CGFloat = 0.46
     private static let openedContentWidthPadding: CGFloat = 28
     private static let openedContentHeight: CGFloat = 500
     private static let openedContentBottomPadding: CGFloat = 14
@@ -68,13 +70,8 @@ final class OverlayPanelController {
     // MARK: - Panel creation
 
     private func makePanel(model: AppModel) -> NotchPanel {
-        let screenFrame = resolveTargetScreen()?.frame ?? NSScreen.main?.frame ?? .zero
-        let windowFrame = NSRect(
-            x: screenFrame.origin.x,
-            y: screenFrame.maxY - Self.windowHeight,
-            width: screenFrame.width,
-            height: Self.windowHeight
-        )
+        let screen = resolveTargetScreen() ?? NSScreen.main
+        let windowFrame = screen.map { panelFrame(for: model, on: $0) } ?? .zero
 
         let panel = NotchPanel(
             contentRect: windowFrame,
@@ -113,12 +110,7 @@ final class OverlayPanelController {
             return nil
         }
 
-        let windowFrame = NSRect(
-            x: screen.frame.origin.x,
-            y: screen.frame.maxY - Self.windowHeight,
-            width: screen.frame.width,
-            height: Self.windowHeight
-        )
+        let windowFrame = panelFrame(for: model, on: screen)
         panel.setFrame(windowFrame, display: true)
         computeNotchRect(screen: screen)
 
@@ -242,46 +234,78 @@ final class OverlayPanelController {
             return isPointInNotchArea(screenPoint)
         }
 
-        guard let panel,
-              let localRect = contentRect(for: model, in: panel.contentView?.bounds ?? .zero) else {
+        guard let panel else {
             return false
         }
 
-        let expandedRect = panel.convertToScreen(localRect)
-        return expandedRect.contains(screenPoint)
+        return panel.frame.contains(screenPoint)
     }
 
     func openedPanelWidth(for screen: NSScreen?) -> CGFloat {
         guard let screen else { return 820 }
-        return min(max(screen.frame.width * 0.68, 760), screen.frame.width - 36)
+        return min(
+            max(screen.visibleFrame.width * Self.openedPanelWidthFactor, Self.minimumOpenedPanelWidth),
+            min(Self.maximumOpenedPanelWidth, screen.visibleFrame.width - 32)
+        )
     }
 
     func contentRect(for model: AppModel, in bounds: NSRect) -> NSRect? {
-        guard let screen = resolveTargetScreen() else { return nil }
+        bounds
+    }
 
-        if model.notchStatus == .opened {
-            let panelWidth = openedPanelWidth(for: screen)
-            let contentWidth = panelWidth + Self.openedContentWidthPadding
-            let contentHeight = Self.openedContentHeight + Self.openedContentBottomPadding
-            let centerX = bounds.midX
+    private func panelFrame(for model: AppModel?, on screen: NSScreen) -> NSRect {
+        let size = panelSize(for: model, on: screen)
+        return NSRect(
+            x: screen.frame.midX - size.width / 2,
+            y: screen.frame.maxY - size.height,
+            width: size.width,
+            height: size.height
+        )
+    }
 
-            return NSRect(
-                x: centerX - contentWidth / 2,
-                y: bounds.maxY - contentHeight,
-                width: contentWidth,
-                height: contentHeight
-            )
-        } else {
-            let notchSize = screen.notchSize
-            let centerX = bounds.midX
-
-            return NSRect(
-                x: centerX - notchSize.width / 2,
-                y: bounds.maxY - notchSize.height,
-                width: notchSize.width,
-                height: notchSize.height
+    private func panelSize(for model: AppModel?, on screen: NSScreen) -> CGSize {
+        guard let model else {
+            return CGSize(
+                width: openedPanelWidth(for: screen) + Self.openedContentWidthPadding,
+                height: Self.openedContentHeight + Self.openedContentBottomPadding
             )
         }
+
+        switch model.notchStatus {
+        case .opened:
+            return CGSize(
+                width: openedPanelWidth(for: screen) + Self.openedContentWidthPadding,
+                height: Self.openedContentHeight + Self.openedContentBottomPadding
+            )
+        case .closed, .popping:
+            return CGSize(
+                width: closedPanelWidth(for: model, on: screen),
+                height: screen.notchSize.height
+            )
+        }
+    }
+
+    private func closedPanelWidth(for model: AppModel, on screen: NSScreen) -> CGFloat {
+        let notchWidth = screen.notchSize.width
+        let notchHeight = screen.notchSize.height
+        let spotlightSession = model.surfacedSessions.first(where: { $0.phase.requiresAttention })
+            ?? model.surfacedSessions.first(where: { $0.phase == .running })
+            ?? model.surfacedSessions.first
+        let hasClosedPresence = model.liveSessionCount > 0
+
+        guard hasClosedPresence else {
+            return notchWidth
+        }
+
+        let sideWidth = max(0, notchHeight - 12) + 10
+        let digits = max(1, "\(model.liveSessionCount)".count)
+        let countBadgeWidth = CGFloat(18 + max(0, digits - 1) * 7)
+        let hasAttention = spotlightSession?.phase.requiresAttention == true
+        let leftWidth = sideWidth + 8 + (hasAttention ? 18 : 0)
+        let rightWidth = max(sideWidth, countBadgeWidth)
+        let expansionWidth = leftWidth + rightWidth + 16 + (hasAttention ? 6 : 0)
+        let popWidth = model.notchStatus == .popping ? 18 : 0
+        return notchWidth + expansionWidth + CGFloat(popWidth)
     }
 
     // MARK: - Event reposting
