@@ -362,6 +362,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
         case .userPromptSubmit:
             ensureSessionExists(for: payload)
+            synchronizeJumpTarget(for: payload)
             let prompt = payload.promptPreview ?? "User submitted a prompt to Codex."
             emit(
                 .activityUpdated(
@@ -377,8 +378,24 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
         case .preToolUse:
             ensureSessionExists(for: payload)
+            synchronizeJumpTarget(for: payload)
 
             let command = payload.commandPreview ?? "Bash command"
+            guard !payload.permissionMode.bypassesIslandApproval else {
+                emit(
+                    .activityUpdated(
+                        SessionActivityUpdated(
+                            sessionID: payload.sessionID,
+                            summary: "Running Bash without approval: \(command)",
+                            phase: .running,
+                            timestamp: .now
+                        )
+                    )
+                )
+                send(.response(.acknowledged), to: clientID)
+                return
+            }
+
             guard hasApprovalObserver(excluding: clientID) else {
                 emit(
                     .activityUpdated(
@@ -427,6 +444,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
         case .postToolUse:
             ensureSessionExists(for: payload)
+            synchronizeJumpTarget(for: payload)
             let command = payload.commandPreview ?? "Bash command"
             let responsePreview = payload.toolResponsePreview
             let summary = responsePreview.map { "Bash finished: \(command) · \($0)" } ?? "Bash finished: \(command)"
@@ -445,6 +463,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
         case .stop:
             ensureSessionExists(for: payload)
+            synchronizeJumpTarget(for: payload)
             let summary = payload.assistantMessagePreview ?? "Codex completed the turn."
 
             emit(
@@ -482,6 +501,27 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     summary: payload.implicitStartSummary,
                     timestamp: .now,
                     jumpTarget: payload.defaultJumpTarget
+                )
+            )
+        )
+    }
+
+    private func synchronizeJumpTarget(for payload: CodexHookPayload) {
+        guard let existingSession = state.session(id: payload.sessionID) else {
+            return
+        }
+
+        let jumpTarget = payload.defaultJumpTarget
+        guard existingSession.jumpTarget != jumpTarget else {
+            return
+        }
+
+        emit(
+            .jumpTargetUpdated(
+                JumpTargetUpdated(
+                    sessionID: payload.sessionID,
+                    jumpTarget: jumpTarget,
+                    timestamp: .now
                 )
             )
         )

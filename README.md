@@ -163,6 +163,8 @@ If you want to manage the files yourself, a minimal `~/.codex/hooks.json` shape 
 
 The helper reads the Codex hook payload from `stdin`, forwards it to the app bridge over a Unix socket in `/tmp`, and only writes JSON to `stdout` when the island explicitly denies a `PreToolUse` Bash command. If the app or bridge is unavailable, the hook fails open and Codex keeps running unchanged.
 
+The bridge also respects non-interactive Codex permission modes such as `dontAsk` and `bypassPermissions`, so the island does not insert extra approval prompts when Codex itself is configured to run through.
+
 ## Jump Back
 
 Codex hook ingestion now captures terminal hints from the hook process environment, such as `TERM_PROGRAM`, `ITERM_SESSION_ID`, and Ghostty-specific variables. The island uses those hints to power a best-effort `Jump` action:

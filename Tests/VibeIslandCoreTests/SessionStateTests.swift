@@ -198,6 +198,92 @@ struct SessionStateTests {
     }
 
     @Test
+    func codexPreToolUseBypassesIslandApprovalWhenCodexDoesNotAsk() async throws {
+        let socketURL = BridgeSocketLocation.uniqueTestURL()
+        let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
+        try server.start()
+        defer { server.stop() }
+
+        let observer = LocalBridgeClient(socketURL: socketURL)
+        let stream = try observer.connect()
+        defer { observer.disconnect() }
+        try await observer.send(.registerClient(role: .observer))
+
+        let payload = CodexHookPayload(
+            cwd: "/tmp/worktree",
+            hookEventName: .preToolUse,
+            model: "gpt-5-codex",
+            permissionMode: .dontAsk,
+            sessionID: "codex-session-no-ask",
+            terminalApp: "Ghostty",
+            terminalSessionID: "ghostty-session-1",
+            transcriptPath: nil,
+            turnID: "turn-1",
+            toolName: "Bash",
+            toolUseID: "tool-use-1",
+            toolInput: CodexHookToolInput(command: "ls")
+        )
+
+        let response = try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(payload))
+
+        var iterator = stream.makeAsyncIterator()
+        let startedEvent = try await nextEvent(from: &iterator)
+        let activityEvent = try await nextEvent(from: &iterator)
+
+        #expect(startedEvent.isSessionStarted)
+        #expect(activityEvent.activityUpdate?.summary == "Running Bash without approval: ls")
+        #expect(response == .acknowledged)
+    }
+
+    @Test
+    func codexHookUpdatesJumpTargetWhenLaterHooksLearnMoreAboutTheTerminal() async throws {
+        let socketURL = BridgeSocketLocation.uniqueTestURL()
+        let server = DemoBridgeServer(socketURL: socketURL)
+        try server.start()
+        defer { server.stop() }
+
+        let observer = LocalBridgeClient(socketURL: socketURL)
+        let stream = try observer.connect()
+        defer { observer.disconnect() }
+        try await observer.send(.registerClient(role: .observer))
+
+        let startedPayload = CodexHookPayload(
+            cwd: "/tmp/worktree",
+            hookEventName: .sessionStart,
+            model: "gpt-5-codex",
+            permissionMode: .default,
+            sessionID: "codex-session-jump",
+            terminalApp: "Terminal",
+            transcriptPath: nil
+        )
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(startedPayload))
+
+        let updatedPayload = CodexHookPayload(
+            cwd: "/tmp/worktree",
+            hookEventName: .userPromptSubmit,
+            model: "gpt-5-codex",
+            permissionMode: .default,
+            sessionID: "codex-session-jump",
+            terminalApp: "Ghostty",
+            terminalSessionID: "ghostty-terminal-42",
+            terminalTitle: "codex ~/tmp/worktree",
+            transcriptPath: nil,
+            prompt: "inspect the auth flow"
+        )
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(updatedPayload))
+
+        var iterator = stream.makeAsyncIterator()
+        let startedEvent = try await nextEvent(from: &iterator)
+        let jumpTargetEvent = try await nextEvent(from: &iterator)
+        let activityEvent = try await nextEvent(from: &iterator)
+
+        #expect(startedEvent.isSessionStarted)
+        #expect(jumpTargetEvent.jumpTargetUpdate?.jumpTarget.terminalApp == "Ghostty")
+        #expect(jumpTargetEvent.jumpTargetUpdate?.jumpTarget.terminalSessionID == "ghostty-terminal-42")
+        #expect(activityEvent.activityUpdate?.summary == "Prompt: inspect the auth flow")
+    }
+
+    @Test
     func codexHookInstallerMergesManagedGroupsWithoutDroppingUnrelatedHooks() throws {
         let existing = """
         {
@@ -419,6 +505,22 @@ private extension AgentEvent {
             true
         } else {
             false
+        }
+    }
+
+    var activityUpdate: SessionActivityUpdated? {
+        if case let .activityUpdated(payload) = self {
+            payload
+        } else {
+            nil
+        }
+    }
+
+    var jumpTargetUpdate: JumpTargetUpdated? {
+        if case let .jumpTargetUpdated(payload) = self {
+            payload
+        } else {
+            nil
         }
     }
 }
