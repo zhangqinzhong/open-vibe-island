@@ -12,17 +12,6 @@ enum IslandSessionPresence: Equatable {
     case running
     case active
     case inactive
-
-    var title: String {
-        switch self {
-        case .running:
-            "Running"
-        case .active:
-            "Active"
-        case .inactive:
-            "Inactive"
-        }
-    }
 }
 
 extension AgentSession {

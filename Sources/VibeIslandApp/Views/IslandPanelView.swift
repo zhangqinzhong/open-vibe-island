@@ -443,11 +443,12 @@ private struct IslandSessionRow: View {
 
     private func rowBody(referenceDate: Date) -> some View {
         let presence = session.islandPresence(at: referenceDate)
+        let showsExpandedContent = presence != .inactive
 
         return VStack(alignment: .leading, spacing: 10) {
             Button(action: handlePrimaryTap) {
                 HStack(alignment: .top, spacing: 14) {
-                    statusColumn(for: presence)
+                    statusDot(for: presence)
 
                     VStack(alignment: .leading, spacing: 6) {
                         HStack(alignment: .top, spacing: 12) {
@@ -467,14 +468,16 @@ private struct IslandSessionRow: View {
                             }
                         }
 
-                        if let promptLine = session.spotlightPromptLineText {
+                        if showsExpandedContent,
+                           let promptLine = session.spotlightPromptLineText {
                             Text(promptLine)
                                 .font(.system(size: 11.5, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.62))
                                 .lineLimit(1)
                         }
 
-                        if let activityLine = session.spotlightActivityLineText {
+                        if showsExpandedContent,
+                           let activityLine = session.spotlightActivityLineText {
                             Text(activityLine)
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(activityColor(for: presence).opacity(0.94))
@@ -510,26 +513,11 @@ private struct IslandSessionRow: View {
         .onHover(perform: onHoverChange)
     }
 
-    private func statusColumn(for presence: IslandSessionPresence) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(statusTileFill(for: presence))
-
-                VibeIslandIcon(
-                    size: 14,
-                    isAnimating: presence == .running,
-                    tint: statusTint(for: presence)
-                )
-            }
-            .frame(width: 36, height: 36)
-
-            Text(presence.title)
-                .font(.system(size: 10, weight: .bold))
-                .foregroundStyle(statusTint(for: presence))
-                .lineLimit(1)
-        }
-        .frame(width: 64, alignment: .leading)
+    private func statusDot(for presence: IslandSessionPresence) -> some View {
+        Circle()
+            .fill(statusTint(for: presence))
+            .frame(width: 9, height: 9)
+            .padding(.top, 6)
     }
 
     @ViewBuilder
@@ -577,22 +565,11 @@ private struct IslandSessionRow: View {
     private func statusTint(for presence: IslandSessionPresence) -> Color {
         switch presence {
         case .running:
-            .mint
+            Color(red: 0.34, green: 0.61, blue: 0.99)
         case .active:
-            Color(red: 0.53, green: 0.94, blue: 0.72)
+            Color(red: 0.29, green: 0.86, blue: 0.46)
         case .inactive:
-            .white.opacity(0.48)
-        }
-    }
-
-    private func statusTileFill(for presence: IslandSessionPresence) -> Color {
-        switch presence {
-        case .running:
-            Color.mint.opacity(0.14)
-        case .active:
-            Color.green.opacity(0.12)
-        case .inactive:
-            Color.white.opacity(0.05)
+            .white.opacity(0.38)
         }
     }
 
