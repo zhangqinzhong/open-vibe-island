@@ -508,26 +508,24 @@ final class AppModel {
         }
 
         do {
+            dismissOverlayForJump()
             let result = try terminalJumpService.jump(to: jumpTarget)
             lastActionMessage = result
-            NSApp.activate(ignoringOtherApps: true)
         } catch {
             lastActionMessage = "Jump failed: \(error.localizedDescription)"
         }
     }
 
     func jumpToSession(_ session: AgentSession) {
-        select(sessionID: session.id)
-
         guard let jumpTarget = session.jumpTarget else {
             lastActionMessage = "No jump target is available yet."
             return
         }
 
         do {
+            dismissOverlayForJump()
             let result = try terminalJumpService.jump(to: jumpTarget)
             lastActionMessage = result
-            NSApp.activate(ignoringOtherApps: true)
         } catch {
             lastActionMessage = "Jump failed: \(error.localizedDescription)"
         }
@@ -836,6 +834,14 @@ final class AppModel {
             currentCommandPreview: discovered.currentCommandPreview ?? existing.currentCommandPreview
         )
         return merged.isEmpty ? nil : merged
+    }
+
+    private func dismissOverlayForJump() {
+        guard isOverlayVisible else {
+            return
+        }
+
+        notchClose()
     }
 
     private var preferredOverlayScreenID: String? {
