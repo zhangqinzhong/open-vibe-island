@@ -199,15 +199,15 @@ struct TerminalSessionAttachmentProbe {
             let matches = sessions.filter { session in
                 guard !claimedSessionIDs.contains(session.id),
                       let jumpTarget = session.jumpTarget,
-                      nonEmptyValue(jumpTarget.workingDirectory) == snapshot.workingDirectory else {
+                      canFallbackFromRecordedGhosttySessionID(jumpTarget, claimedSnapshotIDs: claimedSnapshotIDs) else {
                     return false
                 }
 
-                guard let recordedSessionID = nonEmptyValue(jumpTarget.terminalSessionID) else {
+                if nonEmptyValue(jumpTarget.workingDirectory) == snapshot.workingDirectory {
                     return true
                 }
 
-                return claimedSnapshotIDs.contains(recordedSessionID)
+                return sessionWorkspaceNameCandidates(for: session).contains(snapshotWorkspaceName(for: snapshot))
             }
 
             guard let preferred = preferredSession(from: matches) else {
@@ -220,6 +220,45 @@ struct TerminalSessionAttachmentProbe {
         }
 
         return assignments
+    }
+
+    private func canFallbackFromRecordedGhosttySessionID(
+        _ jumpTarget: JumpTarget,
+        claimedSnapshotIDs: Set<String>
+    ) -> Bool {
+        guard let recordedSessionID = nonEmptyValue(jumpTarget.terminalSessionID) else {
+            return true
+        }
+
+        return claimedSnapshotIDs.contains(recordedSessionID)
+    }
+
+    private func sessionWorkspaceNameCandidates(for session: AgentSession) -> Set<String> {
+        var candidates: Set<String> = []
+
+        if let workspaceName = nonEmptyValue(session.jumpTarget?.workspaceName) {
+            candidates.insert(workspaceName)
+        }
+
+        if let workingDirectory = nonEmptyValue(session.jumpTarget?.workingDirectory) {
+            let derivedWorkspace = URL(fileURLWithPath: workingDirectory).lastPathComponent
+            if !derivedWorkspace.isEmpty {
+                candidates.insert(derivedWorkspace)
+            }
+        }
+
+        let titlePieces = session.title
+            .split(separator: "·", maxSplits: 1)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+        if titlePieces.count == 2, !titlePieces[1].isEmpty {
+            candidates.insert(titlePieces[1])
+        }
+
+        return candidates
+    }
+
+    private func snapshotWorkspaceName(for snapshot: GhosttyTerminalSnapshot) -> String {
+        URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent
     }
 
     private func attachedTerminalSessionIDs(

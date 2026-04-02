@@ -39,6 +39,7 @@ final class OverlayPanelController {
         positionPanel(panel, preferredScreenID: preferredScreenID)
         panel.orderFrontRegardless()
         panel.ignoresMouseEvents = true
+        panel.acceptsMouseMovedEvents = false
         startEventMonitoring()
     }
 
@@ -47,18 +48,29 @@ final class OverlayPanelController {
         let panel = self.panel ?? makePanel(model: model)
         self.panel = panel
         let diagnostics = positionPanel(panel, preferredScreenID: preferredScreenID)
-        panel.orderFrontRegardless()
+        panel.makeKeyAndOrderFront(nil)
         panel.ignoresMouseEvents = false
+        panel.acceptsMouseMovedEvents = true
         startEventMonitoring()
         return diagnostics
     }
 
     func hide() {
         panel?.ignoresMouseEvents = true
+        panel?.acceptsMouseMovedEvents = false
     }
 
     func setInteractive(_ interactive: Bool) {
-        panel?.ignoresMouseEvents = !interactive
+        guard let panel else {
+            return
+        }
+
+        panel.ignoresMouseEvents = !interactive
+        panel.acceptsMouseMovedEvents = interactive
+
+        if interactive {
+            panel.makeKeyAndOrderFront(nil)
+        }
     }
 
     func reposition(preferredScreenID: String?) -> OverlayPlacementDiagnostics? {
@@ -88,7 +100,7 @@ final class OverlayPanelController {
         )
 
         panel.isFloatingPanel = true
-        panel.becomesKeyOnlyIfNeeded = true
+        panel.becomesKeyOnlyIfNeeded = false
         panel.level = .statusBar
         panel.sharingType = .readOnly
         panel.backgroundColor = .clear
@@ -96,6 +108,7 @@ final class OverlayPanelController {
         panel.hasShadow = false
         panel.isMovable = false
         panel.hidesOnDeactivate = false
+        panel.acceptsMouseMovedEvents = false
         panel.collectionBehavior = [.fullScreenAuxiliary, .stationary, .canJoinAllSpaces, .ignoresCycle]
         panel.titleVisibility = .hidden
         panel.titlebarAppearsTransparent = true

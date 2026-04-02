@@ -102,6 +102,56 @@ struct TerminalSessionAttachmentProbeTests {
     }
 
     @Test
+    func ghosttyRehomesFromTitleWorkspaceWhenJumpTargetDirectoryIsWrong() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let primary = ghosttySession(
+            id: "primary",
+            updatedAt: now,
+            phase: .running,
+            terminalSessionID: "ghostty-1",
+            workingDirectory: "/tmp/vibe-island",
+            workspaceName: "vibe-island"
+        )
+        let rehomed = AgentSession(
+            id: "rehomed",
+            title: "Codex · claude-research",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Summary",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "vibe-island",
+                paneTitle: "codex ~/tmp/vibe-island",
+                workingDirectory: "/tmp/vibe-island",
+                terminalSessionID: "ghostty-1"
+            )
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [primary, rehomed],
+            ghosttyAvailability: .available(
+                [
+                    .init(sessionID: "ghostty-1", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island"),
+                    .init(sessionID: "ghostty-2", workingDirectory: "/tmp/claude-research", title: "codex ~/tmp/claude-research"),
+                ],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            now: now
+        )
+
+        #expect(resolutions["primary"]?.attachmentState == .attached)
+        #expect(resolutions["rehomed"]?.attachmentState == .attached)
+        #expect(resolutions["rehomed"]?.correctedJumpTarget?.terminalSessionID == "ghostty-2")
+        #expect(resolutions["rehomed"]?.correctedJumpTarget?.workspaceName == "claude-research")
+        #expect(resolutions["rehomed"]?.correctedJumpTarget?.workingDirectory == "/tmp/claude-research")
+    }
+
+    @Test
     func explicitTerminalMissDropsRecentlyAttachedSessionOutOfLiveState() {
         let now = Date(timeIntervalSince1970: 1_000)
         let probe = TerminalSessionAttachmentProbe()

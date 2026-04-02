@@ -281,9 +281,7 @@ struct IslandPanelView: View {
                         session: session,
                         isHighlighted: session.id == hoveredSessionID,
                         onHoverChange: { isHovering in
-                            withAnimation(.smooth(duration: 0.18)) {
-                                hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
-                            }
+                            hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
                         },
                         onJump: { model.jumpToSession(session) },
                         onApprove: { model.approvePermission(for: session.id, approved: $0) },
@@ -519,7 +517,7 @@ private struct IslandSessionRow: View {
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, isHighlighted ? 14 : 12)
+        .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(Color.black)
@@ -528,7 +526,7 @@ private struct IslandSessionRow: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(isHighlighted ? .white.opacity(0.12) : .white.opacity(0.04))
         )
-        .shadow(color: isHighlighted ? .black.opacity(0.28) : .clear, radius: 14, y: 8)
+        .shadow(color: isHighlighted ? .black.opacity(0.16) : .clear, radius: 10, y: 6)
         .overlay(
             Rectangle()
                 .fill(Color.white.opacity(isHighlighted ? 0 : 0.02))
