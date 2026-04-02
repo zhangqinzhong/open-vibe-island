@@ -330,14 +330,7 @@ struct IslandPanelView: View {
     // MARK: - Helpers
 
     private var surfaceFill: some ShapeStyle {
-        LinearGradient(
-            colors: [
-                Color(red: 0.12, green: 0.12, blue: 0.13),
-                Color(red: 0.03, green: 0.03, blue: 0.04),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        Color.black
     }
 
     private func phaseColor(_ phase: SessionPhase) -> Color {
@@ -529,16 +522,16 @@ private struct IslandSessionRow: View {
         .padding(.vertical, isHighlighted ? 14 : 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(isHighlighted ? Color(red: 0.11, green: 0.11, blue: 0.12) : Color(red: 0.05, green: 0.05, blue: 0.06))
+                .fill(Color.black)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(isHighlighted ? .white.opacity(0.12) : .white.opacity(0.025))
+                .strokeBorder(isHighlighted ? .white.opacity(0.12) : .white.opacity(0.04))
         )
         .shadow(color: isHighlighted ? .black.opacity(0.28) : .clear, radius: 14, y: 8)
         .overlay(
             Rectangle()
-                .fill(Color.white.opacity(isHighlighted ? 0 : 0.03))
+                .fill(Color.white.opacity(isHighlighted ? 0 : 0.02))
                 .frame(height: 1),
             alignment: .bottom
         )
@@ -640,11 +633,11 @@ private struct HiddenSessionsRow: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.05, green: 0.05, blue: 0.06))
+                .fill(Color.black)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.02))
+                .strokeBorder(.white.opacity(0.04))
         )
     }
 }
