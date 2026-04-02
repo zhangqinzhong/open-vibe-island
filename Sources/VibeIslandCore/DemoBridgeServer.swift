@@ -153,6 +153,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
             }
 
             do {
+                try disableSocketSigPipe(clientFileDescriptor)
                 try makeSocketNonBlocking(clientFileDescriptor)
                 configureClient(fileDescriptor: clientFileDescriptor)
             } catch {

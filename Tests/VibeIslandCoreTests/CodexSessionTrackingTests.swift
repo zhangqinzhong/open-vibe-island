@@ -247,6 +247,62 @@ struct CodexSessionTrackingTests {
     }
 
     @Test
+    func codexRolloutWatcherBootstrapsFromBoundedTailWindow() async throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vibe-island-rollout-tail-\(UUID().uuidString)", isDirectory: true)
+        let rolloutURL = rootURL.appendingPathComponent("rollout.jsonl")
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        let oldMessage = String(repeating: "old-", count: 120)
+        let oldLine = rolloutLine(
+            timestamp: "2026-04-02T04:03:40.000Z",
+            type: "event_msg",
+            payload: [
+                "type": "agent_message",
+                "message": oldMessage,
+            ]
+        )
+        let recentLine = rolloutLine(
+            timestamp: "2026-04-02T04:03:45.000Z",
+            type: "event_msg",
+            payload: [
+                "type": "agent_message",
+                "message": "Tail bootstrap kept the watcher responsive.",
+            ]
+        )
+
+        try [oldLine, recentLine]
+            .joined(separator: "\n")
+            .appending("\n")
+            .write(to: rolloutURL, atomically: true, encoding: .utf8)
+
+        let recorder = EventRecorder()
+        let watcher = CodexRolloutWatcher(pollInterval: 0.05, initialReadLimit: 160)
+        watcher.eventHandler = { event in
+            Task {
+                await recorder.append(event)
+            }
+        }
+        watcher.sync(targets: [
+            CodexRolloutWatchTarget(
+                sessionID: "codex-session-tail",
+                transcriptPath: rolloutURL.path
+            )
+        ])
+
+        try await Task.sleep(for: .milliseconds(200))
+        watcher.stop()
+
+        let events = await recorder.snapshot()
+        #expect(events.contains(where: { $0.trackedActivityUpdate?.summary == "Tail bootstrap kept the watcher responsive." }))
+        #expect(!events.contains(where: { $0.trackedActivityUpdate?.summary == oldMessage }))
+    }
+
+    @Test
     func codexRolloutDiscoveryFindsRecentSessionsFromLocalRollouts() throws {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("vibe-island-discovery-\(UUID().uuidString)", isDirectory: true)

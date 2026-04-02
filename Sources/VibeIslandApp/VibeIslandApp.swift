@@ -4,15 +4,17 @@ import SwiftUI
 @MainActor
 final class VibeIslandAppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
-    private lazy var controlCenterWindowController = ControlCenterWindowController(model: model)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ProcessInfo.processInfo.disableAutomaticTermination(
+            "Vibe Island should remain active while monitoring local agent sessions."
+        )
+        ProcessInfo.processInfo.disableSuddenTermination()
         NSApp.setActivationPolicy(.regular)
 
         DispatchQueue.main.async { [self] in
-            model.attach(controlCenterWindowController: controlCenterWindowController)
-            controlCenterWindowController.show()
             model.startIfNeeded()
+            model.showControlCenter()
         }
     }
 
@@ -21,7 +23,7 @@ final class VibeIslandAppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        controlCenterWindowController.show()
+        model.showControlCenter()
         return false
     }
 }
@@ -32,6 +34,10 @@ struct VibeIslandApp: App {
     private var appDelegate
 
     var body: some Scene {
+        WindowGroup("Vibe Island OSS") {
+            ControlCenterView(model: appDelegate.model)
+        }
+
         MenuBarExtra("Vibe Island", systemImage: "circle.hexagongrid.circle.fill") {
             MenuBarContentView(model: appDelegate.model)
         }

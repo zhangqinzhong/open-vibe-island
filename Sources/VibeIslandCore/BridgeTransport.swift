@@ -309,6 +309,19 @@ func makeSocketNonBlocking(_ fileDescriptor: Int32) throws {
     }
 }
 
+func disableSocketSigPipe(_ fileDescriptor: Int32) throws {
+    var enabled: Int32 = 1
+    guard setsockopt(
+        fileDescriptor,
+        SOL_SOCKET,
+        SO_NOSIGPIPE,
+        &enabled,
+        socklen_t(MemoryLayout<Int32>.size)
+    ) != -1 else {
+        throw BridgeTransportError.systemCallFailed("setsockopt(SO_NOSIGPIPE)", errno)
+    }
+}
+
 func writeAll(_ data: Data, to fileDescriptor: Int32) throws {
     var remaining = data[...]
 

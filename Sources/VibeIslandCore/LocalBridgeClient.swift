@@ -26,6 +26,7 @@ public final class LocalBridgeClient: @unchecked Sendable {
         }
 
         do {
+            try disableSocketSigPipe(fileDescriptor)
             try withUnixSocketAddress(path: socketURL.path) { address, length in
                 guard Darwin.connect(fileDescriptor, address, length) != -1 else {
                     throw BridgeTransportError.systemCallFailed("connect", errno)

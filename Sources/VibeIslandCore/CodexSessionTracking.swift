@@ -595,17 +595,23 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
         var offset: UInt64 = 0
         var pendingBuffer = Data()
         var snapshot = CodexRolloutSnapshot()
+        var shouldTrimLeadingPartialLine = false
     }
 
     public var eventHandler: (@Sendable (AgentEvent) -> Void)?
 
     private let pollInterval: TimeInterval
+    private let initialReadLimit: UInt64
     private let queue = DispatchQueue(label: "app.vibeisland.codex.rollout-watcher")
     private var timer: DispatchSourceTimer?
     private var observations: [String: Observation] = [:]
 
-    public init(pollInterval: TimeInterval = 0.75) {
+    public init(
+        pollInterval: TimeInterval = 0.75,
+        initialReadLimit: UInt64 = 128 * 1_024
+    ) {
         self.pollInterval = pollInterval
+        self.initialReadLimit = initialReadLimit
     }
 
     deinit {
@@ -637,12 +643,12 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
             if pair.value.target == updatedTarget {
                 partialResult[pair.key] = pair.value
             } else {
-                partialResult[pair.key] = Observation(target: updatedTarget)
+                partialResult[pair.key] = makeObservation(for: updatedTarget)
             }
         }
 
         for target in targets where observations[target.sessionID] == nil {
-            observations[target.sessionID] = Observation(target: target)
+            observations[target.sessionID] = makeObservation(for: target)
         }
 
         if observations.isEmpty {
@@ -706,6 +712,11 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
             observation.offset += UInt64(data.count)
             observation.pendingBuffer.append(data)
 
+            if observation.shouldTrimLeadingPartialLine {
+                trimLeadingPartialLine(from: &observation.pendingBuffer)
+                observation.shouldTrimLeadingPartialLine = false
+            }
+
             let lines = completeLines(from: &observation.pendingBuffer)
             guard !lines.isEmpty else {
                 return []
@@ -741,6 +752,42 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
         }
 
         return lines
+    }
+
+    private func makeObservation(for target: CodexRolloutWatchTarget) -> Observation {
+        let fileURL = URL(fileURLWithPath: target.transcriptPath)
+        guard FileManager.default.fileExists(atPath: fileURL.path),
+              let fileHandle = try? FileHandle(forReadingFrom: fileURL) else {
+            return Observation(target: target)
+        }
+
+        defer {
+            try? fileHandle.close()
+        }
+
+        let fileSize = (try? fileHandle.seekToEnd()) ?? 0
+        guard fileSize > initialReadLimit else {
+            return Observation(target: target)
+        }
+
+        return Observation(
+            target: target,
+            offset: fileSize - initialReadLimit,
+            pendingBuffer: Data(),
+            snapshot: CodexRolloutSnapshot(),
+            shouldTrimLeadingPartialLine: true
+        )
+    }
+
+    private func trimLeadingPartialLine(from buffer: inout Data) {
+        let newline = UInt8(ascii: "\n")
+
+        guard let newlineIndex = buffer.firstIndex(of: newline) else {
+            buffer.removeAll(keepingCapacity: false)
+            return
+        }
+
+        buffer.removeSubrange(...newlineIndex)
     }
 }
 

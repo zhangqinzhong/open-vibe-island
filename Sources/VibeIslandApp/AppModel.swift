@@ -66,9 +66,6 @@ final class AppModel {
     private let overlayPanelController = OverlayPanelController()
 
     @ObservationIgnored
-    private weak var controlCenterWindowController: ControlCenterWindowController?
-
-    @ObservationIgnored
     private let bridgeServer = DemoBridgeServer()
 
     @ObservationIgnored
@@ -401,12 +398,15 @@ final class AppModel {
         }
     }
 
-    func attach(controlCenterWindowController: ControlCenterWindowController) {
-        self.controlCenterWindowController = controlCenterWindowController
-    }
-
     func showControlCenter() {
-        controlCenterWindowController?.show()
+        guard let window = NSApp.windows.first(where: { $0.title == "Vibe Island OSS" }) else {
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+
+        window.orderFrontRegardless()
+        window.makeKey()
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func approveFocusedPermission(_ approved: Bool) {
