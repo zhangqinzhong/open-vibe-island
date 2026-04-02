@@ -8,6 +8,7 @@ final class OverlayPanelController {
     private static let minimumOpenedPanelWidth: CGFloat = 680
     private static let maximumOpenedPanelWidth: CGFloat = 740
     private static let openedPanelWidthFactor: CGFloat = 0.46
+    private static let preferredNotificationPanelWidth: CGFloat = 620
     private static let openedContentWidthPadding: CGFloat = 28
     private static let openedContentBottomPadding: CGFloat = 14
     private static let maxVisibleSessionRows: Int = 6
@@ -17,6 +18,7 @@ final class OverlayPanelController {
     private static let openedRowSpacing: CGFloat = 4
     private static let openedContentVerticalInsets: CGFloat = 28
     private static let openedEmptyStateHeight: CGFloat = 108
+    private static let notificationCardHeight: CGFloat = 172
 
     private var panel: NotchPanel?
     private var eventMonitors = NotchEventMonitors()
@@ -200,9 +202,12 @@ final class OverlayPanelController {
             cancelHoverOpen()
         }
 
-        if model.notchStatus == .opened && !isPointInExpandedArea(screenLocation) {
-            // Mouse moved far from the panel — don't auto-close on hover leave
-            // Only close on explicit click outside (handled in mouseDown)
+        if model.shouldAutoCollapseOnMouseLeave {
+            if isPointInExpandedArea(screenLocation) {
+                model.notePointerInsideIslandSurface()
+            } else {
+                model.handlePointerExitedIslandSurface()
+            }
         }
     }
 
@@ -269,6 +274,14 @@ final class OverlayPanelController {
         )
     }
 
+    func notificationPanelWidth(for screen: NSScreen?) -> CGFloat {
+        guard let screen else {
+            return Self.preferredNotificationPanelWidth
+        }
+
+        return min(Self.preferredNotificationPanelWidth, screen.visibleFrame.width - 32)
+    }
+
     func contentRect(for model: AppModel, in bounds: NSRect) -> NSRect? {
         bounds
     }
@@ -293,8 +306,11 @@ final class OverlayPanelController {
 
         switch model.notchStatus {
         case .opened:
+            let panelWidth = model.showsNotificationCard
+                ? notificationPanelWidth(for: screen)
+                : openedPanelWidth(for: screen)
             return CGSize(
-                width: openedPanelWidth(for: screen) + Self.openedContentWidthPadding,
+                width: panelWidth + Self.openedContentWidthPadding,
                 height: screen.notchSize.height + openedContentHeight(for: model) + Self.openedContentBottomPadding
             )
         case .closed, .popping:
@@ -329,6 +345,10 @@ final class OverlayPanelController {
     }
 
     private func openedContentHeight(for model: AppModel) -> CGFloat {
+        if model.showsNotificationCard {
+            return Self.notificationCardHeight
+        }
+
         let now = Date.now
         let presentation = openedSessionListPresentation(
             sessions: model.surfacedSessions,

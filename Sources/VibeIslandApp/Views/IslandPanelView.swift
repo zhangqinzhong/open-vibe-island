@@ -245,7 +245,10 @@ struct IslandPanelView: View {
 
     private var openedContent: some View {
         VStack(spacing: 0) {
-            if model.surfacedSessions.isEmpty {
+            if let session = model.activeIslandCardSession,
+               model.showsNotificationCard {
+                notificationCard(session: session)
+            } else if model.surfacedSessions.isEmpty {
                 emptyState
             } else {
                 sessionList
@@ -283,9 +286,7 @@ struct IslandPanelView: View {
                         onHoverChange: { isHovering in
                             hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
                         },
-                        onJump: { model.jumpToSession(session) },
-                        onApprove: { model.approvePermission(for: session.id, approved: $0) },
-                        onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
+                        onJump: { model.jumpToSession(session) }
                     )
                 }
 
@@ -295,6 +296,14 @@ struct IslandPanelView: View {
             }
             .padding(.vertical, 2)
         }
+    }
+
+    private func notificationCard(session: AgentSession) -> some View {
+        IslandNotificationCard(
+            session: session,
+            onApprove: { model.approvePermission(for: session.id, approved: $0) },
+            onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
+        )
     }
 
     private var displayedSessions: [AgentSession] {
@@ -456,8 +465,6 @@ private struct IslandSessionRow: View {
     let isHighlighted: Bool
     let onHoverChange: (Bool) -> Void
     let onJump: () -> Void
-    let onApprove: (Bool) -> Void
-    let onAnswer: (String) -> Void
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
@@ -468,55 +475,47 @@ private struct IslandSessionRow: View {
     private func rowBody(referenceDate: Date) -> some View {
         let presence = session.islandPresence(at: referenceDate)
         let showsExpandedContent = presence != .inactive
-        let showsActionRow = session.phase.requiresAttention || isHighlighted
+        return Button(action: handlePrimaryTap) {
+            HStack(alignment: .top, spacing: 14) {
+                statusDot(for: presence)
 
-        return VStack(alignment: .leading, spacing: 10) {
-            Button(action: handlePrimaryTap) {
-                HStack(alignment: .top, spacing: 14) {
-                    statusDot(for: presence)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(session.spotlightHeadlineText)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(headlineColor(for: presence))
+                            .lineLimit(1)
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack(alignment: .top, spacing: 12) {
-                            Text(session.spotlightHeadlineText)
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundStyle(headlineColor(for: presence))
-                                .lineLimit(1)
+                        Spacer(minLength: 8)
 
-                            Spacer(minLength: 8)
-
-                            HStack(spacing: 6) {
-                                compactBadge(session.tool.displayName, presence: presence)
-                                if let terminalBadge = session.spotlightTerminalBadge {
-                                    compactBadge(terminalBadge, presence: presence)
-                                }
-                                compactBadge(session.spotlightAgeBadge, presence: presence)
+                        HStack(spacing: 6) {
+                            compactBadge(session.tool.displayName, presence: presence)
+                            if let terminalBadge = session.spotlightTerminalBadge {
+                                compactBadge(terminalBadge, presence: presence)
                             }
+                            compactBadge(session.spotlightAgeBadge, presence: presence)
                         }
+                    }
 
-                        if showsExpandedContent,
-                           let promptLine = session.spotlightPromptLineText {
-                            Text(promptLine)
-                                .font(.system(size: 11.5, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.62))
-                                .lineLimit(1)
-                        }
+                    if showsExpandedContent,
+                       let promptLine = session.spotlightPromptLineText {
+                        Text(promptLine)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.62))
+                            .lineLimit(1)
+                    }
 
-                        if showsExpandedContent,
-                           let activityLine = session.spotlightActivityLineText {
-                            Text(activityLine)
-                                .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(activityColor(for: presence).opacity(0.94))
-                                .lineLimit(1)
-                        }
+                    if showsExpandedContent,
+                       let activityLine = session.spotlightActivityLineText {
+                        Text(activityLine)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(activityColor(for: presence).opacity(0.94))
+                            .lineLimit(1)
                     }
                 }
             }
-            .buttonStyle(.plain)
-
-            if showsActionRow {
-                actionRow
-            }
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(
@@ -543,35 +542,6 @@ private struct IslandSessionRow: View {
             .fill(statusTint(for: presence))
             .frame(width: 9, height: 9)
             .padding(.top, 6)
-    }
-
-    @ViewBuilder
-    private var actionRow: some View {
-        if let request = session.permissionRequest {
-            HStack(spacing: 8) {
-                Text(request.summary)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.orange.opacity(0.9))
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                Button(request.secondaryActionTitle) { onApprove(false) }
-                    .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
-                Button(request.primaryActionTitle) { onApprove(true) }
-                    .buttonStyle(IslandCompactButtonStyle(tint: .orange))
-            }
-        } else if let prompt = session.questionPrompt {
-            HStack(spacing: 8) {
-                Text(prompt.title)
-                    .font(.system(size: 10))
-                    .foregroundStyle(.yellow.opacity(0.9))
-                    .lineLimit(2)
-                Spacer(minLength: 8)
-                ForEach(prompt.options.prefix(3), id: \.self) { option in
-                    Button(option) { onAnswer(option) }
-                        .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
-                }
-            }
-        }
     }
 
     private func handlePrimaryTap() {
@@ -626,6 +596,136 @@ private struct IslandSessionRow: View {
     }
 }
 
+private struct IslandNotificationCard: View {
+    let session: AgentSession
+    let onApprove: (Bool) -> Void
+    let onAnswer: (String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 14) {
+                Circle()
+                    .fill(statusTint)
+                    .frame(width: 10, height: 10)
+                    .padding(.top, 6)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(alignment: .top, spacing: 12) {
+                        Text(session.spotlightHeadlineText)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        HStack(spacing: 6) {
+                            compactBadge(session.tool.displayName)
+                            if let terminalBadge = session.spotlightTerminalBadge {
+                                compactBadge(terminalBadge)
+                            }
+                            compactBadge(session.spotlightAgeBadge)
+                        }
+                    }
+
+                    if let promptLine = session.spotlightPromptLineText {
+                        Text(promptLine)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.66))
+                            .lineLimit(2)
+                    }
+
+                    Text(bodyText)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(statusTint.opacity(0.95))
+                        .lineLimit(2)
+
+                    if let detailText {
+                        Text(detailText)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.42))
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            actionRow
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(Color.black)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(statusTint.opacity(0.28))
+        )
+    }
+
+    @ViewBuilder
+    private var actionRow: some View {
+        if let request = session.permissionRequest {
+            HStack(spacing: 8) {
+                Button(request.secondaryActionTitle) { onApprove(false) }
+                    .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
+                Button(request.primaryActionTitle) { onApprove(true) }
+                    .buttonStyle(IslandCompactButtonStyle(tint: .orange))
+                Spacer(minLength: 0)
+            }
+        } else if let prompt = session.questionPrompt {
+            HStack(spacing: 8) {
+                ForEach(prompt.options.prefix(3), id: \.self) { option in
+                    Button(option) { onAnswer(option) }
+                        .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private var bodyText: String {
+        switch session.phase {
+        case .waitingForApproval:
+            return session.permissionRequest?.summary.trimmedForNotificationCard ?? "Approval needed"
+        case .waitingForAnswer:
+            return session.questionPrompt?.title.trimmedForNotificationCard ?? "Answer needed"
+        case .running, .completed:
+            return session.spotlightActivityLineText ?? session.summary
+        }
+    }
+
+    private var detailText: String? {
+        if let path = session.permissionRequest?.affectedPath.trimmedForNotificationCard,
+           !path.isEmpty {
+            return path
+        }
+
+        return session.spotlightActivityLineText == bodyText ? nil : session.spotlightActivityLineText
+    }
+
+    private var statusTint: Color {
+        switch session.phase {
+        case .waitingForApproval:
+            .orange
+        case .waitingForAnswer:
+            .yellow
+        case .running:
+            Color(red: 0.34, green: 0.61, blue: 0.99)
+        case .completed:
+            .white.opacity(0.74)
+        }
+    }
+
+    private func compactBadge(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.68))
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3.5)
+            .background(Color(red: 0.14, green: 0.14, blue: 0.15), in: Capsule())
+    }
+}
+
 private struct HiddenSessionsRow: View {
     let hiddenSessionCount: Int
 
@@ -652,6 +752,12 @@ private struct HiddenSessionsRow: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(.white.opacity(0.04))
         )
+    }
+}
+
+private extension String {
+    var trimmedForNotificationCard: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

@@ -1,0 +1,52 @@
+import Foundation
+import VibeIslandCore
+
+enum IslandSurface: Equatable {
+    case sessionList
+    case approvalCard(sessionID: String)
+    case questionCard(sessionID: String)
+
+    var sessionID: String? {
+        switch self {
+        case .sessionList:
+            nil
+        case let .approvalCard(sessionID), let .questionCard(sessionID):
+            sessionID
+        }
+    }
+
+    var isNotificationCard: Bool {
+        switch self {
+        case .sessionList:
+            false
+        case .approvalCard, .questionCard:
+            true
+        }
+    }
+
+    static func notificationSurface(for event: AgentEvent) -> IslandSurface? {
+        switch event {
+        case let .permissionRequested(payload):
+            .approvalCard(sessionID: payload.sessionID)
+        case let .questionAsked(payload):
+            .questionCard(sessionID: payload.sessionID)
+        default:
+            nil
+        }
+    }
+
+    func matchesCurrentState(of session: AgentSession?) -> Bool {
+        guard let session else {
+            return false
+        }
+
+        switch self {
+        case .sessionList:
+            return true
+        case .approvalCard:
+            return session.phase == .waitingForApproval && session.permissionRequest != nil
+        case .questionCard:
+            return session.phase == .waitingForAnswer && session.questionPrompt != nil
+        }
+    }
+}

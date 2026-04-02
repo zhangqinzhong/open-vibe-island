@@ -16,17 +16,13 @@ enum NotchOpenReason: Equatable {
     case boot
 }
 
-enum NotchContentType: Equatable {
-    case sessions
-    case menu
-}
-
 @MainActor
 @Observable
 final class AppModel {
     private static let overlayDisplayPreferenceDefaultsKey = "overlay.display.preference"
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
+    private static let notificationSurfaceAutoCollapseDelay: TimeInterval = 10
     static let hoverOpenDelay: TimeInterval = 1.0
 
     struct AcceptanceStep: Identifiable {
@@ -40,7 +36,7 @@ final class AppModel {
     var selectedSessionID: String?
     var notchStatus: NotchStatus = .closed
     var notchOpenReason: NotchOpenReason?
-    var notchContentType: NotchContentType = .sessions
+    var islandSurface: IslandSurface = .sessionList
     var isOverlayVisible: Bool { notchStatus != .closed }
     var isCodexSetupBusy = false
     var isClaudeUsageSetupBusy = false
@@ -116,6 +112,12 @@ final class AppModel {
 
     @ObservationIgnored
     private var claudeUsageMonitorTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var notificationAutoCollapseTask: Task<Void, Never>?
+
+    @ObservationIgnored
+    private var notificationSurfaceHasBeenHovered = false
 
     init() {
         overlayDisplaySelectionID = UserDefaults.standard.string(
@@ -252,6 +254,22 @@ final class AppModel {
 
     var focusedSession: AgentSession? {
         state.session(id: selectedSessionID) ?? surfacedSessions.first ?? state.activeActionableSession ?? state.sessions.first
+    }
+
+    var activeIslandCardSession: AgentSession? {
+        guard let sessionID = islandSurface.sessionID else {
+            return nil
+        }
+
+        return state.session(id: sessionID)
+    }
+
+    var showsNotificationCard: Bool {
+        islandSurface.isNotificationCard
+    }
+
+    var shouldAutoCollapseOnMouseLeave: Bool {
+        notchStatus == .opened && notchOpenReason == .notification && showsNotificationCard
     }
 
     var hasAnySession: Bool {
@@ -406,9 +424,12 @@ final class AppModel {
         }
     }
 
-    func notchOpen(reason: NotchOpenReason) {
+    func notchOpen(reason: NotchOpenReason, surface: IslandSurface = .sessionList) {
+        islandSurface = surface
         notchOpenReason = reason
         notchStatus = .opened
+        notificationSurfaceHasBeenHovered = false
+        updateNotificationAutoCollapse()
 
         overlayPlacementDiagnostics = overlayPanelController.show(
             model: self,
@@ -424,12 +445,17 @@ final class AppModel {
     func notchClose() {
         notchStatus = .closed
         notchOpenReason = nil
+        islandSurface = .sessionList
+        notificationSurfaceHasBeenHovered = false
+        notificationAutoCollapseTask?.cancel()
+        notificationAutoCollapseTask = nil
         overlayPanelController.setInteractive(false)
         refreshOverlayPlacement()
     }
 
     func notchPop() {
         guard notchStatus == .closed else { return }
+        islandSurface = .sessionList
         notchStatus = .popping
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard self?.notchStatus == .popping else { return }
@@ -440,7 +466,7 @@ final class AppModel {
     func performBootAnimation() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self else { return }
-            self.notchOpen(reason: .boot)
+            self.notchOpen(reason: .boot, surface: .sessionList)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 guard self?.notchOpenReason == .boot else { return }
                 self?.notchClose()
@@ -453,7 +479,7 @@ final class AppModel {
     }
 
     // Legacy compatibility
-    func showOverlay() { notchOpen(reason: .click) }
+    func showOverlay() { notchOpen(reason: .click, surface: .sessionList) }
     func hideOverlay() { notchClose() }
 
     func refreshOverlayDisplayConfiguration() {
@@ -495,6 +521,23 @@ final class AppModel {
 
     func toggleSoundMuted() {
         isSoundMuted.toggle()
+    }
+
+    func notePointerInsideIslandSurface() {
+        guard shouldAutoCollapseOnMouseLeave else {
+            return
+        }
+
+        notificationSurfaceHasBeenHovered = true
+    }
+
+    func handlePointerExitedIslandSurface() {
+        guard shouldAutoCollapseOnMouseLeave,
+              notificationSurfaceHasBeenHovered else {
+            return
+        }
+
+        notchClose()
     }
 
     func approveFocusedPermission(_ approved: Bool) {
@@ -556,6 +599,8 @@ final class AppModel {
             return
         }
 
+        dismissNotificationSurfaceIfPresent(for: sessionID)
+
         send(
             .resolvePermission(sessionID: session.id, approved: approved),
             userMessage: approved
@@ -568,6 +613,8 @@ final class AppModel {
         guard let session = state.session(id: sessionID) else {
             return
         }
+
+        dismissNotificationSurfaceIfPresent(for: sessionID)
 
         send(
             .answerQuestion(sessionID: session.id, answer: answer),
@@ -716,6 +763,7 @@ final class AppModel {
         updateLastActionMessage: Bool = true
     ) {
         state.apply(event)
+        reconcileIslandSurfaceAfterStateChange()
         markSessionAttached(for: event)
         synchronizeSelection()
         refreshCodexRolloutTracking()
@@ -726,13 +774,68 @@ final class AppModel {
             lastActionMessage = describe(event)
         }
 
-        if notchStatus == .closed {
-            switch event {
-            case .permissionRequested, .questionAsked:
-                notchPop()
-            default:
-                break
+        if let surface = IslandSurface.notificationSurface(for: event),
+           notchStatus == .closed || notchOpenReason == .notification {
+            presentNotificationSurface(surface)
+        }
+    }
+
+    private func presentNotificationSurface(_ surface: IslandSurface) {
+        guard surface.isNotificationCard else {
+            return
+        }
+
+        notchOpen(reason: .notification, surface: surface)
+    }
+
+    private func reconcileIslandSurfaceAfterStateChange() {
+        guard islandSurface.isNotificationCard else {
+            return
+        }
+
+        let session = activeIslandCardSession
+        guard islandSurface.matchesCurrentState(of: session) else {
+            if notchOpenReason == .notification {
+                notchClose()
+            } else {
+                islandSurface = .sessionList
             }
+            return
+        }
+
+        updateNotificationAutoCollapse()
+    }
+
+    private func dismissNotificationSurfaceIfPresent(for sessionID: String) {
+        guard islandSurface.sessionID == sessionID,
+              notchOpenReason == .notification else {
+            return
+        }
+
+        notchClose()
+    }
+
+    private func updateNotificationAutoCollapse() {
+        notificationAutoCollapseTask?.cancel()
+        notificationAutoCollapseTask = nil
+
+        guard notchStatus == .opened,
+              notchOpenReason == .notification,
+              islandSurface.isNotificationCard else {
+            return
+        }
+
+        notificationAutoCollapseTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(Self.notificationSurfaceAutoCollapseDelay))
+
+            guard let self,
+                  self.notchStatus == .opened,
+                  self.notchOpenReason == .notification,
+                  self.islandSurface.isNotificationCard else {
+                return
+            }
+
+            self.notchClose()
         }
     }
 
