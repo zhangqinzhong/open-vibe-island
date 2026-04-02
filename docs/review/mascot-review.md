@@ -4,13 +4,19 @@ Open [mascot-concepts.svg](/Users/wangruobing/Personal/vibe-island/docs/review/m
 
 This sheet is intentionally separate from the app UI. It is only for choosing the mascot style before wiring anything back into the product.
 
+All concepts now follow a strict pixel-grid rule:
+
+- mascot body: `8x8` canvas
+- working spark: separate `4x4` canvas
+- every pixel: same square size
+
 ## What Changed In This Round
 
 - The previously integrated mascot UI change has been backed out in the working tree.
-- Three softer pixel directions were added for review only.
+- Three softer pixel directions were rebuilt for review only.
 - Each direction includes two states:
-  - `idle`: green
-  - `working`: blue with a small activity spark
+  - `idle`: green 8x8 mascot
+  - `working`: blue 8x8 mascot plus 4x4 activity spark
 
 ## Reading Guide
 
