@@ -67,7 +67,7 @@ Notchi does not rely only on incoming hook payloads. It also watches transcript-
 Vibe Island should do a control-oriented version of that:
 
 - use `transcriptPath` from Codex hook payloads when available
-- tail or parse recent transcript content after `userPromptSubmit`, `postToolUse`, and `stop`
+- tail or parse recent transcript content after `userPromptSubmit` and `stop`
 - extract better summaries for the island and the control panel
 - retain the current shared event model instead of leaking transcript-specific details into the UI layer
 

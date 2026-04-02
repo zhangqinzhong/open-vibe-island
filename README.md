@@ -7,7 +7,7 @@
 
 The open-source macOS companion for terminal-native AI coding.
 
-`open-vibe-island` puts a lightweight control surface in your notch or top bar so you can keep an eye on live coding agents, handle approvals, answer questions, and jump back to the right terminal without breaking flow.
+`open-vibe-island` puts a lightweight control surface in your notch or top bar so you can keep an eye on live coding agents, follow session progress, and jump back to the right terminal without breaking flow.
 
 ## Why This Product Exists
 
@@ -27,7 +27,7 @@ This is for developers who already live in the terminal and want a better way to
 ## What You Get
 
 - a small native island for live agent activity
-- fast visibility into approvals and questions
+- fast visibility into active Codex sessions
 - quicker return to the active terminal context
 - a companion experience that stays out of the way until it matters
 
@@ -40,7 +40,7 @@ Current scope:
 - macOS only
 - Codex first
 - live session visibility
-- approval flow
+- low-noise Codex hook install
 - jump-back behavior
 
 ## Available Today
@@ -51,6 +51,8 @@ Today the project can already:
 - surface session and approval state in the app
 - install and uninstall managed Codex hooks from `~/.codex`
 - use terminal hints for best-effort jump back behavior
+
+The managed Codex install now follows the original Vibe Island footprint and only installs `SessionStart`, `UserPromptSubmit`, and `Stop` hooks by default. The bridge still supports richer interactive hooks, but they are not enabled by default because `PreToolUse` and `PostToolUse` create a lot of terminal noise during normal Codex use.
 
 ## Quick Start
 
@@ -74,6 +76,8 @@ swift build -c release --product VibeIslandHooks
 swift run VibeIslandSetup install --hooks-binary "$(pwd)/.build/release/VibeIslandHooks"
 ```
 
+That setup enables `codex_hooks = true` and installs a low-noise hook set matching the original app's Codex integration: `SessionStart`, `UserPromptSubmit`, and `Stop`.
+
 Check or remove the setup later:
 
 ```bash
@@ -89,7 +93,7 @@ That means:
 
 - less context switching
 - less tab hunting
-- less friction around approvals
+- less friction around session awareness
 - a faster path back to the active agent session
 
 ## Roadmap

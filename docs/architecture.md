@@ -38,9 +38,17 @@ The current bridge server still lives inside the app process for convenience, bu
 1. Codex runs in the user’s existing terminal session.
 2. Codex invokes a repo-built `VibeIslandHooks` helper from `hooks.json`.
 3. The helper forwards hook payloads to the app bridge over a Unix socket.
-4. The app consumes normalized `AgentEvent` values from that socket and sends approval commands back over the same bridge.
+4. The app consumes normalized `AgentEvent` values from that socket. The same bridge can also carry approval commands back to hook processes when an adapter opts into interactive hooks.
 5. A separate setup CLI owns `config.toml` and `hooks.json` edits so installation and rollback stay explicit and reversible.
 6. The app persists recent Codex sessions into a local session cache, scans recent `~/.codex/sessions` rollouts on launch for cold-start recovery, and follows `transcriptPath` rollout files to enrich state after the initial hook ingress.
+
+The default managed Codex hook install intentionally stays small to match the original app and keep terminal noise down:
+
+- `SessionStart`
+- `UserPromptSubmit`
+- `Stop`
+
+`PreToolUse` and `PostToolUse` are still supported by the bridge protocol, but they are not installed by default because they fire on every Bash tool call and create a large amount of hook log output.
 
 The supported surface area is intentionally narrower than the current source tree might suggest:
 
@@ -52,7 +60,7 @@ If other terminal or agent-specific code paths exist, treat them as experiments 
 
 The hook helper also enriches Codex payloads with local runtime hints from the terminal environment. That allows the app to record a probable terminal app, working directory, and terminal-specific locators such as iTerm session IDs or Terminal TTYs even though Codex hooks do not directly expose a native macOS window handle.
 
-For `PreToolUse`, the hook helper waits for the bridge response. If the island denies the request, the helper writes the blocking JSON shape that Codex already understands. If the app is unavailable, the helper fails open so the terminal flow remains unchanged.
+When `PreToolUse` is enabled for an interactive adapter, the hook helper waits for the bridge response. If the island denies the request, the helper writes the blocking JSON shape that Codex already understands. If the app is unavailable, the helper fails open so the terminal flow remains unchanged.
 
 The current Codex slice is now three-stage:
 

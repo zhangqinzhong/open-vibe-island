@@ -397,8 +397,10 @@ struct SessionStateTests {
         #expect(stopCommands.contains("'/tmp/VibeIslandHooks'"))
         #expect(managedStopHook?["statusMessage"] == nil)
 
-        let preToolGroups = hooks?["PreToolUse"] as? [[String: Any]]
-        #expect(preToolGroups?.contains(where: { $0["matcher"] as? String == "Bash" }) == true)
+        let sessionStartGroups = hooks?["SessionStart"] as? [[String: Any]]
+        #expect(sessionStartGroups?.contains(where: { $0["matcher"] as? String == "startup|resume" }) == true)
+        #expect(hooks?["PreToolUse"] == nil)
+        #expect(hooks?["PostToolUse"] == nil)
     }
 
     @Test
