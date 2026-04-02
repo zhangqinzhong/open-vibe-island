@@ -219,20 +219,11 @@ struct IslandPanelView: View {
                 headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
                     model.showControlCenter()
                 }
-
-                Button {
-                    model.notchClose()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .frame(width: 20, height: 20)
-                        .background(.white.opacity(0.08), in: Circle())
-                }
-                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 4)
+        .padding(.leading, 18)
+        .padding(.trailing, 18)
+        .padding(.top, 2)
     }
 
     private func headerIconButton(
