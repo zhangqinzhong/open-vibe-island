@@ -13,61 +13,73 @@ struct IslandPanelView: View {
     var model: AppModel
 
     @Namespace private var notchNamespace
+    @State private var isBouncing = false
+    @State private var isHovering = false
 
     private var isOpened: Bool {
         model.notchStatus == .opened
     }
 
-    private var isPopping: Bool {
-        model.notchStatus == .popping
+    private var closedSpotlightSession: AgentSession? {
+        model.surfacedSessions.first(where: { $0.phase.requiresAttention })
+            ?? model.surfacedSessions.first(where: { $0.phase == .running })
+    }
+
+    /// Whether any session has activity worth showing in the closed notch
+    private var hasClosedActivity: Bool {
+        closedSpotlightSession != nil
+    }
+
+    /// Extra width to add on each side of the notch for activity indicators
+    private var expansionWidth: CGFloat {
+        guard hasClosedActivity else { return 0 }
+        let sideWidth = max(0, closedNotchHeight - 12) + 10
+        let hasPending = closedSpotlightSession?.phase.requiresAttention == true
+        return 2 * sideWidth + 20 + (hasPending ? 18 : 0)
+    }
+
+    private var sideWidth: CGFloat {
+        max(0, closedNotchHeight - 12) + 10
     }
 
     var body: some View {
         GeometryReader { geometry in
             let screenWidth = geometry.size.width
-            let screenHeight = geometry.size.height
 
             ZStack(alignment: .top) {
                 Color.clear
 
                 notchContent(screenWidth: screenWidth)
                     .frame(maxWidth: .infinity, alignment: .top)
-                    .padding(.top, 0)
             }
-            .frame(width: screenWidth, height: screenHeight)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .onChange(of: model.notchStatus) { oldValue, newValue in
-            // Status changes are animated by the withAnimation calls in the model
-        }
+        .preferredColorScheme(.dark)
     }
 
     @ViewBuilder
     private func notchContent(screenWidth: CGFloat) -> some View {
-        let notchWidth = closedNotchWidth
         let openedWidth = min(screenWidth * 0.4, 480)
-        let openedHeight: CGFloat = 400
-
-        let currentWidth = isOpened ? openedWidth : (isPopping ? notchWidth + 32 : notchWidth)
-        let currentHeight = isOpened ? openedHeight : closedNotchHeight
 
         VStack(spacing: 0) {
-            if isOpened {
-                openedHeaderRow(width: openedWidth)
-                    .padding(.top, 8)
-                    .padding(.horizontal, 16)
+            headerRow
+                .frame(height: closedNotchHeight)
 
+            if isOpened {
                 openedContent
+                    .frame(width: openedWidth - 24)
                     .transition(
                         .asymmetric(
-                            insertion: .scale(scale: 0.8, anchor: .top).combined(with: .opacity),
-                            removal: .opacity
+                            insertion: .scale(scale: 0.8, anchor: .top)
+                                .combined(with: .opacity)
+                                .animation(.smooth(duration: 0.35)),
+                            removal: .opacity.animation(.easeOut(duration: 0.15))
                         )
                     )
-            } else {
-                closedContent
             }
         }
-        .frame(width: currentWidth, height: currentHeight)
+        .padding(.horizontal, isOpened ? 12 : 0)
+        .padding(.bottom, isOpened ? 12 : 0)
         .background(Color.black)
         .clipShape(
             NotchShape(
@@ -75,52 +87,128 @@ struct IslandPanelView: View {
                 bottomCornerRadius: isOpened ? NotchShape.openedBottomRadius : NotchShape.closedBottomRadius
             )
         )
-        .shadow(color: .black.opacity(isOpened ? 0.7 : 0), radius: isOpened ? 6 : 0)
+        .overlay(alignment: .top) {
+            // Black strip to blend with physical notch at the very top
+            Rectangle()
+                .fill(Color.black)
+                .frame(height: 1)
+                .padding(.horizontal, isOpened ? NotchShape.openedTopRadius : NotchShape.closedTopRadius)
+        }
+        .shadow(
+            color: (isOpened || isHovering) ? .black.opacity(0.7) : .clear,
+            radius: 6
+        )
         .animation(isOpened ? openAnimation : closeAnimation, value: model.notchStatus)
+        .animation(.smooth, value: hasClosedActivity)
+        .animation(.smooth, value: expansionWidth)
+        .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isBouncing)
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
+                isHovering = hovering
+            }
+        }
+        .onTapGesture {
+            if !isOpened {
+                model.notchOpen(reason: .click)
+            }
+        }
     }
 
     // MARK: - Closed state
 
-    private var closedNotchWidth: CGFloat { 224 }
-    private var closedNotchHeight: CGFloat { 38 }
+    private var closedNotchWidth: CGFloat {
+        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.notchSize.width ?? 224
+    }
 
-    private var closedContent: some View {
-        HStack(spacing: 8) {
-            if let session = model.focusedSession {
-                closedSessionIndicator(session: session)
+    private var closedNotchHeight: CGFloat {
+        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.notchSize.height ?? 38
+    }
+
+    // MARK: - Header row (shared between closed and opened)
+
+    @ViewBuilder
+    private var headerRow: some View {
+        HStack(spacing: 0) {
+            // Left side: icon + optional attention indicator
+            if hasClosedActivity || isOpened {
+                HStack(spacing: 4) {
+                    VibeIslandIcon(size: 14, isAnimating: closedSpotlightSession?.phase == .running)
+                        .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: hasClosedActivity || isOpened)
+
+                    if closedSpotlightSession?.phase.requiresAttention == true {
+                        AttentionIndicator(
+                            size: 14,
+                            color: phaseColor(closedSpotlightSession?.phase ?? .running)
+                        )
+                    }
+                }
+                .frame(width: isOpened ? nil : sideWidth + (closedSpotlightSession?.phase.requiresAttention == true ? 18 : 0))
+                .padding(.leading, isOpened ? 8 : 0)
+            }
+
+            // Center
+            if isOpened {
+                openedHeaderContent
+            } else if !hasClosedActivity {
+                // Idle: invisible center filling the notch width
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(width: closedNotchWidth - 20)
+            } else {
+                // Active: black spacer covering the notch
+                Rectangle()
+                    .fill(Color.black)
+                    .frame(width: closedNotchWidth - NotchShape.closedTopRadius + (isBouncing ? 16 : 0))
+            }
+
+            // Right side: spinner or status indicator
+            if hasClosedActivity || isOpened {
+                if closedSpotlightSession?.phase == .running {
+                    ClosedSpinner()
+                        .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: hasClosedActivity || isOpened)
+                        .frame(width: isOpened ? 20 : sideWidth)
+                } else if closedSpotlightSession?.phase.requiresAttention == true {
+                    ClosedSpinner()
+                        .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: hasClosedActivity || isOpened)
+                        .frame(width: isOpened ? 20 : sideWidth)
+                }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 12)
+        .frame(height: closedNotchHeight)
     }
 
     @ViewBuilder
-    private func closedSessionIndicator(session: AgentSession) -> some View {
-        HStack(spacing: 6) {
-            // Left: status dot
-            Circle()
-                .fill(phaseColor(session.phase))
-                .frame(width: 6, height: 6)
-
-            Spacer()
-
-            // Center: phase text
-            if session.phase.requiresAttention {
-                Text(session.phase == .waitingForApproval ? "Approval" : "Question")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.9))
+    private var openedHeaderContent: some View {
+        HStack(spacing: 12) {
+            if !hasClosedActivity {
+                VibeIslandIcon(size: 14, isAnimating: false)
+                    .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: !hasClosedActivity)
+                    .padding(.leading, 8)
             }
 
             Spacer()
 
-            // Right: activity indicator
-            if session.phase == .running {
-                SpinnerView()
-            } else if session.phase.requiresAttention {
-                Image(systemName: "exclamationmark.circle.fill")
-                    .font(.system(size: 10))
-                    .foregroundStyle(phaseColor(session.phase))
+            Text("\(model.liveSessionCount) live")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.white.opacity(0.5))
+
+            if model.liveAttentionCount > 0 {
+                Text("\(model.liveAttentionCount) attention")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.orange.opacity(0.9))
+                }
+
+            Button {
+                model.notchClose()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.4))
+                    .frame(width: 20, height: 20)
+                    .background(.white.opacity(0.08), in: Circle())
             }
+            .buttonStyle(.plain)
         }
     }
 
@@ -141,12 +229,12 @@ struct IslandPanelView: View {
             Spacer()
 
             HStack(spacing: 12) {
-                Text("\(model.state.runningCount) live")
+                Text("\(model.liveSessionCount) live")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
 
-                if model.state.attentionCount > 0 {
-                    Text("\(model.state.attentionCount) attention")
+                if model.liveAttentionCount > 0 {
+                    Text("\(model.liveAttentionCount) attention")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(.orange.opacity(0.9))
                 }
@@ -358,20 +446,50 @@ private struct IslandCompactButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - Spinner
+// MARK: - Vibe Island icon (left side of closed notch)
 
-private struct SpinnerView: View {
-    @State private var rotation: Double = 0
+private struct VibeIslandIcon: View {
+    let size: CGFloat
+    var isAnimating: Bool = false
 
     var body: some View {
-        Image(systemName: "arrow.trianglehead.2.counterclockwise")
-            .font(.system(size: 9, weight: .bold))
-            .foregroundStyle(.mint.opacity(0.7))
-            .rotationEffect(.degrees(rotation))
-            .onAppear {
-                withAnimation(.linear(duration: 2).repeatForever(autoreverses: false)) {
-                    rotation = 360
-                }
+        Circle()
+            .fill(Color.mint)
+            .frame(width: size, height: size)
+            .opacity(isAnimating ? 1.0 : 0.7)
+    }
+}
+
+// MARK: - Attention indicator (permission/question dot)
+
+private struct AttentionIndicator: View {
+    let size: CGFloat
+    let color: Color
+
+    var body: some View {
+        Image(systemName: "exclamationmark.triangle.fill")
+            .font(.system(size: size * 0.75, weight: .bold))
+            .foregroundStyle(color)
+    }
+}
+
+// MARK: - Closed spinner (right side of closed notch)
+
+private struct ClosedSpinner: View {
+    @State private var phase: Int = 0
+
+    private let symbols = ["·", "✢", "✳", "∗", "✻", "✽"]
+    private let color = Color.mint
+
+    private let timer = Timer.publish(every: 0.15, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        Text(symbols[phase % symbols.count])
+            .font(.system(size: 12, weight: .bold))
+            .foregroundColor(color)
+            .frame(width: 12, alignment: .center)
+            .onReceive(timer) { _ in
+                phase = (phase + 1) % symbols.count
             }
     }
 }
@@ -385,7 +503,7 @@ struct MenuBarContentView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Vibe Island OSS")
                 .font(.headline)
-            Text("\(model.state.runningCount) running · \(model.state.attentionCount) attention")
+            Text("\(model.liveSessionCount) live · \(model.liveAttentionCount) attention")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 

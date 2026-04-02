@@ -128,6 +128,18 @@ final class AppModel {
         recentSessions.count
     }
 
+    var liveSessionCount: Int {
+        state.liveSessionCount
+    }
+
+    var liveAttentionCount: Int {
+        state.liveAttentionCount
+    }
+
+    var liveRunningCount: Int {
+        state.liveRunningCount
+    }
+
     var codexHooksInstalled: Bool {
         codexHookStatus?.managedHooksPresent == true
     }

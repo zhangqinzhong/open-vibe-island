@@ -165,6 +165,46 @@ struct SessionStateTests {
     }
 
     @Test
+    func liveCountsOnlyIncludeAttachedSessions() {
+        let state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "live-running",
+                    title: "Live running",
+                    tool: .codex,
+                    attachmentState: .attached,
+                    phase: .running,
+                    summary: "Working",
+                    updatedAt: .now
+                ),
+                AgentSession(
+                    id: "live-attention",
+                    title: "Live attention",
+                    tool: .codex,
+                    attachmentState: .attached,
+                    phase: .waitingForApproval,
+                    summary: "Needs approval",
+                    updatedAt: .now
+                ),
+                AgentSession(
+                    id: "detached-running",
+                    title: "Detached running",
+                    tool: .codex,
+                    attachmentState: .detached,
+                    phase: .running,
+                    summary: "Old run",
+                    updatedAt: .now
+                ),
+            ]
+        )
+
+        #expect(state.liveSessionCount == 2)
+        #expect(state.liveRunningCount == 1)
+        #expect(state.liveAttentionCount == 1)
+        #expect(state.runningCount == 2)
+    }
+
+    @Test
     func bridgeEnvelopeRoundTripsThroughLineCodec() throws {
         let envelope = BridgeEnvelope.event(
             .permissionRequested(

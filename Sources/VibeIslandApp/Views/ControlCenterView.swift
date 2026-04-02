@@ -28,9 +28,9 @@ struct ControlCenterView: View {
                 }
 
                 HStack(spacing: 12) {
-                    summaryCard(title: "Running", value: model.state.runningCount, tint: .mint)
-                    summaryCard(title: "Attention", value: model.state.attentionCount, tint: .orange)
-                    summaryCard(title: "Completed", value: model.state.completedCount, tint: .blue)
+                    summaryCard(title: "Live", value: model.liveSessionCount, tint: .mint)
+                    summaryCard(title: "Running", value: model.liveRunningCount, tint: .teal)
+                    summaryCard(title: "Attention", value: model.liveAttentionCount, tint: .orange)
                 }
 
                 HStack(spacing: 12) {

@@ -29,6 +29,18 @@ public struct SessionState: Equatable, Sendable {
         sessionsByID.values.filter { $0.phase.requiresAttention }.count
     }
 
+    public var liveSessionCount: Int {
+        sessionsByID.values.filter(\.isAttachedToTerminal).count
+    }
+
+    public var liveAttentionCount: Int {
+        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase.requiresAttention }.count
+    }
+
+    public var liveRunningCount: Int {
+        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase == .running }.count
+    }
+
     public var completedCount: Int {
         sessionsByID.values.filter { $0.phase == .completed }.count
     }
