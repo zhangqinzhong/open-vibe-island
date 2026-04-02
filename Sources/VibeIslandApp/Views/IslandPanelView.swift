@@ -159,57 +159,55 @@ struct IslandPanelView: View {
 
     @ViewBuilder
     private var headerRow: some View {
-        HStack(spacing: 0) {
-            if hasClosedPresence || isOpened {
-                HStack(spacing: 4) {
-                    VibeIslandIcon(size: 14, isAnimating: hasClosedActivity)
-                        .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: hasClosedPresence || isOpened)
+        if isOpened {
+            openedHeaderContent
+                .frame(height: closedNotchHeight)
+        } else {
+            HStack(spacing: 0) {
+                if hasClosedPresence {
+                    HStack(spacing: 4) {
+                        VibeIslandIcon(size: 14, isAnimating: hasClosedActivity)
+                            .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
 
-                    if closedSpotlightSession?.phase.requiresAttention == true {
-                        AttentionIndicator(
-                            size: 14,
-                            color: phaseColor(closedSpotlightSession?.phase ?? .running)
-                        )
+                        if closedSpotlightSession?.phase.requiresAttention == true {
+                            AttentionIndicator(
+                                size: 14,
+                                color: phaseColor(closedSpotlightSession?.phase ?? .running)
+                            )
+                        }
                     }
+                    .frame(width: sideWidth + 8 + (closedSpotlightSession?.phase.requiresAttention == true ? 18 : 0))
                 }
-                .frame(width: isOpened ? nil : sideWidth + 8 + (closedSpotlightSession?.phase.requiresAttention == true ? 18 : 0))
-                .padding(.leading, isOpened ? 8 : 0)
-            }
 
-            if isOpened {
-                openedHeaderContent
-            } else if !hasClosedPresence {
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(width: closedNotchWidth - 20)
-            } else {
-                Rectangle()
-                    .fill(Color.black)
-                    .frame(width: closedNotchWidth - NotchShape.closedTopRadius + (isPopping ? 18 : 0))
-            }
+                if !hasClosedPresence {
+                    Rectangle()
+                        .fill(Color.clear)
+                        .frame(width: closedNotchWidth - 20)
+                } else {
+                    Rectangle()
+                        .fill(Color.black)
+                        .frame(width: closedNotchWidth - NotchShape.closedTopRadius + (isPopping ? 18 : 0))
+                }
 
-            if isOpened {
-                EmptyView()
-            } else if hasClosedPresence {
-                ClosedCountBadge(
-                    liveCount: model.liveSessionCount,
-                    tint: closedSpotlightSession?.phase.requiresAttention == true ? .orange : (hasClosedActivity ? .mint : .white.opacity(0.7))
-                )
-                .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: hasClosedPresence)
-                .frame(width: max(sideWidth, countBadgeWidth))
+                if hasClosedPresence {
+                    ClosedCountBadge(
+                        liveCount: model.liveSessionCount,
+                        tint: closedSpotlightSession?.phase.requiresAttention == true ? .orange : (hasClosedActivity ? .mint : .white.opacity(0.7))
+                    )
+                    .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: true)
+                    .frame(width: max(sideWidth, countBadgeWidth))
+                }
             }
+            .frame(height: closedNotchHeight)
         }
-        .frame(height: closedNotchHeight)
     }
 
     @ViewBuilder
     private var openedHeaderContent: some View {
         HStack(spacing: 12) {
-            if !hasClosedPresence {
-                VibeIslandIcon(size: 14, isAnimating: false)
-                    .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: !hasClosedPresence)
-                    .padding(.leading, 8)
-            }
+            VibeIslandIcon(size: 14, isAnimating: hasClosedActivity)
+                .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
+                .padding(.leading, 8)
 
             openedUsageSummary
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,6 +223,17 @@ struct IslandPanelView: View {
                     headerPill("\(model.liveAttentionCount) attention", tint: .orange.opacity(0.95))
                 }
 
+                headerIconButton(
+                    systemName: model.isSoundMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                    tint: model.isSoundMuted ? .orange.opacity(0.92) : .white.opacity(0.62)
+                ) {
+                    model.toggleSoundMuted()
+                }
+
+                headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
+                    model.showControlCenter()
+                }
+
                 Button {
                     model.notchClose()
                 } label: {
@@ -238,6 +247,21 @@ struct IslandPanelView: View {
             }
         }
         .padding(.horizontal, 4)
+    }
+
+    private func headerIconButton(
+        systemName: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 22, height: 22)
+                .background(.white.opacity(0.08), in: Circle())
+        }
+        .buttonStyle(.plain)
     }
 
     private var openedContent: some View {

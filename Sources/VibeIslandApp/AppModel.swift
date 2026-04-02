@@ -25,6 +25,7 @@ enum NotchContentType: Equatable {
 @Observable
 final class AppModel {
     private static let overlayDisplayPreferenceDefaultsKey = "overlay.display.preference"
+    private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     static let hoverOpenDelay: TimeInterval = 1.0
 
@@ -51,6 +52,18 @@ final class AppModel {
     var hooksBinaryURL: URL?
     var overlayDisplayOptions: [OverlayDisplayOption] = []
     var overlayPlacementDiagnostics: OverlayPlacementDiagnostics?
+    var isSoundMuted = false {
+        didSet {
+            guard isSoundMuted != oldValue else {
+                return
+            }
+
+            UserDefaults.standard.set(isSoundMuted, forKey: Self.soundMutedDefaultsKey)
+            lastActionMessage = isSoundMuted
+                ? "Island sound notifications muted."
+                : "Island sound notifications enabled."
+        }
+    }
     var overlayDisplaySelectionID = OverlayDisplayOption.automaticID {
         didSet {
             guard overlayDisplaySelectionID != oldValue else {
@@ -108,6 +121,7 @@ final class AppModel {
         overlayDisplaySelectionID = UserDefaults.standard.string(
             forKey: Self.overlayDisplayPreferenceDefaultsKey
         ) ?? OverlayDisplayOption.automaticID
+        isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
 
         codexRolloutWatcher.eventHandler = { [weak self] event in
             Task { @MainActor [weak self] in
@@ -469,6 +483,10 @@ final class AppModel {
         window.orderFrontRegardless()
         window.makeKey()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func toggleSoundMuted() {
+        isSoundMuted.toggle()
     }
 
     func approveFocusedPermission(_ approved: Bool) {
