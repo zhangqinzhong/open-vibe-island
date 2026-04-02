@@ -228,6 +228,45 @@ struct SessionStateTests {
     }
 
     @Test
+    func bridgeQuestionCommandEmitsQuestionEventForExistingSession() async throws {
+        let socketURL = BridgeSocketLocation.uniqueTestURL()
+        let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
+        try server.start()
+        defer { server.stop() }
+
+        let observer = LocalBridgeClient(socketURL: socketURL)
+        let stream = try observer.connect()
+        defer { observer.disconnect() }
+        try await observer.send(.registerClient(role: .observer))
+
+        let startPayload = CodexHookPayload(
+            cwd: "/tmp/worktree",
+            hookEventName: .sessionStart,
+            model: "gpt-5-codex",
+            permissionMode: .default,
+            sessionID: "codex-session-question",
+            transcriptPath: nil
+        )
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(startPayload))
+
+        let prompt = QuestionPrompt(
+            title: "Which environment?",
+            options: ["Production", "Staging", "Local"]
+        )
+        _ = try BridgeCommandClient(socketURL: socketURL).send(
+            .requestQuestion(sessionID: "codex-session-question", prompt: prompt)
+        )
+
+        var iterator = stream.makeAsyncIterator()
+        let startedEvent = try await nextEvent(from: &iterator)
+        let questionEvent = try await nextEvent(from: &iterator)
+
+        #expect(startedEvent.isSessionStarted)
+        #expect(questionEvent.questionPrompt?.title == "Which environment?")
+        #expect(questionEvent.questionPrompt?.options == ["Production", "Staging", "Local"])
+    }
+
+    @Test
     func codexPreToolUseWaitsForApprovalAndReturnsDenyDirective() async throws {
         let socketURL = BridgeSocketLocation.uniqueTestURL()
         let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
@@ -651,6 +690,14 @@ private extension AgentEvent {
             true
         } else {
             false
+        }
+    }
+
+    var questionPrompt: QuestionPrompt? {
+        if case let .questionAsked(payload) = self {
+            payload.prompt
+        } else {
+            nil
         }
     }
 

@@ -248,6 +248,23 @@ public final class DemoBridgeServer: @unchecked Sendable {
             clients[clientID] = client
             send(.response(.acknowledged), to: clientID)
 
+        case let .requestQuestion(sessionID, prompt):
+            guard state.session(id: sessionID) != nil else {
+                send(.response(.acknowledged), to: clientID)
+                return
+            }
+
+            emit(
+                .questionAsked(
+                    QuestionAsked(
+                        sessionID: sessionID,
+                        prompt: prompt,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+
         case let .resolvePermission(sessionID, approved):
             let hasPendingHook = pendingApprovals[sessionID] != nil
             let event: AgentEvent

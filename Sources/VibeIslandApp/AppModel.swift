@@ -726,8 +726,13 @@ final class AppModel {
             lastActionMessage = describe(event)
         }
 
-        if case .permissionRequested = event, notchStatus == .closed {
-            notchPop()
+        if notchStatus == .closed {
+            switch event {
+            case .permissionRequested, .questionAsked:
+                notchPop()
+            default:
+                break
+            }
         }
     }
 

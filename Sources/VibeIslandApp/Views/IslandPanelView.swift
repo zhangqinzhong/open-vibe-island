@@ -468,6 +468,7 @@ private struct IslandSessionRow: View {
     private func rowBody(referenceDate: Date) -> some View {
         let presence = session.islandPresence(at: referenceDate)
         let showsExpandedContent = presence != .inactive
+        let showsActionRow = session.phase.requiresAttention || isHighlighted
 
         return VStack(alignment: .leading, spacing: 10) {
             Button(action: handlePrimaryTap) {
@@ -512,7 +513,7 @@ private struct IslandSessionRow: View {
             }
             .buttonStyle(.plain)
 
-            if isHighlighted {
+            if showsActionRow {
                 actionRow
             }
         }
@@ -565,7 +566,7 @@ private struct IslandSessionRow: View {
                     .foregroundStyle(.yellow.opacity(0.9))
                     .lineLimit(2)
                 Spacer(minLength: 8)
-                ForEach(prompt.options.prefix(2), id: \.self) { option in
+                ForEach(prompt.options.prefix(3), id: \.self) { option in
                     Button(option) { onAnswer(option) }
                         .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
                 }
@@ -574,6 +575,9 @@ private struct IslandSessionRow: View {
     }
 
     private func handlePrimaryTap() {
+        guard !session.phase.requiresAttention else {
+            return
+        }
         onJump()
     }
 
