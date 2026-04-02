@@ -85,11 +85,11 @@ enum IslandDebugScenario: String, CaseIterable, Identifiable {
             return IslandDebugSnapshot(
                 title: title,
                 summary: summary,
-                previewHeight: 250,
+                previewHeight: 330,
                 notchStatus: .opened,
                 notchOpenReason: .notification,
                 islandSurface: .approvalCard(sessionID: session.id),
-                sessions: [session],
+                sessions: DebugSessionFactory.notificationSessions(lead: session, now: now),
                 selectedSessionID: session.id
             )
 
@@ -98,11 +98,11 @@ enum IslandDebugScenario: String, CaseIterable, Identifiable {
             return IslandDebugSnapshot(
                 title: title,
                 summary: summary,
-                previewHeight: 250,
+                previewHeight: 270,
                 notchStatus: .opened,
                 notchOpenReason: .notification,
                 islandSurface: .questionCard(sessionID: session.id),
-                sessions: [session],
+                sessions: DebugSessionFactory.notificationSessions(lead: session, now: now),
                 selectedSessionID: session.id
             )
 
@@ -111,11 +111,11 @@ enum IslandDebugScenario: String, CaseIterable, Identifiable {
             return IslandDebugSnapshot(
                 title: title,
                 summary: summary,
-                previewHeight: 240,
+                previewHeight: 250,
                 notchStatus: .opened,
                 notchOpenReason: .notification,
                 islandSurface: .completionCard(sessionID: session.id),
-                sessions: [session],
+                sessions: DebugSessionFactory.notificationSessions(lead: session, now: now),
                 selectedSessionID: session.id
             )
         }
@@ -154,7 +154,52 @@ private enum DebugSessionFactory {
                 age: 60 * 60,
                 now: now
             ),
+            inactiveSession(
+                id: "session-voice-input",
+                workspace: "voice-input",
+                initialPrompt: "看看 voice-input 这个仓库，重点关注模型选型。",
+                latestPrompt: "严格来说它应该选哪个模型？",
+                assistant: "如果目标是轻量实时，不建议直接按 Cursor 现成套餐来映射。",
+                age: 78 * 60,
+                now: now
+            ),
+            inactiveSession(
+                id: "session-agents",
+                workspace: "agents",
+                initialPrompt: "把你的分支和 worktree 都给我。",
+                latestPrompt: "所以你是要先重启吗？",
+                assistant: "已经重启了。现在跑的是新的 dev 进程。",
+                age: 92 * 60,
+                now: now
+            ),
+            inactiveSession(
+                id: "session-claude",
+                workspace: "claude-code",
+                initialPrompt: "我们先把整个 notch 的背景换成纯黑。",
+                latestPrompt: "下面那块空白要去掉。",
+                assistant: "展开态高度已经改成按内容自适应。",
+                age: 118 * 60,
+                now: now
+            ),
+            inactiveSession(
+                id: "session-hooks",
+                workspace: "hooks",
+                initialPrompt: "假如我想实时监控 Claude Code 的 usage 应该怎么做？",
+                latestPrompt: "如果是在别的 app 里展示呢？",
+                assistant: "代码里已经有几条更直接的路可以走。",
+                age: 130 * 60,
+                now: now
+            ),
         ]
+    }
+
+    static func notificationSessions(lead: AgentSession, now: Date) -> [AgentSession] {
+        var sessions = listSessions(now: now)
+        if sessions.isEmpty {
+            return [lead]
+        }
+        sessions[0] = lead
+        return sessions
     }
 
     static func runningSession(now: Date) -> AgentSession {
@@ -269,7 +314,9 @@ private enum DebugSessionFactory {
             codexMetadata: CodexSessionMetadata(
                 initialUserPrompt: "接下来我打算继续补齐一些能力。",
                 lastUserPrompt: "askUserquestion 和权限审批，我想把他们也做到我们的 island 里。",
-                lastAssistantMessage: "已经准备好重写 DEV 页面，需要批准文件改动。"
+                lastAssistantMessage: "已经准备好重写 DEV 页面，需要批准文件改动。",
+                currentTool: "exec_command",
+                currentCommandPreview: "head -5000 /Users/wangruobing/Personal/claude-research/extracts/claude-bun-2.1.81-v3/islands/000_cli.js.txt"
             )
         )
     }
@@ -323,7 +370,7 @@ private enum DebugSessionFactory {
             codexMetadata: CodexSessionMetadata(
                 initialUserPrompt: "这次我可能确实需要一些 mock 手段，让我能验收这些 Card 的 UI。",
                 lastUserPrompt: "可以把 DEV 完全重构成一个 debug 页面。",
-                lastAssistantMessage: "已经把 DEV 主窗口替换成专用 debug 页面，并补了 approval、question、completion 三种 card 预览。"
+                lastAssistantMessage: "Plan 文件已写好。你的 hooks 触发情况如何？"
             )
         )
     }

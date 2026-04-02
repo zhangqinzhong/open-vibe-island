@@ -299,11 +299,22 @@ struct IslandPanelView: View {
     }
 
     private func notificationCard(session: AgentSession) -> some View {
-        IslandNotificationCard(
-            session: session,
-            onApprove: { model.approvePermission(for: session.id, approved: $0) },
-            onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
-        )
+        VStack(spacing: 12) {
+            IslandNotificationCard(
+                session: session,
+                onApprove: { model.approvePermission(for: session.id, approved: $0) },
+                onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
+            )
+
+            if model.liveSessionCount > 0 {
+                Button("Show all \(model.liveSessionCount) sessions") {
+                    model.showSessionListFromNotificationSurface()
+                }
+                .buttonStyle(.plain)
+                .font(.system(size: 11.5, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.5))
+            }
+        }
     }
 
     private var displayedSessions: [AgentSession] {
@@ -633,22 +644,10 @@ private struct IslandNotificationCard: View {
                             .foregroundStyle(.white.opacity(0.66))
                             .lineLimit(2)
                     }
-
-                    Text(bodyText)
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(statusTint.opacity(0.95))
-                        .lineLimit(2)
-
-                    if let detailText {
-                        Text(detailText)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.42))
-                            .lineLimit(1)
-                    }
                 }
             }
 
-            actionRow
+            cardBody
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
@@ -663,47 +662,149 @@ private struct IslandNotificationCard: View {
     }
 
     @ViewBuilder
-    private var actionRow: some View {
-        if let request = session.permissionRequest {
-            HStack(spacing: 8) {
-                Button(request.secondaryActionTitle) { onApprove(false) }
-                    .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
-                Button(request.primaryActionTitle) { onApprove(true) }
-                    .buttonStyle(IslandCompactButtonStyle(tint: .orange))
-                Spacer(minLength: 0)
-            }
-        } else if let prompt = session.questionPrompt {
-            HStack(spacing: 8) {
-                ForEach(prompt.options.prefix(3), id: \.self) { option in
-                    Button(option) { onAnswer(option) }
-                        .buttonStyle(IslandCompactButtonStyle(tint: .secondary))
-                }
-                Spacer(minLength: 0)
-            }
-        }
-    }
-
-    private var bodyText: String {
+    private var cardBody: some View {
         switch session.phase {
         case .waitingForApproval:
-            return session.permissionRequest?.summary.trimmedForNotificationCard ?? "Approval needed"
+            approvalBody
         case .waitingForAnswer:
-            return session.questionPrompt?.title.trimmedForNotificationCard ?? "Answer needed"
+            questionBody
         case .completed:
-            return session.codexMetadata?.lastAssistantMessage?.trimmedForNotificationCard
-                ?? session.summary.trimmedForNotificationCard
+            completionBody
         case .running:
-            return session.spotlightActivityLineText ?? session.summary
+            defaultBody
         }
     }
 
-    private var detailText: String? {
-        if let path = session.permissionRequest?.affectedPath.trimmedForNotificationCard,
-           !path.isEmpty {
-            return path
-        }
+    private var approvalBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.orange)
 
-        return session.spotlightActivityLineText == bodyText ? nil : session.spotlightActivityLineText
+                Text(commandLabel)
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(.orange)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(commandPreviewText)
+                    .font(.system(size: 13, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.9))
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let path = session.permissionRequest?.affectedPath.trimmedForNotificationCard,
+                   !path.isEmpty {
+                    Text(path)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.42))
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(red: 0.11, green: 0.08, blue: 0.03))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.orange.opacity(0.18))
+            )
+
+            HStack(spacing: 10) {
+                Button(denyTitle) { onApprove(false) }
+                    .buttonStyle(IslandWideButtonStyle(kind: .secondary))
+                Button(allowTitle) { onApprove(true) }
+                    .buttonStyle(IslandWideButtonStyle(kind: .primary))
+            }
+        }
+    }
+
+    private var questionBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(session.questionPrompt?.title.trimmedForNotificationCard ?? "Answer needed")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.yellow.opacity(0.96))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                ForEach(session.questionPrompt?.options.prefix(3) ?? [], id: \.self) { option in
+                    Button(option) { onAnswer(option) }
+                        .buttonStyle(IslandWideButtonStyle(kind: .secondary))
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.06))
+        )
+    }
+
+    private var completionBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(session.spotlightPromptLineText ?? "You:")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.8))
+                    .lineLimit(2)
+
+                Spacer(minLength: 8)
+
+                Text("Done")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.74))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+
+            Rectangle()
+                .fill(.white.opacity(0.04))
+                .frame(height: 1)
+
+            Text(session.codexMetadata?.lastAssistantMessage?.trimmedForNotificationCard ?? session.summary)
+                .font(.system(size: 13.5, weight: .medium))
+                .foregroundStyle(.white.opacity(0.88))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 14)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.08))
+        )
+    }
+
+    private var defaultBody: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(session.spotlightActivityLineText ?? session.summary)
+                .font(.system(size: 12.5, weight: .medium))
+                .foregroundStyle(statusTint.opacity(0.95))
+                .lineLimit(3)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.06))
+        )
     }
 
     private var statusTint: Color {
@@ -717,6 +818,42 @@ private struct IslandNotificationCard: View {
         case .completed:
             .white.opacity(0.74)
         }
+    }
+
+    private var commandLabel: String {
+        switch session.codexMetadata?.currentTool {
+        case "exec_command":
+            return "Bash"
+        case "apply_patch":
+            return "Patch"
+        case "write_stdin":
+            return "Input"
+        case let value?:
+            return value.capitalized
+        case nil:
+            return "Command"
+        }
+    }
+
+    private var commandPreviewText: String {
+        let preview = session.codexMetadata?.currentCommandPreview?.trimmedForNotificationCard
+        if let preview, !preview.isEmpty {
+            return "$ \(preview)"
+        }
+
+        return session.permissionRequest?.summary.trimmedForNotificationCard ?? session.summary.trimmedForNotificationCard
+    }
+
+    private var allowTitle: String {
+        let title = session.permissionRequest?.primaryActionTitle.trimmedForNotificationCard
+        if title == nil || title == "Allow" {
+            return "Allow Once"
+        }
+        return title ?? "Allow Once"
+    }
+
+    private var denyTitle: String {
+        session.permissionRequest?.secondaryActionTitle.trimmedForNotificationCard ?? "Deny"
     }
 
     private func compactBadge(_ title: String) -> some View {
@@ -780,6 +917,33 @@ private struct IslandCompactButtonStyle: ButtonStyle {
                 in: Capsule()
             )
             .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+private struct IslandWideButtonStyle: ButtonStyle {
+    enum Kind {
+        case primary
+        case secondary
+    }
+
+    let kind: Kind
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 11.5, weight: .semibold))
+            .foregroundStyle(kind == .primary ? Color.white : Color.white.opacity(0.88))
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(backgroundColor(configuration.isPressed), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func backgroundColor(_ isPressed: Bool) -> Color {
+        switch kind {
+        case .primary:
+            return Color(red: 0.26, green: 0.45, blue: 0.86).opacity(isPressed ? 0.78 : 1.0)
+        case .secondary:
+            return Color.white.opacity(isPressed ? 0.12 : 0.16)
+        }
     }
 }
 

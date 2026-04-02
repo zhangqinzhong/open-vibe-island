@@ -18,7 +18,9 @@ final class OverlayPanelController {
     private static let openedRowSpacing: CGFloat = 4
     private static let openedContentVerticalInsets: CGFloat = 28
     private static let openedEmptyStateHeight: CGFloat = 108
-    private static let notificationCardHeight: CGFloat = 172
+    private static let approvalCardHeight: CGFloat = 288
+    private static let questionCardHeight: CGFloat = 232
+    private static let completionCardHeight: CGFloat = 214
 
     private var panel: NotchPanel?
     private var eventMonitors = NotchEventMonitors()
@@ -346,7 +348,16 @@ final class OverlayPanelController {
 
     private func openedContentHeight(for model: AppModel) -> CGFloat {
         if model.showsNotificationCard {
-            return Self.notificationCardHeight
+            switch model.islandSurface {
+            case .approvalCard:
+                return Self.approvalCardHeight
+            case .questionCard:
+                return Self.questionCardHeight
+            case .completionCard:
+                return Self.completionCardHeight
+            case .sessionList:
+                break
+            }
         }
 
         let now = Date.now
