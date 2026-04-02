@@ -76,7 +76,17 @@ public enum CodexHookInstaller {
         hookCommand: String
     ) throws -> CodexHookFileMutation {
         var rootObject = try loadRootObject(from: existingData)
-        var hooksObject = rootObject["hooks"] as? [String: Any] ?? [:]
+        let existingHooksObject = rootObject["hooks"] as? [String: Any] ?? [:]
+        var hooksObject: [String: Any] = [:]
+
+        for (eventName, value) in existingHooksObject {
+            let existingGroups = value as? [Any] ?? []
+            let cleanedGroups = sanitizeForInstall(groups: existingGroups, replacingCommand: hookCommand)
+
+            if !cleanedGroups.isEmpty {
+                hooksObject[eventName] = cleanedGroups
+            }
+        }
 
         for spec in eventSpecs {
             let existingGroups = hooksObject[spec.name] as? [Any] ?? []

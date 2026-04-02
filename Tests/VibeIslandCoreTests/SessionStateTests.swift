@@ -408,6 +408,21 @@ struct SessionStateTests {
         let existing = """
         {
           "hooks": {
+            "PreToolUse": [
+              {
+                "matcher": "Bash",
+                "hooks": [
+                  {
+                    "type": "command",
+                    "command": "'/Users/test/.vibe-island/bin/vibe-island-bridge' --source codex"
+                  },
+                  {
+                    "type": "command",
+                    "command": "/usr/bin/printf"
+                  }
+                ]
+              }
+            ],
             "Stop": [
               {
                 "hooks": [
@@ -439,12 +454,19 @@ struct SessionStateTests {
 
         let root = try jsonObject(from: mutation.contents)
         let hooks = root["hooks"] as? [String: Any]
+        let preToolGroups = hooks?["PreToolUse"] as? [[String: Any]]
+        let preToolCommands = preToolGroups?
+            .compactMap { $0["hooks"] as? [[String: Any]] }
+            .flatMap { $0 }
+            .compactMap { $0["command"] as? String } ?? []
         let stopGroups = hooks?["Stop"] as? [[String: Any]]
         let stopCommands = stopGroups?
             .compactMap { $0["hooks"] as? [[String: Any]] }
             .flatMap { $0 }
             .compactMap { $0["command"] as? String } ?? []
 
+        #expect(preToolCommands == ["/usr/bin/printf"])
+        #expect(hooks?["PostToolUse"] == nil)
         #expect(stopCommands.contains("/usr/bin/true"))
         #expect(stopCommands.contains("'/tmp/new-release/VibeIslandHooks'"))
         #expect(!stopCommands.contains("'/Users/test/.vibe-island/bin/vibe-island-bridge' --source codex"))
