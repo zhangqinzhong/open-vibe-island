@@ -799,7 +799,7 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
     public init(
         pollInterval: TimeInterval = 0.75,
         initialReadLimit: UInt64 = 128 * 1_024,
-        initialPromptBootstrapLimit: UInt64 = 128 * 1_024
+        initialPromptBootstrapLimit: UInt64 = 1_024 * 1_024
     ) {
         self.pollInterval = pollInterval
         self.initialReadLimit = initialReadLimit
@@ -987,16 +987,30 @@ public final class CodexRolloutWatcher: @unchecked Sendable {
 
         do {
             try fileHandle.seek(toOffset: 0)
-            let data = try fileHandle.read(upToCount: Int(readLimit)) ?? Data()
-            guard !data.isEmpty else {
-                return CodexRolloutSnapshot()
+            var buffer = Data()
+            var snapshot = CodexRolloutSnapshot()
+            var bytesRemaining = readLimit
+
+            while bytesRemaining > 0, snapshot.initialUserPrompt == nil {
+                let chunkSize = Int(min(bytesRemaining, 64 * 1_024))
+                guard let data = try fileHandle.read(upToCount: chunkSize), !data.isEmpty else {
+                    break
+                }
+
+                buffer.append(data)
+                bytesRemaining -= UInt64(data.count)
+
+                let lines = completeLines(from: &buffer)
+                guard !lines.isEmpty else {
+                    continue
+                }
+
+                lines.forEach { CodexRolloutReducer.apply(line: $0, to: &snapshot) }
             }
 
-            var buffer = data
-            let headSnapshot = CodexRolloutReducer.snapshot(for: completeLines(from: &buffer))
             return CodexRolloutSnapshot(
-                initialUserPrompt: headSnapshot.initialUserPrompt,
-                lastUserPrompt: headSnapshot.lastUserPrompt
+                initialUserPrompt: snapshot.initialUserPrompt,
+                lastUserPrompt: snapshot.lastUserPrompt
             )
         } catch {
             return CodexRolloutSnapshot()
