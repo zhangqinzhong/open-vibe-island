@@ -22,6 +22,7 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 - Use clear conventional-style commit messages such as `feat:`, `fix:`, `refactor:`, `docs:`, or `chore:`.
 - Do not amend existing commits unless explicitly requested.
 - Do not create branches unless explicitly requested.
+- When the user explicitly requests parallel work or multiple worktrees, create a dedicated branch for each worktree and keep `main` as the integration branch.
 
 ## Safety Rules
 
@@ -36,6 +37,22 @@ Keep all work incremental, reviewable, and reversible. Every meaningful round of
 - Preserve a clean working tree after each round.
 - Add documentation when making architectural or workflow decisions.
 - Prefer native macOS and Swift-friendly project structure for this repository.
+
+## Parallel Worktree Rules
+
+- Treat `/Users/wangruobing/Personal/vibe-island` on `main` as the shared integration worktree.
+- Do not do day-to-day feature development directly on the shared `main` worktree when parallel work is active.
+- Create one worktree per branch and one branch per worktree. Never attach two worktrees to the same branch.
+- Create new worktrees from `origin/main`, not from a locally drifted feature branch.
+- Use sibling worktree paths named like `/Users/wangruobing/Personal/vibe-island-<topic>`.
+- Use branch names that match the workstream, such as `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, or `investigate/<topic>`.
+- Keep each worktree focused on one coherent slice with a narrow file ownership area when possible.
+- Rebase or merge the latest `origin/main` into the feature branch before integrating it back.
+- Integrate completed work from the shared `main` worktree after verification, preferably with fast-forward history when practical.
+- Remove merged worktrees and delete merged branches after the integration round is complete.
+- If multiple agents are working in parallel, assign each agent its own worktree instead of sharing one checkout.
+
+See [docs/worktree-workflow.md](/Users/wangruobing/Personal/vibe-island/docs/worktree-workflow.md) for the concrete commands and lifecycle.
 
 ## Reproduction Scope
 
