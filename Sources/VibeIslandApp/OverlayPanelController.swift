@@ -85,7 +85,8 @@ final class OverlayPanelController {
 
         panel.isFloatingPanel = true
         panel.becomesKeyOnlyIfNeeded = true
-        panel.level = NSWindow.Level(rawValue: Int(CGShieldingWindowLevel()))
+        panel.level = .statusBar
+        panel.sharingType = .readOnly
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
