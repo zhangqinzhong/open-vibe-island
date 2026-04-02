@@ -214,28 +214,27 @@ struct IslandPanelView: View {
                     .padding(.leading, 8)
             }
 
-            Spacer()
+            openedUsageSummary
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text("\(model.liveSessionCount) live")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.72))
+            HStack(spacing: 8) {
+                headerPill("\(model.state.runningCount) live", tint: .white.opacity(0.7))
 
-            if model.liveAttentionCount > 0 {
-                Text("\(model.liveAttentionCount) attention")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.orange.opacity(0.9))
+                if model.state.attentionCount > 0 {
+                    headerPill("\(model.state.attentionCount) attention", tint: .orange.opacity(0.95))
+                }
+
+                Button {
+                    model.notchClose()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .frame(width: 20, height: 20)
+                        .background(.white.opacity(0.08), in: Circle())
+                }
+                .buttonStyle(.plain)
             }
-
-            Button {
-                model.notchClose()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .frame(width: 20, height: 20)
-                    .background(.white.opacity(0.08), in: Circle())
-            }
-            .buttonStyle(.plain)
         }
         .padding(.horizontal, 4)
     }
@@ -305,6 +304,109 @@ struct IslandPanelView: View {
         case .waitingForAnswer: .yellow
         case .completed: .blue
         }
+    }
+
+    @ViewBuilder
+    private var openedUsageSummary: some View {
+        if let snapshot = model.claudeUsageSnapshot,
+           snapshot.isEmpty == false {
+            HStack(spacing: 8) {
+                Text("Claude")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                if let fiveHour = snapshot.fiveHour {
+                    usageWindowView(label: "5h", window: fiveHour)
+                }
+
+                if let fiveHour = snapshot.fiveHour,
+                   let sevenDay = snapshot.sevenDay,
+                   fiveHour.usedPercentage >= 0,
+                   sevenDay.usedPercentage >= 0 {
+                    Text("|")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.16))
+                }
+
+                if let sevenDay = snapshot.sevenDay {
+                    usageWindowView(label: "7d", window: sevenDay)
+                }
+            }
+            .lineLimit(1)
+        } else {
+            HStack(spacing: 8) {
+                Text("Vibe Island")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+
+                Text("Claude usage waiting")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .lineLimit(1)
+        }
+    }
+
+    private func usageWindowView(label: String, window: ClaudeUsageWindow) -> some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.55))
+
+            Text("\(window.roundedUsedPercentage)%")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(usageColor(for: window.usedPercentage))
+
+            if let resetsAt = window.resetsAt,
+               let remaining = remainingDurationString(until: resetsAt) {
+                Text(remaining)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.35))
+            }
+        }
+    }
+
+    private func headerPill(_ title: String, tint: Color) -> some View {
+        Text(title)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(.white.opacity(0.08), in: Capsule())
+    }
+
+    private func usageColor(for percentage: Double) -> Color {
+        switch percentage {
+        case 90...:
+            .red.opacity(0.95)
+        case 70..<90:
+            .orange.opacity(0.95)
+        default:
+            .green.opacity(0.95)
+        }
+    }
+
+    private func remainingDurationString(until date: Date) -> String? {
+        let interval = date.timeIntervalSinceNow
+        guard interval > 0 else {
+            return nil
+        }
+
+        let formatter = DateComponentsFormatter()
+        formatter.unitsStyle = .abbreviated
+
+        if interval >= 86_400 {
+            formatter.allowedUnits = [.day]
+            formatter.maximumUnitCount = 1
+        } else if interval >= 3_600 {
+            formatter.allowedUnits = [.hour, .minute]
+            formatter.maximumUnitCount = 2
+        } else {
+            formatter.allowedUnits = [.minute]
+            formatter.maximumUnitCount = 1
+        }
+
+        return formatter.string(from: interval)
     }
 }
 

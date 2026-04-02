@@ -39,6 +39,7 @@ Current scope:
 
 - macOS only
 - Codex first
+- experimental Claude Code usage status
 - live session visibility
 - low-noise Codex hook install
 - jump-back behavior
@@ -49,10 +50,15 @@ Today the project can already:
 
 - receive Codex hook events locally
 - surface session and approval state in the app
+- restore recent Codex sessions from local rollout files and cache
 - install and uninstall managed Codex hooks from `~/.codex`
+- inspect `~/.claude/settings.json` and install a managed Claude usage bridge when no custom status line exists
+- read cached Claude 5-hour and 7-day usage windows in the UI
 - use terminal hints for best-effort jump back behavior
 
 The managed Codex install now follows the original Vibe Island footprint and only installs `SessionStart`, `UserPromptSubmit`, and `Stop` hooks by default. The bridge still supports richer interactive hooks, but they are not enabled by default because `PreToolUse` and `PostToolUse` create a lot of terminal noise during normal Codex use.
+
+The Claude bridge is intentionally conservative. It writes a managed `statusLine.command` to `~/.vibe-island/bin/vibe-island-statusline`, caches `rate_limits` into `/tmp/vibe-island-rl.json`, and refuses to overwrite an existing custom Claude status line automatically.
 
 ## Quick Start
 
@@ -65,6 +71,10 @@ open Package.swift
 ```
 
 Connect Codex:
+
+Open the package in Xcode to run the macOS app target. On launch, the app restores its local cache, scans recent `~/.codex/sessions/**/rollout-*.jsonl` files for existing Codex sessions, and then starts the live bridge for new hook events.
+
+The control center also shows live Codex hook install status from `~/.codex`, and can install or uninstall the managed hook entries directly if it can locate a local `VibeIslandHooks` executable. Claude usage setup is available from the app and remains opt-in.
 
 ```toml
 [features]
