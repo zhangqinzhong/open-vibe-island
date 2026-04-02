@@ -8,8 +8,26 @@ enum SpotlightActivityTone {
     case attention
 }
 
+enum IslandSessionPresence: Equatable {
+    case running
+    case active
+    case inactive
+
+    var title: String {
+        switch self {
+        case .running:
+            "Running"
+        case .active:
+            "Active"
+        case .inactive:
+            "Inactive"
+        }
+    }
+}
+
 extension AgentSession {
     private static let collapsedDetailAgeThreshold: TimeInterval = 2 * 60 * 60
+    private static let islandActivityThreshold: TimeInterval = 15 * 60
 
     var spotlightPrimaryText: String {
         if let request = permissionRequest {
@@ -219,6 +237,22 @@ extension AgentSession {
         }
 
         return "\(max(1, age / 86_400))d"
+    }
+
+    func islandPresence(at referenceDate: Date) -> IslandSessionPresence {
+        if phase == .running, spotlightCurrentToolLabel != nil {
+            return .running
+        }
+
+        if phase.requiresAttention || phase == .running {
+            return .active
+        }
+
+        if referenceDate.timeIntervalSince(updatedAt) <= Self.islandActivityThreshold {
+            return .active
+        }
+
+        return .inactive
     }
 
     private var spotlightRunningActivityText: String? {

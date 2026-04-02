@@ -14,6 +14,7 @@ struct IslandPanelView: View {
 
     @Namespace private var notchNamespace
     @State private var isHovering = false
+    @State private var hoveredSessionID: String?
 
     private var isOpened: Bool {
         model.notchStatus == .opened
@@ -218,10 +219,14 @@ struct IslandPanelView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 8) {
-                headerPill("\(model.state.runningCount) live", tint: .white.opacity(0.7))
+                headerPill("\(model.liveSessionCount) open", tint: .white.opacity(0.7))
 
-                if model.state.attentionCount > 0 {
-                    headerPill("\(model.state.attentionCount) attention", tint: .orange.opacity(0.95))
+                if model.liveRunningCount > 0 {
+                    headerPill("\(model.liveRunningCount) running", tint: .mint.opacity(0.95))
+                }
+
+                if model.liveAttentionCount > 0 {
+                    headerPill("\(model.liveAttentionCount) attention", tint: .orange.opacity(0.95))
                 }
 
                 Button {
@@ -254,10 +259,12 @@ struct IslandPanelView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Spacer()
-            Text("No active sessions")
+            Text("No open terminal sessions")
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.4))
-            Text("Start Codex in your terminal")
+            Text(model.recentSessions.isEmpty
+                ? "Start Codex in your terminal"
+                : "Recent sessions remain in Control Center until the terminal is open again")
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.25))
             Spacer()
@@ -271,8 +278,12 @@ struct IslandPanelView: View {
                 ForEach(displayedSessions) { session in
                     IslandSessionRow(
                         session: session,
-                        isSelected: session.id == model.focusedSession?.id,
-                        onSelect: { model.select(sessionID: session.id) },
+                        isHighlighted: session.id == hoveredSessionID,
+                        onHoverChange: { isHovering in
+                            withAnimation(.smooth(duration: 0.18)) {
+                                hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
+                            }
+                        },
                         onJump: { model.jumpToSession(session) },
                         onApprove: { model.approvePermission(for: session.id, approved: $0) },
                         onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
@@ -285,7 +296,7 @@ struct IslandPanelView: View {
     }
 
     private var displayedSessions: [AgentSession] {
-        model.surfacedSessions + model.recentSessions
+        model.surfacedSessions
     }
 
     // MARK: - Helpers
@@ -418,25 +429,43 @@ struct IslandPanelView: View {
 
 private struct IslandSessionRow: View {
     let session: AgentSession
-    let isSelected: Bool
-    let onSelect: () -> Void
+    let isHighlighted: Bool
+    let onHoverChange: (Bool) -> Void
     let onJump: () -> Void
     let onApprove: (Bool) -> Void
     let onAnswer: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button(action: handlePrimaryTap) {
-                HStack(spacing: 10) {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 9, height: 9)
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            rowBody(referenceDate: context.date)
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: isSelected ? 4 : 2) {
-                        Text(session.spotlightHeadlineText)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .lineLimit(1)
+    private func rowBody(referenceDate: Date) -> some View {
+        let presence = session.islandPresence(at: referenceDate)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Button(action: handlePrimaryTap) {
+                HStack(alignment: .top, spacing: 14) {
+                    statusColumn(for: presence)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 12) {
+                            Text(session.spotlightHeadlineText)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 8)
+
+                            HStack(spacing: 6) {
+                                compactBadge(session.tool.displayName)
+                                if let terminalBadge = session.spotlightTerminalBadge {
+                                    compactBadge(terminalBadge)
+                                }
+                                compactBadge(session.spotlightAgeBadge)
+                            }
+                        }
 
                         if let promptLine = session.spotlightPromptLineText {
                             Text(promptLine)
@@ -448,51 +477,59 @@ private struct IslandSessionRow: View {
                         if let activityLine = session.spotlightActivityLineText {
                             Text(activityLine)
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(activityColor.opacity(0.94))
+                                .foregroundStyle(activityColor(for: presence).opacity(0.94))
                                 .lineLimit(1)
-                        }
-                    }
-
-                    Spacer(minLength: 8)
-
-                    VStack(alignment: .trailing, spacing: 8) {
-                        HStack(spacing: 6) {
-                            compactBadge(session.tool.displayName)
-                            if let terminalBadge = session.spotlightTerminalBadge {
-                                compactBadge(terminalBadge)
-                            }
-                            compactBadge(session.spotlightAgeBadge)
-                        }
-
-                        if isSelected {
-                            compactBadge(session.spotlightStatusLabel)
                         }
                     }
                 }
             }
             .buttonStyle(.plain)
 
-            if isSelected {
+            if isHighlighted {
                 actionRow
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, isSelected ? 14 : 12)
+        .padding(.vertical, isHighlighted ? 14 : 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(isSelected ? Color(red: 0.13, green: 0.13, blue: 0.14) : Color(red: 0.05, green: 0.05, blue: 0.06))
+                .fill(isHighlighted ? Color(red: 0.11, green: 0.11, blue: 0.12) : Color(red: 0.05, green: 0.05, blue: 0.06))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(isSelected ? .white.opacity(0.08) : .white.opacity(0.025))
+                .strokeBorder(isHighlighted ? .white.opacity(0.12) : .white.opacity(0.025))
         )
+        .shadow(color: isHighlighted ? .black.opacity(0.28) : .clear, radius: 14, y: 8)
         .overlay(
             Rectangle()
-                .fill(Color.white.opacity(isSelected ? 0 : 0.03))
+                .fill(Color.white.opacity(isHighlighted ? 0 : 0.03))
                 .frame(height: 1),
             alignment: .bottom
         )
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onHover(perform: onHoverChange)
+    }
+
+    private func statusColumn(for presence: IslandSessionPresence) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(statusTileFill(for: presence))
+
+                VibeIslandIcon(
+                    size: 14,
+                    isAnimating: presence == .running,
+                    tint: statusTint(for: presence)
+                )
+            }
+            .frame(width: 36, height: 36)
+
+            Text(presence.title)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(statusTint(for: presence))
+                .lineLimit(1)
+        }
+        .frame(width: 64, alignment: .leading)
     }
 
     @ViewBuilder
@@ -525,16 +562,7 @@ private struct IslandSessionRow: View {
     }
 
     private func handlePrimaryTap() {
-        if session.permissionRequest != nil || session.questionPrompt != nil {
-            onSelect()
-            return
-        }
-
-        if session.jumpTarget != nil {
-            onJump()
-        } else {
-            onSelect()
-        }
+        onJump()
     }
 
     private func compactBadge(_ title: String) -> some View {
@@ -546,25 +574,38 @@ private struct IslandSessionRow: View {
             .background(Color(red: 0.14, green: 0.14, blue: 0.15), in: Capsule())
     }
 
-    private var statusColor: Color {
-        switch session.phase {
-        case .running: .mint
-        case .waitingForApproval: .orange
-        case .waitingForAnswer: .yellow
-        case .completed: session.jumpTarget != nil ? .white.opacity(0.5) : .blue
+    private func statusTint(for presence: IslandSessionPresence) -> Color {
+        switch presence {
+        case .running:
+            .mint
+        case .active:
+            Color(red: 0.53, green: 0.94, blue: 0.72)
+        case .inactive:
+            .white.opacity(0.48)
         }
     }
 
-    private var activityColor: Color {
+    private func statusTileFill(for presence: IslandSessionPresence) -> Color {
+        switch presence {
+        case .running:
+            Color.mint.opacity(0.14)
+        case .active:
+            Color.green.opacity(0.12)
+        case .inactive:
+            Color.white.opacity(0.05)
+        }
+    }
+
+    private func activityColor(for presence: IslandSessionPresence) -> Color {
         switch session.spotlightActivityTone {
+        case .attention:
+            .orange.opacity(0.94)
         case .live:
-            Color(red: 0.36, green: 0.64, blue: 1.0)
+            statusTint(for: presence)
         case .idle:
             .white.opacity(0.46)
         case .ready:
-            .green.opacity(0.92)
-        case .attention:
-            .orange.opacity(0.94)
+            presence == .inactive ? .white.opacity(0.46) : statusTint(for: presence)
         }
     }
 }
@@ -593,6 +634,7 @@ private struct IslandCompactButtonStyle: ButtonStyle {
 private struct VibeIslandIcon: View {
     let size: CGFloat
     var isAnimating: Bool = false
+    var tint: Color = .mint
 
     var body: some View {
         VStack(spacing: 2) {
@@ -610,7 +652,7 @@ private struct VibeIslandIcon: View {
 
     private var iconBlock: some View {
         RoundedRectangle(cornerRadius: 1.8, style: .continuous)
-            .fill(Color.mint.opacity(isAnimating ? 1.0 : 0.82))
+            .fill(tint.opacity(isAnimating ? 1.0 : 0.82))
     }
 }
 
