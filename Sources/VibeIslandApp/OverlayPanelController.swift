@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import VibeIslandCore
 
 @MainActor
 final class OverlayPanelController {
@@ -8,8 +9,14 @@ final class OverlayPanelController {
     private static let maximumOpenedPanelWidth: CGFloat = 740
     private static let openedPanelWidthFactor: CGFloat = 0.46
     private static let openedContentWidthPadding: CGFloat = 28
-    private static let openedContentHeight: CGFloat = 500
     private static let openedContentBottomPadding: CGFloat = 14
+    private static let maxVisibleSessionRows: Int = 6
+    private static let openedExpandedRowHeight: CGFloat = 76
+    private static let openedCollapsedRowHeight: CGFloat = 44
+    private static let openedHiddenRowHeight: CGFloat = 42
+    private static let openedRowSpacing: CGFloat = 4
+    private static let openedContentVerticalInsets: CGFloat = 28
+    private static let openedEmptyStateHeight: CGFloat = 108
 
     private var panel: NotchPanel?
     private var eventMonitors = NotchEventMonitors()
@@ -267,7 +274,7 @@ final class OverlayPanelController {
         guard let model else {
             return CGSize(
                 width: openedPanelWidth(for: screen) + Self.openedContentWidthPadding,
-                height: Self.openedContentHeight + Self.openedContentBottomPadding
+                height: screen.notchSize.height + Self.openedEmptyStateHeight + Self.openedContentBottomPadding
             )
         }
 
@@ -275,7 +282,7 @@ final class OverlayPanelController {
         case .opened:
             return CGSize(
                 width: openedPanelWidth(for: screen) + Self.openedContentWidthPadding,
-                height: Self.openedContentHeight + Self.openedContentBottomPadding
+                height: screen.notchSize.height + openedContentHeight(for: model) + Self.openedContentBottomPadding
             )
         case .closed, .popping:
             return CGSize(
@@ -306,6 +313,55 @@ final class OverlayPanelController {
         let expansionWidth = leftWidth + rightWidth + 16 + (hasAttention ? 6 : 0)
         let popWidth = model.notchStatus == .popping ? 18 : 0
         return notchWidth + expansionWidth + CGFloat(popWidth)
+    }
+
+    private func openedContentHeight(for model: AppModel) -> CGFloat {
+        let now = Date.now
+        let presentation = openedSessionListPresentation(
+            sessions: model.surfacedSessions,
+            referenceDate: now
+        )
+
+        if presentation.visibleSessions.isEmpty {
+            return Self.openedEmptyStateHeight
+        }
+
+        var rowHeights = presentation.visibleSessions.map { session in
+            session.islandPresence(at: now) == .inactive
+                ? Self.openedCollapsedRowHeight
+                : Self.openedExpandedRowHeight
+        }
+
+        if presentation.hiddenSessionCount > 0 {
+            rowHeights.append(Self.openedHiddenRowHeight)
+        }
+
+        let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
+        let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * Self.openedRowSpacing
+        return rowsHeight + spacingHeight + Self.openedContentVerticalInsets
+    }
+
+    private func openedSessionListPresentation(
+        sessions: [AgentSession],
+        referenceDate: Date
+    ) -> (visibleSessions: [AgentSession], hiddenSessionCount: Int) {
+        guard sessions.count > Self.maxVisibleSessionRows else {
+            return (sessions, 0)
+        }
+
+        let activeSessions = sessions.filter { $0.islandPresence(at: referenceDate) != .inactive }
+        let inactiveSessions = sessions.filter { $0.islandPresence(at: referenceDate) == .inactive }
+        let contentSlots = max(0, Self.maxVisibleSessionRows - 1)
+
+        var visibleSessions = Array(activeSessions.prefix(contentSlots))
+
+        if visibleSessions.count < contentSlots {
+            let remainingSlots = contentSlots - visibleSessions.count
+            visibleSessions.append(contentsOf: inactiveSessions.prefix(remainingSlots))
+        }
+
+        let hiddenSessionCount = max(0, sessions.count - visibleSessions.count)
+        return (visibleSessions, hiddenSessionCount)
     }
 
     // MARK: - Event reposting

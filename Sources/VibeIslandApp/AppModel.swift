@@ -474,6 +474,14 @@ final class AppModel {
         )
     }
 
+    private func refreshOverlayPlacementIfVisible() {
+        guard notchStatus == .opened else {
+            return
+        }
+
+        refreshOverlayPlacement()
+    }
+
     func showControlCenter() {
         guard let window = NSApp.windows.first(where: { $0.title == "Vibe Island OSS" }) else {
             NSApp.activate(ignoringOtherApps: true)
@@ -711,6 +719,7 @@ final class AppModel {
         markSessionAttached(for: event)
         synchronizeSelection()
         refreshCodexRolloutTracking()
+        refreshOverlayPlacementIfVisible()
         scheduleCodexSessionPersistence()
 
         if updateLastActionMessage {
@@ -755,6 +764,7 @@ final class AppModel {
 
             state = SessionState(sessions: records.map(\.session))
             synchronizeSelection()
+            refreshOverlayPlacementIfVisible()
             lastActionMessage = "Restored \(records.count) recent Codex session(s) from local cache."
         } catch {
             lastActionMessage = "Failed to restore Codex session cache: \(error.localizedDescription)"
@@ -770,6 +780,7 @@ final class AppModel {
         let mergedSessions = mergeDiscoveredSessions(records.map(\.session))
         state = SessionState(sessions: mergedSessions)
         synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
         scheduleCodexSessionPersistence()
         lastActionMessage = "Discovered \(records.count) recent Codex session(s) from local rollouts."
     }
@@ -1002,6 +1013,7 @@ final class AppModel {
         }
 
         synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
         scheduleCodexSessionPersistence()
     }
 
