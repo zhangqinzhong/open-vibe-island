@@ -172,19 +172,19 @@
     <main class="page">
       <h1>Pickaxe Swing Preview</h1>
       <p class="lede">
-        Trial direction for a Terraria-like pixel pickaxe swing. The mascot stays on an 8x8 body grid, while a separate pickaxe layer swings across a fixed cell grid and hits a small rock target. This is intentionally more game-like than the spark-only motion families.
+        Trial direction for a Terraria-like pixel pickaxe swing. The mascot stays on an 8x8 body grid, and the pickaxe now swings around a fixed grip point instead of drifting independently. This should read more like a real tool arc and less like a floating prop.
       </p>
 
       <div class="toolbar">
         <button type="button" id="toggle-motion">Pause Motion</button>
-        <span class="hint">4 frames, 180ms per frame. Same swing pattern applied to all three mascots for comparison.</span>
+        <span class="hint">5 frames, 160ms per frame. Same pivot-based swing pattern applied to all three mascots for comparison.</span>
       </div>
 
       <section class="grid">
         <article class="card" data-mascot="pebble">
           <div class="eyebrow">Mining Loop</div>
           <h2>Pebble + Pickaxe</h2>
-          <p>Lowest silhouette paired with the clearest “tool swing” read.</p>
+          <p>Lowest silhouette paired with the clearest pivot-driven mining arc.</p>
           <div class="preview-shell"><canvas class="main-canvas" width="332" height="208"></canvas></div>
           <div class="context-row">
             <div class="context">
@@ -201,7 +201,7 @@
         <article class="card" data-mascot="mochi">
           <div class="eyebrow">Mining Loop</div>
           <h2>Mochi + Pickaxe</h2>
-          <p>Round mascot body against a slightly more mechanical action.</p>
+          <p>Round mascot body against a cleaner, more physical swing path.</p>
           <div class="preview-shell"><canvas class="main-canvas" width="332" height="208"></canvas></div>
           <div class="context-row">
             <div class="context">
@@ -218,7 +218,7 @@
         <article class="card" data-mascot="scout">
           <div class="eyebrow">Mining Loop</div>
           <h2>Scout + Pickaxe</h2>
-          <p>The most game-like combination. Strongest sense of active work.</p>
+          <p>The most game-like combination. Strongest sense of active work and tool motion.</p>
           <div class="preview-shell"><canvas class="main-canvas" width="332" height="208"></canvas></div>
           <div class="context-row">
             <div class="context">
@@ -233,7 +233,7 @@
         </article>
       </section>
 
-      <p class="footer">If this direction is right, the next step is not product integration yet. I would first tighten the pickaxe silhouette and hit timing, then decide whether it is too game-like for the notch.</p>
+      <p class="footer">If this direction is right, the next step is not product integration yet. I would first tighten the grip point, pickaxe silhouette, and impact frame timing, then decide whether it is too game-like for the notch.</p>
     </main>
 
     <script>
@@ -291,35 +291,33 @@
 
       const pickaxeFrames = [
         {
-          toolX: 8,
-          toolY: 0,
-          metal: [[2, 0], [1, 1], [2, 1], [3, 1], [2, 2]],
-          light: [[3, 1]],
-          wood: [[2, 2], [3, 3], [4, 4], [4, 5]],
+          wood: [[0, 0], [1, -1], [2, -2], [3, -3]],
+          metal: [[3, -4], [4, -4], [4, -3], [5, -4], [4, -2]],
+          light: [[5, -4]],
           chips: [],
         },
         {
-          toolX: 10,
-          toolY: 2,
-          metal: [[2, 1], [1, 2], [2, 2], [3, 2], [2, 3]],
-          light: [[3, 2]],
-          wood: [[2, 3], [1, 4], [0, 5]],
+          wood: [[0, 0], [1, -1], [2, -1], [3, -2]],
+          metal: [[4, -3], [4, -2], [5, -2], [4, -1], [3, -3]],
+          light: [[5, -2]],
           chips: [],
         },
         {
-          toolX: 12,
-          toolY: 4,
-          metal: [[3, 1], [2, 2], [3, 2], [4, 2], [3, 3]],
-          light: [[4, 2]],
-          wood: [[2, 1], [1, 0], [0, 0]],
-          chips: [[0, 0], [1, 1], [0, 2]],
+          wood: [[0, 0], [1, 0], [2, 0], [3, 0]],
+          metal: [[4, -1], [4, 0], [5, 0], [4, 1], [3, -1]],
+          light: [[5, 0]],
+          chips: [],
         },
         {
-          toolX: 10,
-          toolY: 2,
-          metal: [[3, 0], [2, 1], [3, 1], [4, 1], [3, 2]],
-          light: [[4, 1]],
-          wood: [[2, 2], [1, 3], [1, 4], [0, 5]],
+          wood: [[0, 0], [1, 0], [2, 1], [3, 2]],
+          metal: [[4, 1], [4, 2], [5, 2], [4, 3], [3, 1]],
+          light: [[5, 2]],
+          chips: [[0, 0], [1, -1], [1, 1]],
+        },
+        {
+          wood: [[0, 0], [1, 1], [1, 2], [2, 3]],
+          metal: [[2, 4], [3, 4], [3, 5], [4, 4], [1, 4]],
+          light: [[4, 4]],
           chips: [],
         },
       ];
@@ -384,17 +382,19 @@
         const cell = 12;
         const mascotX = 44;
         const mascotY = 62;
-        const rockX = 208;
-        const rockY = 78;
+        const gripX = mascotX + 6 * cell;
+        const gripY = mascotY + 4 * cell;
+        const rockX = 214;
+        const rockY = 92;
 
         ctx.clearRect(0, 0, card.mainCanvas.width, card.mainCanvas.height);
         drawRoundedRect(ctx, 18, 20, 296, 156, 18, "#111419", "#1D232C");
         drawPattern(ctx, mascotBodies[card.mascot], bodyPalette, mascotX, mascotY, cell);
         drawPattern(ctx, rockPattern, rockPalette, rockX, rockY, cell);
-        drawPixels(ctx, frame.wood, "#8E6742", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.metal, "#AEB8C8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.light, "#E6EEF8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.chips, "#C9D2E0", rockX + 2 * cell, rockY + 1 * cell, cell);
+        drawPixels(ctx, frame.wood, "#8E6742", gripX, gripY, cell);
+        drawPixels(ctx, frame.metal, "#AEB8C8", gripX, gripY, cell);
+        drawPixels(ctx, frame.light, "#E6EEF8", gripX, gripY, cell);
+        drawPixels(ctx, frame.chips, "#C9D2E0", rockX - cell, rockY + cell, cell);
       }
 
       function drawTiny(card, frame) {
@@ -402,16 +402,18 @@
         const cell = 3;
         const mascotX = 18;
         const mascotY = 22;
-        const rockX = 72;
-        const rockY = 27;
+        const gripX = mascotX + 6 * cell;
+        const gripY = mascotY + 4 * cell;
+        const rockX = 78;
+        const rockY = 34;
 
         ctx.clearRect(0, 0, card.tinyCanvas.width, card.tinyCanvas.height);
         drawPattern(ctx, mascotBodies[card.mascot], bodyPalette, mascotX, mascotY, cell);
         drawPattern(ctx, rockPattern, rockPalette, rockX, rockY, cell);
-        drawPixels(ctx, frame.wood, "#8E6742", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.metal, "#AEB8C8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.light, "#E6EEF8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.chips, "#C9D2E0", rockX + 2 * cell, rockY + 1 * cell, cell);
+        drawPixels(ctx, frame.wood, "#8E6742", gripX, gripY, cell);
+        drawPixels(ctx, frame.metal, "#AEB8C8", gripX, gripY, cell);
+        drawPixels(ctx, frame.light, "#E6EEF8", gripX, gripY, cell);
+        drawPixels(ctx, frame.chips, "#C9D2E0", rockX - cell, rockY + cell, cell);
       }
 
       function drawStripChrome(ctx, width, height) {
@@ -424,17 +426,19 @@
         const cell = 3;
         const mascotX = 24;
         const mascotY = 21;
-        const rockX = 78;
-        const rockY = 26;
+        const gripX = mascotX + 6 * cell;
+        const gripY = mascotY + 4 * cell;
+        const rockX = 84;
+        const rockY = 33;
 
         ctx.clearRect(0, 0, card.stripCanvas.width, card.stripCanvas.height);
         drawStripChrome(ctx, card.stripCanvas.width, card.stripCanvas.height);
         drawPattern(ctx, mascotBodies[card.mascot], bodyPalette, mascotX, mascotY, cell);
         drawPattern(ctx, rockPattern, rockPalette, rockX, rockY, cell);
-        drawPixels(ctx, frame.wood, "#8E6742", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.metal, "#AEB8C8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.light, "#E6EEF8", mascotX + frame.toolX * cell, mascotY + frame.toolY * cell, cell);
-        drawPixels(ctx, frame.chips, "#C9D2E0", rockX + 2 * cell, rockY + 1 * cell, cell);
+        drawPixels(ctx, frame.wood, "#8E6742", gripX, gripY, cell);
+        drawPixels(ctx, frame.metal, "#AEB8C8", gripX, gripY, cell);
+        drawPixels(ctx, frame.light, "#E6EEF8", gripX, gripY, cell);
+        drawPixels(ctx, frame.chips, "#C9D2E0", rockX - cell, rockY + cell, cell);
       }
 
       function renderAll() {
@@ -451,7 +455,7 @@
         timerId = window.setInterval(() => {
           frameIndex = (frameIndex + 1) % pickaxeFrames.length;
           renderAll();
-        }, 180);
+        }, 160);
       }
 
       function stopLoop() {
