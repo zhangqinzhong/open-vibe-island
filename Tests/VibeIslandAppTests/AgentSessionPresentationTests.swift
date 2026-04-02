@@ -5,7 +5,7 @@ import VibeIslandCore
 
 struct AgentSessionPresentationTests {
     @Test
-    func attachedCompletedSessionStaysActiveInIsland() {
+    func attachedCompletedSessionStaysActiveWhileRecent() {
         let referenceDate = Date(timeIntervalSince1970: 10_000)
         let session = AgentSession(
             id: "session-1",
@@ -15,7 +15,7 @@ struct AgentSessionPresentationTests {
             attachmentState: .attached,
             phase: .completed,
             summary: "Ready",
-            updatedAt: referenceDate.addingTimeInterval(-3_600),
+            updatedAt: referenceDate.addingTimeInterval(-1_199),
             jumpTarget: JumpTarget(
                 terminalApp: "Ghostty",
                 workspaceName: "worktree",
@@ -29,7 +29,7 @@ struct AgentSessionPresentationTests {
     }
 
     @Test
-    func attachedCompletedSessionKeepsDetailLinesEvenWhenOld() {
+    func attachedCompletedSessionCollapsesWhenOld() {
         let referenceDate = Date(timeIntervalSince1970: 10_000)
         let session = AgentSession(
             id: "session-1",
@@ -39,7 +39,7 @@ struct AgentSessionPresentationTests {
             attachmentState: .attached,
             phase: .completed,
             summary: "Ready",
-            updatedAt: referenceDate.addingTimeInterval(-7_200),
+            updatedAt: referenceDate.addingTimeInterval(-1_201),
             jumpTarget: JumpTarget(
                 terminalApp: "Ghostty",
                 workspaceName: "worktree",
@@ -54,7 +54,8 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightShowsDetailLines(at: referenceDate))
+        #expect(session.islandPresence(at: referenceDate) == .inactive)
+        #expect(session.spotlightShowsDetailLines(at: referenceDate) == false)
     }
 
     @Test
@@ -76,7 +77,7 @@ struct AgentSessionPresentationTests {
     }
 
     @Test
-    func detachedCompletedSessionStaysActiveWithinThirtyMinutes() {
+    func detachedCompletedSessionStaysActiveWithinTwentyMinutes() {
         let referenceDate = Date(timeIntervalSince1970: 10_000)
         let session = AgentSession(
             id: "session-1",
@@ -86,7 +87,7 @@ struct AgentSessionPresentationTests {
             attachmentState: .detached,
             phase: .completed,
             summary: "Ready",
-            updatedAt: referenceDate.addingTimeInterval(-1_799),
+            updatedAt: referenceDate.addingTimeInterval(-1_199),
             codexMetadata: CodexSessionMetadata(
                 lastUserPrompt: "Follow-up prompt",
                 lastAssistantMessage: "Last assistant message"

@@ -520,13 +520,13 @@ private struct IslandSessionRow: View {
         .padding(.vertical, 12)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black)
+                .fill(isHighlighted ? Color.white.opacity(0.05) : Color.black)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(isHighlighted ? .white.opacity(0.12) : .white.opacity(0.04))
+                .strokeBorder(isHighlighted ? .white.opacity(0.24) : .white.opacity(0.04))
         )
-        .shadow(color: isHighlighted ? .black.opacity(0.16) : .clear, radius: 10, y: 6)
+        .shadow(color: isHighlighted ? .black.opacity(0.24) : .clear, radius: 12, y: 8)
         .overlay(
             Rectangle()
                 .fill(Color.white.opacity(isHighlighted ? 0 : 0.02))

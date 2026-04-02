@@ -15,8 +15,8 @@ enum IslandSessionPresence: Equatable {
 }
 
 extension AgentSession {
-    private static let collapsedDetailAgeThreshold: TimeInterval = 30 * 60
-    private static let islandActivityThreshold: TimeInterval = 30 * 60
+    private static let collapsedDetailAgeThreshold: TimeInterval = 20 * 60
+    private static let islandActivityThreshold: TimeInterval = 20 * 60
 
     var islandActivityDate: Date {
         updatedAt
@@ -220,10 +220,6 @@ extension AgentSession {
             return true
         }
 
-        if attachmentState == .attached {
-            return true
-        }
-
         if referenceDate.timeIntervalSince(islandActivityDate) >= Self.collapsedDetailAgeThreshold {
             return false
         }
@@ -254,7 +250,7 @@ extension AgentSession {
             return .running
         }
 
-        if attachmentState == .attached || phase.requiresAttention {
+        if phase.requiresAttention {
             return .active
         }
 
