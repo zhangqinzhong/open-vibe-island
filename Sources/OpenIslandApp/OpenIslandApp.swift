@@ -5,6 +5,7 @@ import SwiftUI
 final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private let harnessLaunchConfiguration = HarnessLaunchConfiguration()
+    private let launchedAt = Date()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ProcessInfo.processInfo.disableAutomaticTermination(
@@ -16,7 +17,8 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [self] in
             model.startIfNeeded(
                 startBridge: harnessLaunchConfiguration.shouldStartBridge,
-                shouldPerformBootAnimation: harnessLaunchConfiguration.shouldPerformBootAnimation
+                shouldPerformBootAnimation: harnessLaunchConfiguration.shouldPerformBootAnimation,
+                loadRuntimeState: harnessLaunchConfiguration.scenario == nil
             )
 
             if let scenario = harnessLaunchConfiguration.scenario {
@@ -28,6 +30,19 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
 
             if harnessLaunchConfiguration.shouldShowControlCenter {
                 model.showControlCenter()
+            } else {
+                model.hideControlCenter()
+            }
+
+            if let captureDelay = harnessLaunchConfiguration.captureDelay,
+               harnessLaunchConfiguration.artifactDirectoryURL != nil {
+                DispatchQueue.main.asyncAfter(deadline: .now() + captureDelay) { [self] in
+                    try? HarnessArtifactRecorder.record(
+                        configuration: harnessLaunchConfiguration,
+                        model: model,
+                        launchedAt: launchedAt
+                    )
+                }
             }
 
             if let autoExitAfter = harnessLaunchConfiguration.autoExitAfter {

@@ -476,27 +476,30 @@ final class AppModel {
 
     func startIfNeeded(
         startBridge: Bool = true,
-        shouldPerformBootAnimation: Bool = true
+        shouldPerformBootAnimation: Bool = true,
+        loadRuntimeState: Bool = true
     ) {
         guard !hasStarted else {
             return
         }
         hasStarted = true
 
-        restorePersistedCodexSessions()
-        restorePersistedClaudeSessions()
-        discoverRecentCodexSessions()
-        discoverRecentClaudeSessions()
-        reconcileSessionAttachments()
-        startSessionAttachmentMonitoringIfNeeded()
-        hooksBinaryURL = HooksBinaryLocator.locate()
-        refreshCodexHookStatus()
-        refreshClaudeHookStatus()
-        refreshClaudeUsageState()
-        startClaudeUsageMonitoringIfNeeded()
-        refreshCodexUsageState()
-        startCodexUsageMonitoringIfNeeded()
-        refreshCodexRolloutTracking()
+        if loadRuntimeState {
+            restorePersistedCodexSessions()
+            restorePersistedClaudeSessions()
+            discoverRecentCodexSessions()
+            discoverRecentClaudeSessions()
+            reconcileSessionAttachments()
+            startSessionAttachmentMonitoringIfNeeded()
+            hooksBinaryURL = HooksBinaryLocator.locate()
+            refreshCodexHookStatus()
+            refreshClaudeHookStatus()
+            refreshClaudeUsageState()
+            startClaudeUsageMonitoringIfNeeded()
+            refreshCodexUsageState()
+            startCodexUsageMonitoringIfNeeded()
+            refreshCodexRolloutTracking()
+        }
         refreshOverlayDisplayConfiguration()
         ensureOverlayPanel()
         if shouldPerformBootAnimation {
@@ -505,7 +508,9 @@ final class AppModel {
 
         guard startBridge else {
             isBridgeReady = false
-            lastActionMessage = "Harness mode active. Bridge startup skipped."
+            lastActionMessage = loadRuntimeState
+                ? "Harness mode active. Bridge startup skipped."
+                : "Deterministic harness mode active. Runtime discovery and bridge startup skipped."
             return
         }
 
@@ -653,6 +658,14 @@ final class AppModel {
         window.orderFrontRegardless()
         window.makeKey()
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func hideControlCenter() {
+        guard let window = NSApp.windows.first(where: { $0.title == "Open Island Debug" }) else {
+            return
+        }
+
+        window.orderOut(nil)
     }
 
     func toggleSoundMuted() {

@@ -8,7 +8,7 @@ The repository harness exists to make a round of work mechanically checkable. Th
 
 - `scripts/harness.sh` runs the baseline checks. With no arguments it runs `docs`, `test`, and `build`.
 - `scripts/harness.sh ci` is the non-GUI path used by CI.
-- `scripts/harness.sh smoke` launches the macOS app in harness mode, loads a deterministic debug scenario, and auto-exits after a short timeout.
+- `scripts/harness.sh smoke` launches the macOS app in harness mode, loads a deterministic debug scenario, captures local artifacts, and auto-exits after a short timeout.
 - `scripts/check-docs.sh` enforces the minimum doc map and required links.
 
 ## Current Guarantees
@@ -18,6 +18,7 @@ The repository harness exists to make a round of work mechanically checkable. Th
 - `swift test` stays green for the package targets.
 - `swift build` stays green for the package products.
 - The app can be launched locally in a deterministic harness mode without requiring live hook traffic.
+- The smoke path produces a machine-readable report plus PNG evidence for the rendered window surface.
 
 ## Smoke Mode
 
@@ -30,7 +31,11 @@ The smoke path is intentionally aimed at the repository executable, not `~/Appli
 - `OPEN_ISLAND_HARNESS_SHOW_CONTROL_CENTER` controls whether the debug window is frontmost
 - `OPEN_ISLAND_HARNESS_START_BRIDGE` skips live socket setup when disabled
 - `OPEN_ISLAND_HARNESS_BOOT_ANIMATION` disables the normal boot animation for deterministic runs
+- `OPEN_ISLAND_HARNESS_CAPTURE_DELAY_SECONDS` controls when artifact capture runs after launch
 - `OPEN_ISLAND_HARNESS_AUTO_EXIT_SECONDS` terminates the app automatically after the selected duration
+- `OPEN_ISLAND_HARNESS_ARTIFACT_DIR` selects the output directory for `report.json` and PNG captures
+
+The default smoke path writes artifacts under `output/harness/`.
 
 ## Evidence Expectations
 

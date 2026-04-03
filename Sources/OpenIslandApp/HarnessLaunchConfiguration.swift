@@ -6,7 +6,9 @@ struct HarnessLaunchConfiguration {
     let shouldShowControlCenter: Bool
     let shouldStartBridge: Bool
     let shouldPerformBootAnimation: Bool
+    let captureDelay: TimeInterval?
     let autoExitAfter: TimeInterval?
+    let artifactDirectoryURL: URL?
 
     init(environment: [String: String] = ProcessInfo.processInfo.environment) {
         scenario = Self.scenarioValue(from: environment["OPEN_ISLAND_HARNESS_SCENARIO"])
@@ -26,8 +28,14 @@ struct HarnessLaunchConfiguration {
             environment["OPEN_ISLAND_HARNESS_BOOT_ANIMATION"],
             default: true
         )
+        captureDelay = Self.timeIntervalValue(
+            from: environment["OPEN_ISLAND_HARNESS_CAPTURE_DELAY_SECONDS"]
+        )
         autoExitAfter = Self.timeIntervalValue(
             from: environment["OPEN_ISLAND_HARNESS_AUTO_EXIT_SECONDS"]
+        )
+        artifactDirectoryURL = Self.directoryURLValue(
+            from: environment["OPEN_ISLAND_HARNESS_ARTIFACT_DIR"]
         )
     }
 
@@ -80,5 +88,18 @@ struct HarnessLaunchConfiguration {
         }
 
         return seconds
+    }
+
+    private static func directoryURLValue(from rawValue: String?) -> URL? {
+        guard let rawValue else {
+            return nil
+        }
+
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: normalized, isDirectory: true)
     }
 }
