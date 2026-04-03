@@ -22,10 +22,14 @@ private struct SetupCommand {
         case install
         case uninstall
         case status
+        case installClaude
+        case uninstallClaude
+        case statusClaude
     }
 
     let action: Action
     let codexDirectory: URL
+    let claudeDirectory: URL
     let hooksBinary: URL?
 
     init(arguments: [String]) throws {
@@ -38,6 +42,7 @@ private struct SetupCommand {
 
         var hooksBinary: URL?
         var codexDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)
+        var claudeDirectory = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude", isDirectory: true)
 
         var index = 1
         while index < arguments.count {
@@ -56,6 +61,13 @@ private struct SetupCommand {
                 }
                 codexDirectory = URL(fileURLWithPath: arguments[index]).standardizedFileURL
 
+            case "--claude-dir":
+                index += 1
+                guard index < arguments.count else {
+                    throw SetupError.missingValue("--claude-dir")
+                }
+                claudeDirectory = URL(fileURLWithPath: arguments[index]).standardizedFileURL
+
             default:
                 throw SetupError.unexpectedArgument(arguments[index])
             }
@@ -63,13 +75,14 @@ private struct SetupCommand {
             index += 1
         }
 
-        if action == .install, hooksBinary == nil {
+        if (action == .install || action == .installClaude), hooksBinary == nil {
             hooksBinary = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
                 .appendingPathComponent(".build/release/VibeIslandHooks")
                 .standardizedFileURL
         }
 
         self.codexDirectory = codexDirectory
+        self.claudeDirectory = claudeDirectory
         self.hooksBinary = hooksBinary
     }
 
@@ -81,6 +94,12 @@ private struct SetupCommand {
             try uninstall()
         case .status:
             try status()
+        case .installClaude:
+            try installClaude()
+        case .uninstallClaude:
+            try uninstallClaude()
+        case .statusClaude:
+            try statusClaude()
         }
     }
 
@@ -130,6 +149,51 @@ private struct SetupCommand {
             print("Manifest: missing")
         }
     }
+
+    private func installClaude() throws {
+        guard let hooksBinary else {
+            throw SetupError.usage
+        }
+
+        let manager = ClaudeHookInstallationManager(claudeDirectory: claudeDirectory)
+        let status = try manager.install(hooksBinaryURL: hooksBinary)
+
+        print("Installed Vibe Island Claude hooks.")
+        print("Claude dir: \(status.claudeDirectory.path)")
+        print("Hooks binary: \(hooksBinary.path)")
+        if status.hasClaudeIslandHooks {
+            print("Note: claude-island hooks are still present alongside Vibe Island hooks.")
+        }
+    }
+
+    private func uninstallClaude() throws {
+        let manager = ClaudeHookInstallationManager(claudeDirectory: claudeDirectory)
+        let status = try manager.uninstall()
+
+        print("Removed Vibe Island Claude hooks.")
+        print("Claude dir: \(status.claudeDirectory.path)")
+        if status.hasClaudeIslandHooks {
+            print("Preserved claude-island hooks.")
+        }
+    }
+
+    private func statusClaude() throws {
+        let manager = ClaudeHookInstallationManager(claudeDirectory: claudeDirectory)
+        let status = try manager.status(hooksBinaryURL: hooksBinary)
+
+        print("Claude dir: \(status.claudeDirectory.path)")
+        print("Managed hooks present: \(status.managedHooksPresent ? "yes" : "no")")
+        print("claude-island hooks present: \(status.hasClaudeIslandHooks ? "yes" : "no")")
+        if let hooksBinary {
+            print("Hooks binary: \(hooksBinary.path)")
+        }
+        if let manifest = status.manifest {
+            print("Manifest: present")
+            print("Hook command: \(manifest.hookCommand)")
+        } else {
+            print("Manifest: missing")
+        }
+    }
 }
 
 private enum SetupError: Error, LocalizedError {
@@ -145,6 +209,9 @@ private enum SetupError: Error, LocalizedError {
               swift run VibeIslandSetup install [--hooks-binary /abs/path/to/VibeIslandHooks] [--codex-dir /abs/path/to/.codex]
               swift run VibeIslandSetup uninstall [--codex-dir /abs/path/to/.codex]
               swift run VibeIslandSetup status [--hooks-binary /abs/path/to/VibeIslandHooks] [--codex-dir /abs/path/to/.codex]
+              swift run VibeIslandSetup installClaude [--hooks-binary /abs/path/to/VibeIslandHooks] [--claude-dir /abs/path/to/.claude]
+              swift run VibeIslandSetup uninstallClaude [--claude-dir /abs/path/to/.claude]
+              swift run VibeIslandSetup statusClaude [--hooks-binary /abs/path/to/VibeIslandHooks] [--claude-dir /abs/path/to/.claude]
             """
         case let .missingValue(flag):
             "Missing value for \(flag)"
