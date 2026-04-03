@@ -415,6 +415,20 @@ private final class NotchPanel: NSPanel {
 final class NotchHostingView<Content: View>: NSHostingView<Content> {
     weak var notchController: OverlayPanelController?
 
+    override var isOpaque: Bool {
+        false
+    }
+
+    required init(rootView: Content) {
+        super.init(rootView: rootView)
+        configureTransparency()
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
     override func hitTest(_ point: NSPoint) -> NSView? {
         guard let controller = notchController,
               let model = controller.model else {
@@ -433,6 +447,16 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         guard let window else { return viewPoint }
         let windowPoint = convert(viewPoint, to: nil)
         return window.convertPoint(toScreen: windowPoint)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        configureTransparency()
+    }
+
+    private func configureTransparency() {
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
     }
 }
 

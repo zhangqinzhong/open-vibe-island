@@ -148,10 +148,16 @@ struct IslandPanelView: View {
             )
             .stroke(Color.white.opacity(isOpened ? 0.07 : 0.04), lineWidth: 1)
         }
+        .compositingGroup()
         .shadow(
-            color: (isOpened || isHovering) ? .black.opacity(0.46) : .clear,
-            radius: 16,
-            y: 8
+            color: .black.opacity(isOpened ? 0.20 : (isHovering ? 0.22 : 0.14)),
+            radius: isOpened ? 14 : (isHovering ? 10 : 7),
+            y: isOpened ? 10 : (isHovering ? 5 : 3)
+        )
+        .shadow(
+            color: .black.opacity(isOpened ? 0.10 : (isHovering ? 0.11 : 0.06)),
+            radius: isOpened ? 3 : 2,
+            y: 1
         )
         .animation(isOpened ? openAnimation : closeAnimation, value: model.notchStatus)
         .animation(.smooth, value: hasClosedPresence)
