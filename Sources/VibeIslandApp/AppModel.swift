@@ -114,6 +114,9 @@ final class AppModel {
     private let terminalSessionAttachmentProbe = TerminalSessionAttachmentProbe()
 
     @ObservationIgnored
+    private let activeAgentProcessDiscovery = ActiveAgentProcessDiscovery()
+
+    @ObservationIgnored
     private var codexSessionPersistenceTask: Task<Void, Never>?
 
     @ObservationIgnored
@@ -159,7 +162,7 @@ final class AppModel {
     }
 
     var islandListSessions: [AgentSession] {
-        sessionBuckets.primary + sessionBuckets.overflow
+        surfacedSessions
     }
 
     var recentSessionCount: Int {
@@ -1396,7 +1399,11 @@ final class AppModel {
             return
         }
 
-        let resolutions = terminalSessionAttachmentProbe.sessionResolutions(for: sessions)
+        let activeProcesses = activeAgentProcessDiscovery.discover()
+        let resolutions = terminalSessionAttachmentProbe.sessionResolutions(
+            for: sessions,
+            activeProcesses: activeProcesses
+        )
         let attachmentUpdates = resolutions.mapValues(\.attachmentState)
         let jumpTargetUpdates = resolutions.reduce(into: [String: JumpTarget]()) { partialResult, entry in
             if let correctedJumpTarget = entry.value.correctedJumpTarget {

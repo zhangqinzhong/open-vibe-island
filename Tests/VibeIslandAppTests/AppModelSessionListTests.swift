@@ -6,7 +6,7 @@ import VibeIslandCore
 @MainActor
 struct AppModelSessionListTests {
     @Test
-    func islandListSessionsIncludeRecentNonLiveSessionsAfterLiveOnes() {
+    func islandListSessionsOnlyIncludeLiveAttachedSessions() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
         model.state = SessionState(
@@ -58,6 +58,6 @@ struct AppModelSessionListTests {
 
         #expect(model.surfacedSessions.map(\.id) == ["live-session"])
         #expect(model.recentSessions.map(\.id) == ["recent-session"])
-        #expect(model.islandListSessions.map(\.id) == ["live-session", "recent-session"])
+        #expect(model.islandListSessions.map(\.id) == ["live-session"])
     }
 }

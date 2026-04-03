@@ -195,6 +195,64 @@ struct TerminalSessionAttachmentProbeTests {
     }
 
     @Test
+    func unavailableGhosttyProbeStillAttachesActiveCompletedCodexSession() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let session = ghosttySession(
+            id: "session-1",
+            updatedAt: now.addingTimeInterval(-600),
+            phase: .completed,
+            terminalSessionID: "ghostty-stale"
+        )
+
+        let updates = probe.attachmentStates(
+            for: [session],
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "session-1", workingDirectory: "/tmp/worktree", terminalTTY: "/dev/ttys000"),
+            ],
+            now: now
+        )
+
+        #expect(updates["session-1"] == .attached)
+    }
+
+    @Test
+    func unavailableGhosttyProbeStillAttachesActiveClaudeSession() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let session = AgentSession(
+            id: "claude-session",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Recovered Claude session",
+            updatedAt: now.addingTimeInterval(-600),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude e45d5e87",
+                workingDirectory: "/tmp/vibe-island"
+            )
+        )
+
+        let updates = probe.attachmentStates(
+            for: [session],
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .claudeCode, sessionID: nil, workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys002"),
+            ],
+            now: now
+        )
+
+        #expect(updates["claude-session"] == .attached)
+    }
+
+    @Test
     func unknownTerminalSessionRehomesToGhosttyFromWorkingDirectory() {
         let now = Date(timeIntervalSince1970: 1_000)
         let probe = TerminalSessionAttachmentProbe()
@@ -235,6 +293,191 @@ struct TerminalSessionAttachmentProbeTests {
         #expect(resolutions["claude-session"]?.correctedJumpTarget?.workingDirectory == "/tmp/vibe-island")
     }
 
+    @Test
+    func activeCodexSessionRehomesToRemainingGhosttySnapshot() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let primary = ghosttySession(
+            id: "primary",
+            updatedAt: now,
+            phase: .running,
+            terminalSessionID: "ghostty-1",
+            workingDirectory: "/tmp/vibe-island"
+        )
+        let activeButMisbinding = ghosttySession(
+            id: "active-rehomed",
+            updatedAt: now.addingTimeInterval(-30),
+            phase: .running,
+            terminalSessionID: "ghostty-frontmost",
+            workingDirectory: "/tmp/vibe-island"
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [primary, activeButMisbinding],
+            ghosttyAvailability: .available(
+                [
+                    .init(sessionID: "ghostty-1", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island"),
+                    .init(sessionID: "ghostty-2", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island"),
+                ],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "primary", workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys000"),
+                .init(tool: .codex, sessionID: "active-rehomed", workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys001"),
+            ],
+            now: now
+        )
+
+        #expect(resolutions["primary"]?.attachmentState == .attached)
+        #expect(resolutions["active-rehomed"]?.attachmentState == .attached)
+        #expect(resolutions["active-rehomed"]?.correctedJumpTarget?.terminalSessionID == "ghostty-2")
+    }
+
+    @Test
+    func claudeSessionIDPrefixInGhosttyTitleBeatsSameDirectoryCodexSession() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let codexSession = ghosttySession(
+            id: "codex-session",
+            updatedAt: now,
+            phase: .running,
+            terminalSessionID: "ghostty-codex",
+            workingDirectory: "/tmp/vibe-island"
+        )
+        let claudeSession = AgentSession(
+            id: "e45d5e87-66d0-4f67-8399-6ebc02f3d453",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .running,
+            summary: "Running Claude",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude e45d5e87",
+                workingDirectory: "/tmp/vibe-island"
+            ),
+            claudeMetadata: ClaudeSessionMetadata(
+                transcriptPath: "/tmp/e45d5e87.jsonl",
+                currentTool: "Task"
+            )
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [codexSession, claudeSession],
+            ghosttyAvailability: .available(
+                [
+                    .init(sessionID: "ghostty-codex", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island"),
+                    .init(sessionID: "ghostty-claude", workingDirectory: "/tmp/vibe-island", title: "vibe-island · hi · e45d5e87-66d0-4f"),
+                ],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "codex-session", workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys000"),
+                .init(tool: .claudeCode, sessionID: nil, workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys002"),
+            ],
+            now: now
+        )
+
+        #expect(resolutions["codex-session"]?.attachmentState == .attached)
+        #expect(resolutions["e45d5e87-66d0-4f67-8399-6ebc02f3d453"]?.attachmentState == .attached)
+        #expect(resolutions["e45d5e87-66d0-4f67-8399-6ebc02f3d453"]?.correctedJumpTarget?.terminalSessionID == "ghostty-claude")
+        #expect(resolutions["e45d5e87-66d0-4f67-8399-6ebc02f3d453"]?.correctedJumpTarget?.paneTitle == "vibe-island · hi · e45d5e87-66d0-4f")
+    }
+
+    @Test
+    func claudePrefixClaimOverridesMisbindingRecordedGhosttySessionID() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let misboundCodexSession = ghosttySession(
+            id: "misbound-codex",
+            updatedAt: now,
+            phase: .running,
+            terminalSessionID: "ghostty-claude",
+            paneTitle: "vibe-island · hi · e45d5e87-66d0-4f",
+            workingDirectory: "/tmp/vibe-island"
+        )
+        let claudeSession = AgentSession(
+            id: "e45d5e87-66d0-4f67-8399-6ebc02f3d453",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .running,
+            summary: "Running Claude",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude e45d5e87",
+                workingDirectory: "/tmp/vibe-island"
+            ),
+            claudeMetadata: ClaudeSessionMetadata(
+                transcriptPath: "/tmp/e45d5e87.jsonl",
+                currentTool: "Task"
+            )
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [misboundCodexSession, claudeSession],
+            ghosttyAvailability: .available(
+                [
+                    .init(sessionID: "ghostty-claude", workingDirectory: "/tmp/vibe-island", title: "vibe-island · hi · e45d5e87-66d0-4f"),
+                    .init(sessionID: "ghostty-codex", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island"),
+                ],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "misbound-codex", workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys001"),
+                .init(tool: .claudeCode, sessionID: nil, workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys002"),
+            ],
+            now: now
+        )
+
+        #expect(resolutions["e45d5e87-66d0-4f67-8399-6ebc02f3d453"]?.attachmentState == .attached)
+        #expect(resolutions["e45d5e87-66d0-4f67-8399-6ebc02f3d453"]?.correctedJumpTarget?.terminalSessionID == "ghostty-claude")
+        #expect(resolutions["misbound-codex"]?.attachmentState == .attached)
+        #expect(resolutions["misbound-codex"]?.correctedJumpTarget?.terminalSessionID == "ghostty-codex")
+    }
+
+    @Test
+    func activeCodexSessionWithoutJumpTargetCanAttachFromProcessWorkingDirectory() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let session = AgentSession(
+            id: "active-no-jump-target",
+            title: "Codex · vibe-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Finished",
+            updatedAt: now
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [session],
+            ghosttyAvailability: .available(
+                [.init(sessionID: "ghostty-codex", workingDirectory: "/tmp/vibe-island", title: "codex ~/tmp/vibe-island")],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "active-no-jump-target", workingDirectory: "/tmp/VIBE-island", terminalTTY: "/dev/ttys012"),
+            ],
+            now: now
+        )
+
+        #expect(resolutions["active-no-jump-target"]?.attachmentState == .attached)
+        #expect(resolutions["active-no-jump-target"]?.correctedJumpTarget?.terminalSessionID == "ghostty-codex")
+        #expect(resolutions["active-no-jump-target"]?.correctedJumpTarget?.workingDirectory == "/tmp/vibe-island")
+    }
+
     private func ghosttySession(
         id: String,
         updatedAt: Date,
@@ -247,7 +490,7 @@ struct TerminalSessionAttachmentProbeTests {
     ) -> AgentSession {
         AgentSession(
             id: id,
-            title: "Codex · worktree",
+            title: "Codex · \(workspaceName)",
             tool: .codex,
             origin: .live,
             attachmentState: .attached,

@@ -8,6 +8,8 @@ struct TerminalSessionAttachmentProbe {
         var correctedJumpTarget: JumpTarget?
     }
 
+    typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
+
     struct GhosttyTerminalSnapshot {
         var sessionID: String
         var workingDirectory: String
@@ -51,23 +53,34 @@ struct TerminalSessionAttachmentProbe {
 
     private static let liveGraceWindow: TimeInterval = 120
     private static let staleGraceWindow: TimeInterval = 15 * 60
+    private static let appleScriptTimeout: TimeInterval = 1.0
     private static let fieldSeparator = "\u{1f}"
     private static let recordSeparator = "\u{1e}"
 
-    func attachmentStates(for sessions: [AgentSession], now: Date = .now) -> [String: SessionAttachmentState] {
+    func attachmentStates(
+        for sessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot] = [],
+        now: Date = .now
+    ) -> [String: SessionAttachmentState] {
         sessionResolutions(
             for: sessions,
             ghosttyAvailability: ghosttySnapshotAvailability(),
             terminalAvailability: terminalSnapshotAvailability(),
+            activeProcesses: activeProcesses,
             now: now
         ).mapValues(\.attachmentState)
     }
 
-    func sessionResolutions(for sessions: [AgentSession], now: Date = .now) -> [String: SessionResolution] {
+    func sessionResolutions(
+        for sessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot] = [],
+        now: Date = .now
+    ) -> [String: SessionResolution] {
         sessionResolutions(
             for: sessions,
             ghosttyAvailability: ghosttySnapshotAvailability(),
             terminalAvailability: terminalSnapshotAvailability(),
+            activeProcesses: activeProcesses,
             now: now
         )
     }
@@ -76,6 +89,7 @@ struct TerminalSessionAttachmentProbe {
         for sessions: [AgentSession],
         ghosttyAvailability: SnapshotAvailability<GhosttyTerminalSnapshot>,
         terminalAvailability: SnapshotAvailability<TerminalTabSnapshot>,
+        activeProcesses: [ActiveProcessSnapshot] = [],
         now: Date = .now
     ) -> [String: SessionResolution] {
         guard !sessions.isEmpty else {
@@ -91,9 +105,16 @@ struct TerminalSessionAttachmentProbe {
 
             return terminalName != "ghostty" && terminalName != "terminal"
         }
+        let activeProcessesBySessionID = activeProcessesBySessionID(
+            for: sessions,
+            activeProcesses: activeProcesses
+        )
+        let activeSessionIDs = Set(activeProcessesBySessionID.keys)
         let attachedGhosttySessions = attachedGhosttySessions(
             for: ghosttySessions + ambiguousSessions,
-            availability: ghosttyAvailability
+            availability: ghosttyAvailability,
+            activeSessionIDs: activeSessionIDs,
+            activeProcessesBySessionID: activeProcessesBySessionID
         )
         let attachedTerminalSessions = attachedTerminalSessions(
             for: terminalSessions + ambiguousSessions,
@@ -110,6 +131,7 @@ struct TerminalSessionAttachmentProbe {
                     attachmentState: resolveAttachmentState(
                         for: session,
                         isMatched: matchedSnapshot != nil,
+                        isActiveProcess: activeProcessesBySessionID[session.id] != nil,
                         availability: ghosttyAvailability,
                         now: now
                     ),
@@ -125,6 +147,7 @@ struct TerminalSessionAttachmentProbe {
                     attachmentState: resolveAttachmentState(
                         for: session,
                         isMatched: matchedSnapshot != nil,
+                        isActiveProcess: activeProcessesBySessionID[session.id] != nil,
                         availability: terminalAvailability,
                         now: now
                     ),
@@ -134,12 +157,14 @@ struct TerminalSessionAttachmentProbe {
             }
 
             resolutions[session.id] = SessionResolution(
-                attachmentState: fallbackAttachmentState(
-                    for: session,
-                    appIsRunning: nil,
-                    allowRecentAttachmentGrace: true,
-                    now: now
-                ),
+                attachmentState: activeProcessesBySessionID[session.id] != nil
+                    ? .attached
+                    : fallbackAttachmentState(
+                        for: session,
+                        appIsRunning: nil,
+                        allowRecentAttachmentGrace: true,
+                        now: now
+                    ),
                 correctedJumpTarget: nil
             )
         }
@@ -151,12 +176,14 @@ struct TerminalSessionAttachmentProbe {
         for sessions: [AgentSession],
         ghosttyAvailability: SnapshotAvailability<GhosttyTerminalSnapshot>,
         terminalAvailability: SnapshotAvailability<TerminalTabSnapshot>,
+        activeProcesses: [ActiveProcessSnapshot] = [],
         now: Date = .now
     ) -> [String: SessionAttachmentState] {
         sessionResolutions(
             for: sessions,
             ghosttyAvailability: ghosttyAvailability,
             terminalAvailability: terminalAvailability,
+            activeProcesses: activeProcesses,
             now: now
         ).mapValues(\.attachmentState)
     }
@@ -164,10 +191,15 @@ struct TerminalSessionAttachmentProbe {
     private func resolveAttachmentState<Snapshot>(
         for session: AgentSession,
         isMatched: Bool,
+        isActiveProcess: Bool,
         availability: SnapshotAvailability<Snapshot>,
         now: Date
     ) -> SessionAttachmentState {
         if isMatched {
+            return .attached
+        }
+
+        if isActiveProcess {
             return .attached
         }
 
@@ -181,7 +213,9 @@ struct TerminalSessionAttachmentProbe {
 
     private func attachedGhosttySessions(
         for sessions: [AgentSession],
-        availability: SnapshotAvailability<GhosttyTerminalSnapshot>
+        availability: SnapshotAvailability<GhosttyTerminalSnapshot>,
+        activeSessionIDs: Set<String>,
+        activeProcessesBySessionID: [String: ActiveProcessSnapshot]
     ) -> [String: GhosttyTerminalSnapshot] {
         guard let snapshots = availability.snapshots else {
             return [:]
@@ -191,12 +225,16 @@ struct TerminalSessionAttachmentProbe {
         var claimedSessionIDs: Set<String> = []
         var claimedSnapshotIDs: Set<String> = []
 
-        for snapshot in snapshots {
+        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
             let matches = sessions.filter { session in
-                nonEmptyValue(session.jumpTarget?.terminalSessionID) == snapshot.sessionID
+                guard !claimedSessionIDs.contains(session.id) else {
+                    return false
+                }
+
+                return snapshotTitleMentionsSessionID(snapshot, session: session)
             }
 
-            guard let preferred = preferredSession(from: matches) else {
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
                 continue
             }
 
@@ -207,20 +245,54 @@ struct TerminalSessionAttachmentProbe {
 
         for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
             let matches = sessions.filter { session in
-                guard !claimedSessionIDs.contains(session.id),
-                      let jumpTarget = session.jumpTarget,
-                      canFallbackFromRecordedGhosttySessionID(jumpTarget, claimedSnapshotIDs: claimedSnapshotIDs) else {
-                    return false
-                }
-
-                if nonEmptyValue(jumpTarget.workingDirectory) == snapshot.workingDirectory {
-                    return true
-                }
-
-                return sessionWorkspaceNameCandidates(for: session).contains(snapshotWorkspaceName(for: snapshot))
+                nonEmptyValue(session.jumpTarget?.terminalSessionID) == snapshot.sessionID
             }
 
-            guard let preferred = preferredSession(from: matches) else {
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
+                continue
+            }
+
+            assignments[preferred.id] = snapshot
+            claimedSessionIDs.insert(preferred.id)
+            claimedSnapshotIDs.insert(snapshot.sessionID)
+        }
+
+        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
+            let matches = sessions.filter { session in
+                ghosttyFallbackCandidateMatches(
+                    snapshot,
+                    session: session,
+                    claimedSessionIDs: claimedSessionIDs,
+                    claimedSnapshotIDs: claimedSnapshotIDs,
+                    activeSessionIDs: activeSessionIDs,
+                    activeProcessesBySessionID: activeProcessesBySessionID,
+                    requireActiveSession: true
+                )
+            }
+
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
+                continue
+            }
+
+            assignments[preferred.id] = snapshot
+            claimedSessionIDs.insert(preferred.id)
+            claimedSnapshotIDs.insert(snapshot.sessionID)
+        }
+
+        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
+            let matches = sessions.filter { session in
+                ghosttyFallbackCandidateMatches(
+                    snapshot,
+                    session: session,
+                    claimedSessionIDs: claimedSessionIDs,
+                    claimedSnapshotIDs: claimedSnapshotIDs,
+                    activeSessionIDs: activeSessionIDs,
+                    activeProcessesBySessionID: activeProcessesBySessionID,
+                    requireActiveSession: false
+                )
+            }
+
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
                 continue
             }
 
@@ -232,10 +304,60 @@ struct TerminalSessionAttachmentProbe {
         return assignments
     }
 
+    private func ghosttyFallbackCandidateMatches(
+        _ snapshot: GhosttyTerminalSnapshot,
+        session: AgentSession,
+        claimedSessionIDs: Set<String>,
+        claimedSnapshotIDs: Set<String>,
+        activeSessionIDs: Set<String>,
+        activeProcessesBySessionID: [String: ActiveProcessSnapshot],
+        requireActiveSession: Bool
+    ) -> Bool {
+        guard !claimedSessionIDs.contains(session.id) else {
+            return false
+        }
+
+        let isActiveSession = activeSessionIDs.contains(session.id)
+        if requireActiveSession && !isActiveSession {
+            return false
+        }
+
+        let jumpTarget = session.jumpTarget
+        let activeProcess = activeProcessesBySessionID[session.id]
+
+        if let hintedTool = hintedTool(for: snapshot.title),
+           session.tool != hintedTool {
+            return false
+        }
+
+        if let jumpTarget {
+            guard canFallbackFromRecordedGhosttySessionID(
+                jumpTarget,
+                allowRecordedSessionIDOverride: isActiveSession,
+                claimedSnapshotIDs: claimedSnapshotIDs
+            ) else {
+                return false
+            }
+        }
+
+        let candidateWorkingDirectory = normalizedPathForMatching(jumpTarget?.workingDirectory)
+            ?? normalizedPathForMatching(activeProcess?.workingDirectory)
+        if candidateWorkingDirectory == normalizedPathForMatching(snapshot.workingDirectory) {
+            return true
+        }
+
+        return sessionWorkspaceNameCandidates(for: session).contains(snapshotWorkspaceName(for: snapshot))
+    }
+
     private func canFallbackFromRecordedGhosttySessionID(
         _ jumpTarget: JumpTarget,
+        allowRecordedSessionIDOverride: Bool,
         claimedSnapshotIDs: Set<String>
     ) -> Bool {
+        if allowRecordedSessionIDOverride {
+            return true
+        }
+
         guard let recordedSessionID = nonEmptyValue(jumpTarget.terminalSessionID) else {
             return true
         }
@@ -271,6 +393,48 @@ struct TerminalSessionAttachmentProbe {
         URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent
     }
 
+    private func normalizedPathForMatching(_ value: String?) -> String? {
+        guard let normalized = nonEmptyValue(value) else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: normalized).standardizedFileURL.path.lowercased()
+    }
+
+    private func hintedTool(for title: String) -> AgentTool? {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if normalizedTitle.contains("codex") {
+            return .codex
+        }
+
+        if normalizedTitle.contains("claude") {
+            return .claudeCode
+        }
+
+        return nil
+    }
+
+    private func snapshotTitleMentionsSessionID(
+        _ snapshot: GhosttyTerminalSnapshot,
+        session: AgentSession
+    ) -> Bool {
+        let normalizedTitle = snapshot.title.lowercased()
+        return sessionIDPrefixes(for: session).contains { normalizedTitle.contains($0) }
+    }
+
+    private func sessionIDPrefixes(for session: AgentSession) -> [String] {
+        let normalizedID = session.id.lowercased()
+        let prefixLengths = [normalizedID.count, 18, 13, 8]
+
+        return prefixLengths.compactMap { length in
+            guard length > 0, normalizedID.count >= length else {
+                return nil
+            }
+
+            return String(normalizedID.prefix(length))
+        }
+    }
+
     private func attachedTerminalSessions(
         for sessions: [AgentSession],
         availability: SnapshotAvailability<TerminalTabSnapshot>
@@ -294,6 +458,7 @@ struct TerminalSessionAttachmentProbe {
         for session: AgentSession,
         snapshot: GhosttyTerminalSnapshot
     ) -> JumpTarget? {
+        let hadExistingJumpTarget = session.jumpTarget != nil
         var jumpTarget = session.jumpTarget ?? JumpTarget(
             terminalApp: "Ghostty",
             workspaceName: URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent,
@@ -302,7 +467,7 @@ struct TerminalSessionAttachmentProbe {
             terminalSessionID: snapshot.sessionID
         )
 
-        var changed = false
+        var changed = !hadExistingJumpTarget
 
         if normalizedTerminalName(for: jumpTarget.terminalApp) != "ghostty" {
             jumpTarget.terminalApp = "Ghostty"
@@ -398,8 +563,46 @@ struct TerminalSessionAttachmentProbe {
         return snapshot.customTitle.contains(paneTitle)
     }
 
-    private func preferredSession(from sessions: [AgentSession]) -> AgentSession? {
+    private func activeProcessesBySessionID(
+        for sessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot]
+    ) -> [String: ActiveProcessSnapshot] {
+        let activeCodexSessionIDs = Set(
+            activeProcesses
+                .filter { $0.tool == .codex }
+                .compactMap(\.sessionID)
+        )
+        let activeClaudeProcesses = activeProcesses.filter { $0.tool == .claudeCode }
+
+        return sessions.reduce(into: [String: ActiveProcessSnapshot]()) { partialResult, session in
+            if session.tool == .codex,
+               activeCodexSessionIDs.contains(session.id),
+               let matchedProcess = activeProcesses.first(where: { $0.tool == .codex && $0.sessionID == session.id }) {
+                partialResult[session.id] = matchedProcess
+                return
+            }
+
+            if session.tool == .claudeCode,
+               let workingDirectory = normalizedPathForMatching(session.jumpTarget?.workingDirectory),
+               let matchedProcess = activeClaudeProcesses.first(where: {
+                   normalizedPathForMatching($0.workingDirectory) == workingDirectory
+               }) {
+                partialResult[session.id] = matchedProcess
+            }
+        }
+    }
+
+    private func preferredSession(
+        from sessions: [AgentSession],
+        activeSessionIDs: Set<String> = []
+    ) -> AgentSession? {
         sessions.sorted { lhs, rhs in
+            let lhsIsActive = activeSessionIDs.contains(lhs.id)
+            let rhsIsActive = activeSessionIDs.contains(rhs.id)
+            if lhsIsActive != rhsIsActive {
+                return lhsIsActive && !rhsIsActive
+            }
+
             if lhs.updatedAt != rhs.updatedAt {
                 return lhs.updatedAt > rhs.updatedAt
             }
@@ -599,9 +802,21 @@ struct TerminalSessionAttachmentProbe {
         let errorPipe = Pipe()
         task.standardOutput = outputPipe
         task.standardError = errorPipe
+        let completionGroup = DispatchGroup()
+        completionGroup.enter()
+        task.terminationHandler = { _ in
+            completionGroup.leave()
+        }
 
         try task.run()
-        task.waitUntilExit()
+        let waitResult = completionGroup.wait(timeout: .now() + Self.appleScriptTimeout)
+        if waitResult == .timedOut {
+            task.terminate()
+            _ = completionGroup.wait(timeout: .now() + 0.2)
+            throw NSError(domain: "TerminalSessionAttachmentProbe", code: 408, userInfo: [
+                NSLocalizedDescriptionKey: "AppleScript probe timed out.",
+            ])
+        }
 
         let output = String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
