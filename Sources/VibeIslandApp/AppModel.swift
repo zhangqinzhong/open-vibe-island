@@ -108,6 +108,9 @@ final class AppModel {
     private let codexRolloutDiscovery = CodexRolloutDiscovery()
 
     @ObservationIgnored
+    private let claudeTranscriptDiscovery = ClaudeTranscriptDiscovery()
+
+    @ObservationIgnored
     private let terminalSessionAttachmentProbe = TerminalSessionAttachmentProbe()
 
     @ObservationIgnored
@@ -446,6 +449,7 @@ final class AppModel {
 
         restorePersistedCodexSessions()
         discoverRecentCodexSessions()
+        discoverRecentClaudeSessions()
         reconcileSessionAttachments()
         startSessionAttachmentMonitoringIfNeeded()
         hooksBinaryURL = HooksBinaryLocator.locate()
@@ -1106,6 +1110,19 @@ final class AppModel {
         lastActionMessage = "Discovered \(records.count) recent Codex session(s) from local rollouts."
     }
 
+    private func discoverRecentClaudeSessions() {
+        let sessions = claudeTranscriptDiscovery.discoverRecentSessions()
+        guard !sessions.isEmpty else {
+            return
+        }
+
+        let mergedSessions = mergeDiscoveredSessions(sessions)
+        state = SessionState(sessions: mergedSessions)
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
+        lastActionMessage = "Discovered \(sessions.count) recent Claude session(s) from local transcripts."
+    }
+
     private func refreshCodexRolloutTracking() {
         let targets = state.sessions.compactMap { session -> CodexRolloutWatchTarget? in
             guard session.tool == .codex,
@@ -1154,6 +1171,7 @@ final class AppModel {
         merged.attachmentState = mergeAttachmentState(existing.attachmentState, discovered.attachmentState)
         merged.jumpTarget = existing.jumpTarget ?? discovered.jumpTarget
         merged.codexMetadata = mergeCodexMetadata(existing.codexMetadata, discovered.codexMetadata)
+        merged.claudeMetadata = mergeClaudeMetadata(existing.claudeMetadata, discovered.claudeMetadata)
 
         return merged
     }
@@ -1177,6 +1195,34 @@ final class AppModel {
             lastAssistantMessage: discovered.lastAssistantMessage ?? existing.lastAssistantMessage,
             currentTool: discovered.currentTool ?? existing.currentTool,
             currentCommandPreview: discovered.currentCommandPreview ?? existing.currentCommandPreview
+        )
+        return merged.isEmpty ? nil : merged
+    }
+
+    private func mergeClaudeMetadata(
+        _ existing: ClaudeSessionMetadata?,
+        _ discovered: ClaudeSessionMetadata?
+    ) -> ClaudeSessionMetadata? {
+        guard let existing else {
+            return discovered?.isEmpty == true ? nil : discovered
+        }
+
+        guard let discovered else {
+            return existing.isEmpty ? nil : existing
+        }
+
+        let merged = ClaudeSessionMetadata(
+            transcriptPath: discovered.transcriptPath ?? existing.transcriptPath,
+            initialUserPrompt: existing.initialUserPrompt ?? discovered.initialUserPrompt ?? discovered.lastUserPrompt,
+            lastUserPrompt: discovered.lastUserPrompt ?? existing.lastUserPrompt,
+            lastAssistantMessage: discovered.lastAssistantMessage ?? existing.lastAssistantMessage,
+            currentTool: discovered.currentTool ?? existing.currentTool,
+            currentToolInputPreview: discovered.currentToolInputPreview ?? existing.currentToolInputPreview,
+            model: discovered.model ?? existing.model,
+            startupSource: discovered.startupSource ?? existing.startupSource,
+            permissionMode: discovered.permissionMode ?? existing.permissionMode,
+            agentID: discovered.agentID ?? existing.agentID,
+            agentType: discovered.agentType ?? existing.agentType
         )
         return merged.isEmpty ? nil : merged
     }

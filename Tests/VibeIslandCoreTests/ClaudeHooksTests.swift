@@ -60,6 +60,49 @@ struct ClaudeHooksTests {
     }
 
     @Test
+    func claudeTranscriptDiscoveryRecoversRecentSessions() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("vibe-island-claude-discovery-\(UUID().uuidString)", isDirectory: true)
+        let workspaceDirectory = rootURL
+            .appendingPathComponent("projects", isDirectory: true)
+            .appendingPathComponent("-tmp-demo-repo", isDirectory: true)
+        let transcriptURL = workspaceDirectory
+            .appendingPathComponent("session-123.jsonl")
+        let discovery = ClaudeTranscriptDiscovery(rootURL: rootURL.appendingPathComponent("projects", isDirectory: true))
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: workspaceDirectory, withIntermediateDirectories: true)
+        let transcript = """
+        {"cwd":"/tmp/demo-repo","sessionId":"session-123","type":"user","message":{"role":"user","content":"Fix the flaky auth tests."},"timestamp":"2026-04-03T03:20:00Z"}
+        {"cwd":"/tmp/demo-repo","sessionId":"session-123","type":"assistant","message":{"role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"I’m checking the auth test setup now."},{"type":"tool_use","id":"toolu_1","name":"Glob","input":{"pattern":"**/*auth*.test.ts"}}]},"timestamp":"2026-04-03T03:20:02Z"}
+        {"cwd":"/tmp/demo-repo","sessionId":"session-123","type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_1","content":"auth.test.ts"}]},"timestamp":"2026-04-03T03:20:04Z"}
+        {"cwd":"/tmp/demo-repo","sessionId":"session-123","type":"assistant","message":{"role":"assistant","model":"claude-sonnet-4-5","content":[{"type":"text","text":"Found the failing auth test file."}]},"timestamp":"2026-04-03T03:20:06Z"}
+        """
+        try transcript.write(to: transcriptURL, atomically: true, encoding: .utf8)
+
+        let sessions = discovery.discoverRecentSessions(
+            now: ISO8601DateFormatter().date(from: "2026-04-03T03:20:10Z")!
+        )
+
+        #expect(sessions.count == 1)
+        let session = try #require(sessions.first)
+        #expect(session.id == "session-123")
+        #expect(session.tool == .claudeCode)
+        #expect(session.title == "Claude · demo-repo")
+        #expect(session.summary == "Found the failing auth test file.")
+        #expect(session.claudeMetadata?.initialUserPrompt == "Fix the flaky auth tests.")
+        #expect(session.claudeMetadata?.lastAssistantMessage == "Found the failing auth test file.")
+        #expect(session.claudeMetadata?.currentTool == nil)
+        #expect(
+            URL(fileURLWithPath: session.claudeMetadata?.transcriptPath ?? "").standardizedFileURL.path
+                == transcriptURL.standardizedFileURL.path
+        )
+    }
+
+    @Test
     func claudePermissionRequestReturnsAllowDirectiveAfterApproval() async throws {
         let socketURL = BridgeSocketLocation.uniqueTestURL()
         let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
