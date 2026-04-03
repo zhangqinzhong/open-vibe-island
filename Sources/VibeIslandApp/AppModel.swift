@@ -602,21 +602,6 @@ final class AppModel {
         }
     }
 
-    func showSessionListFromNotificationSurface() {
-        notificationAutoCollapseTask?.cancel()
-        notificationAutoCollapseTask = nil
-        notificationSurfaceHasBeenHovered = false
-
-        if notchStatus == .closed {
-            notchOpen(reason: .click, surface: .sessionList)
-            return
-        }
-
-        islandSurface = .sessionList
-        notchOpenReason = .click
-        refreshOverlayPlacementIfVisible()
-    }
-
     func notePointerInsideIslandSurface() {
         guard shouldAutoCollapseOnMouseLeave else {
             return

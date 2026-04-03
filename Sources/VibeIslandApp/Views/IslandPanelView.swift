@@ -354,22 +354,11 @@ struct IslandPanelView: View {
     }
 
     private func notificationCard(session: AgentSession) -> some View {
-        VStack(spacing: 12) {
-            IslandNotificationCard(
-                session: session,
-                onApprove: { model.approvePermission(for: session.id, approved: $0) },
-                onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
-            )
-
-            if model.liveSessionCount > 0 {
-                Button("Show all \(model.liveSessionCount) sessions") {
-                    model.showSessionListFromNotificationSurface()
-                }
-                .buttonStyle(.plain)
-                .font(.system(size: 11.5, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.5))
-            }
-        }
+        IslandNotificationCard(
+            session: session,
+            onApprove: { model.approvePermission(for: session.id, approved: $0) },
+            onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
+        )
     }
 
     private var displayedSessions: [AgentSession] {
