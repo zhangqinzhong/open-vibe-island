@@ -6,6 +6,7 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
     let model = AppModel()
     private let harnessLaunchConfiguration = HarnessLaunchConfiguration()
     private let launchedAt = Date()
+    private lazy var harnessRuntimeMonitor = HarnessRuntimeMonitor(launchedAt: launchedAt)
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         ProcessInfo.processInfo.disableAutomaticTermination(
@@ -13,8 +14,13 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
         )
         ProcessInfo.processInfo.disableSuddenTermination()
         NSApp.setActivationPolicy(.regular)
+        harnessRuntimeMonitor.recordMilestone("applicationDidFinishLaunching")
 
         DispatchQueue.main.async { [self] in
+            harnessRuntimeMonitor.recordMilestone("bootstrapStarted")
+            model.harnessRuntimeMonitor = harnessRuntimeMonitor
+            harnessRuntimeMonitor.recordLog(model.lastActionMessage)
+
             model.ignoresPointerExitDuringHarness = harnessLaunchConfiguration.scenario != nil
             model.disablesOverlayEventMonitoringDuringHarness = harnessLaunchConfiguration.scenario != nil
             model.startIfNeeded(
@@ -22,6 +28,7 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
                 shouldPerformBootAnimation: harnessLaunchConfiguration.shouldPerformBootAnimation,
                 loadRuntimeState: harnessLaunchConfiguration.scenario == nil
             )
+            harnessRuntimeMonitor.recordMilestone("modelStarted")
 
             if let scenario = harnessLaunchConfiguration.scenario {
                 model.loadDebugSnapshot(
@@ -32,22 +39,36 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
 
             if harnessLaunchConfiguration.shouldShowControlCenter {
                 model.showControlCenter()
+                harnessRuntimeMonitor.recordMilestone("controlCenterConfigured", message: "shown")
             } else {
                 model.hideControlCenter()
+                harnessRuntimeMonitor.recordMilestone("controlCenterConfigured", message: "hidden")
             }
+
+            harnessRuntimeMonitor.recordMilestone("bootstrapCompleted")
 
             if let captureDelay = harnessLaunchConfiguration.captureDelay,
                harnessLaunchConfiguration.artifactDirectoryURL != nil {
+                harnessRuntimeMonitor.recordMilestone(
+                    "captureScheduled",
+                    message: String(format: "%.3fs", captureDelay)
+                )
                 DispatchQueue.main.asyncAfter(deadline: .now() + captureDelay) { [self] in
+                    harnessRuntimeMonitor.recordMilestone("captureStarted")
                     try? HarnessArtifactRecorder.record(
                         configuration: harnessLaunchConfiguration,
                         model: model,
-                        launchedAt: launchedAt
+                        launchedAt: launchedAt,
+                        runtimeMonitor: harnessRuntimeMonitor
                     )
                 }
             }
 
             if let autoExitAfter = harnessLaunchConfiguration.autoExitAfter {
+                harnessRuntimeMonitor.recordMilestone(
+                    "autoExitScheduled",
+                    message: String(format: "%.3fs", autoExitAfter)
+                )
                 DispatchQueue.main.asyncAfter(deadline: .now() + autoExitAfter) {
                     NSApp.terminate(nil)
                 }

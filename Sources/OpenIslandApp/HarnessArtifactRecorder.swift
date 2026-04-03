@@ -90,6 +90,7 @@ struct HarnessArtifactReport: Codable {
     let selectedSessionID: String?
     let islandSurface: String
     let notchStatus: String
+    let runtime: HarnessRuntimeArtifacts?
     let sessions: [SessionSnapshot]
 }
 
@@ -99,6 +100,7 @@ enum HarnessArtifactRecorder {
         configuration: HarnessLaunchConfiguration,
         model: AppModel,
         launchedAt: Date,
+        runtimeMonitor: HarnessRuntimeMonitor? = nil,
         fileManager: FileManager = .default
     ) throws {
         guard let directoryURL = configuration.artifactDirectoryURL else {
@@ -142,6 +144,13 @@ enum HarnessArtifactRecorder {
             )
         }
 
+        let captureSeconds = Date().timeIntervalSince(launchedAt)
+        let runtimeArtifacts = try runtimeMonitor?.writeArtifacts(
+            to: directoryURL,
+            launchToCaptureSeconds: captureSeconds,
+            fileManager: fileManager
+        )
+
         let report = HarnessArtifactReport(
             scenario: configuration.scenario?.rawValue,
             presentOverlay: configuration.presentOverlay,
@@ -149,7 +158,7 @@ enum HarnessArtifactRecorder {
             startedBridge: configuration.shouldStartBridge,
             performedBootAnimation: configuration.shouldPerformBootAnimation,
             capturedAt: .now,
-            launchToCaptureSeconds: Date().timeIntervalSince(launchedAt),
+            launchToCaptureSeconds: captureSeconds,
             windows: windows,
             overlay: overlaySnapshot(from: model.overlayPlacementDiagnostics),
             sessionCount: model.sessions.count,
@@ -158,6 +167,7 @@ enum HarnessArtifactRecorder {
             selectedSessionID: model.selectedSessionID,
             islandSurface: surfaceDescription(model.islandSurface),
             notchStatus: notchStatusDescription(model.notchStatus),
+            runtime: runtimeArtifacts,
             sessions: model.sessions.map {
                 HarnessArtifactReport.SessionSnapshot(
                     id: $0.id,

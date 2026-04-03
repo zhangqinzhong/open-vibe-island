@@ -17,6 +17,11 @@ def load_json(path: pathlib.Path) -> dict:
     return json.loads(path.read_text())
 
 
+def require_path(path: pathlib.Path, context: str) -> None:
+    if not path.exists():
+        fail(f"missing {context} at {path}")
+
+
 def find_overlay_window(report: dict) -> dict:
     windows = report.get("windows") or []
     overlay = next((window for window in windows if window.get("kind") == "overlay"), None)
@@ -60,12 +65,99 @@ def assert_contains_any(haystack: set[str], needles: list[str], context: str) ->
         fail(f"{context} is missing any of {needles}")
 
 
+def validate_runtime(report_path: pathlib.Path, report: dict) -> None:
+    runtime = report.get("runtime")
+    if not isinstance(runtime, dict):
+        fail("report is missing runtime observability artifacts")
+
+    timeline_rel_path = runtime.get("timelinePath")
+    log_rel_path = runtime.get("logPath")
+    if not isinstance(timeline_rel_path, str) or not timeline_rel_path:
+        fail("runtime timelinePath is missing")
+    if not isinstance(log_rel_path, str) or not log_rel_path:
+        fail("runtime logPath is missing")
+
+    timeline_path = report_path.parent / timeline_rel_path
+    log_path = report_path.parent / log_rel_path
+    require_path(timeline_path, "runtime timeline")
+    require_path(log_path, "runtime log")
+
+    timeline = json.loads(timeline_path.read_text())
+    if not isinstance(timeline, list) or not timeline:
+        fail("runtime timeline is empty")
+
+    event_count = runtime.get("eventCount")
+    if event_count != len(timeline):
+        fail(f"runtime eventCount {event_count!r} does not match timeline length {len(timeline)}")
+
+    if runtime.get("launchCompleted") is not True:
+        fail("runtime launchCompleted is false")
+
+    milestones = runtime.get("milestones")
+    if not isinstance(milestones, list) or not milestones:
+        fail("runtime milestones are missing")
+
+    milestone_names = [milestone.get("name") for milestone in milestones if isinstance(milestone, dict)]
+    required_names = {
+        "applicationDidFinishLaunching",
+        "bootstrapStarted",
+        "modelStarted",
+        "controlCenterConfigured",
+        "bootstrapCompleted",
+        "captureScheduled",
+        "captureStarted",
+    }
+    missing = sorted(required_names - set(name for name in milestone_names if isinstance(name, str)))
+    if missing:
+        fail(f"runtime milestones are missing {missing}")
+
+    if report.get("presentOverlay") and "overlayPresented" not in milestone_names:
+        fail("runtime milestones are missing overlayPresented for an overlay-present run")
+
+    if report.get("startedBridge") is False and "bridgeSkipped" not in milestone_names:
+        fail("runtime milestones are missing bridgeSkipped for a deterministic run")
+
+    timings = runtime.get("timings")
+    if not isinstance(timings, dict):
+        fail("runtime timings are missing")
+
+    bootstrap_seconds = timings.get("bootstrapSeconds")
+    if not isinstance(bootstrap_seconds, (int, float)) or bootstrap_seconds <= 0 or bootstrap_seconds > 2.5:
+        fail(f"bootstrapSeconds {bootstrap_seconds!r} is outside the expected range")
+
+    capture_scheduled_seconds = timings.get("captureScheduledSeconds")
+    if not isinstance(capture_scheduled_seconds, (int, float)) or capture_scheduled_seconds <= 0 or capture_scheduled_seconds > 2.5:
+        fail(f"captureScheduledSeconds {capture_scheduled_seconds!r} is outside the expected range")
+
+    capture_started_seconds = timings.get("captureStartedSeconds")
+    if not isinstance(capture_started_seconds, (int, float)) or capture_started_seconds < capture_scheduled_seconds:
+        fail(
+            "captureStartedSeconds is missing or occurs before captureScheduledSeconds"
+        )
+
+    if report.get("presentOverlay"):
+        overlay_presented_seconds = timings.get("overlayPresentedSeconds")
+        if not isinstance(overlay_presented_seconds, (int, float)) or overlay_presented_seconds <= 0 or overlay_presented_seconds > 2.5:
+            fail(f"overlayPresentedSeconds {overlay_presented_seconds!r} is outside the expected range")
+
+    launch_to_capture_seconds = timings.get("launchToCaptureSeconds")
+    report_launch_to_capture_seconds = report.get("launchToCaptureSeconds")
+    if not isinstance(launch_to_capture_seconds, (int, float)) or launch_to_capture_seconds <= 0 or launch_to_capture_seconds > 5.0:
+        fail(f"launchToCaptureSeconds {launch_to_capture_seconds!r} is outside the expected range")
+    if report_launch_to_capture_seconds != launch_to_capture_seconds:
+        fail("runtime launchToCaptureSeconds does not match report launchToCaptureSeconds")
+
+    if not isinstance(runtime.get("latestMessage"), str) or not runtime.get("latestMessage"):
+        fail("runtime latestMessage is missing")
+
+
 def main() -> None:
     if len(sys.argv) != 2:
         raise SystemExit("usage: validate-harness-artifacts.py <report.json>")
 
     report_path = pathlib.Path(sys.argv[1])
     report = load_json(report_path)
+    validate_runtime(report_path, report)
     overlay = find_overlay_window(report)
 
     accessibility_path = overlay.get("accessibilityPath")

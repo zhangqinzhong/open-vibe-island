@@ -44,7 +44,15 @@ final class AppModel {
     var isClaudeHookSetupBusy = false
     var isClaudeUsageSetupBusy = false
     var isBridgeReady = false
-    var lastActionMessage = "Waiting for agent hook events..."
+    var lastActionMessage = "Waiting for agent hook events..." {
+        didSet {
+            guard lastActionMessage != oldValue else {
+                return
+            }
+
+            harnessRuntimeMonitor?.recordLog(lastActionMessage)
+        }
+    }
     var codexHookStatus: CodexHookInstallationStatus?
     var claudeHookStatus: ClaudeHookInstallationStatus?
     var claudeStatusLineStatus: ClaudeStatusLineInstallationStatus?
@@ -122,6 +130,9 @@ final class AppModel {
 
     @ObservationIgnored
     private let terminalSessionAttachmentProbe = TerminalSessionAttachmentProbe()
+
+    @ObservationIgnored
+    var harnessRuntimeMonitor: HarnessRuntimeMonitor?
 
     @ObservationIgnored
     private let activeAgentProcessDiscovery = ActiveAgentProcessDiscovery()
@@ -517,6 +528,7 @@ final class AppModel {
             lastActionMessage = loadRuntimeState
                 ? "Harness mode active. Bridge startup skipped."
                 : "Deterministic harness mode active. Runtime discovery and bridge startup skipped."
+            harnessRuntimeMonitor?.recordMilestone("bridgeSkipped", message: lastActionMessage)
             return
         }
 
@@ -533,9 +545,14 @@ final class AppModel {
                     try await self.bridgeClient.send(.registerClient(role: .observer))
                     self.isBridgeReady = true
                     self.lastActionMessage = "Bridge ready. Waiting for Claude and Codex hook events."
+                    self.harnessRuntimeMonitor?.recordMilestone("bridgeReady", message: self.lastActionMessage)
                 } catch {
                     self.isBridgeReady = false
                     self.lastActionMessage = "Failed to register bridge observer: \(error.localizedDescription)"
+                    self.harnessRuntimeMonitor?.recordMilestone(
+                        "bridgeRegistrationFailed",
+                        message: self.lastActionMessage
+                    )
                 }
             }
 
@@ -551,11 +568,13 @@ final class AppModel {
                 } catch {
                     self.isBridgeReady = false
                     self.lastActionMessage = "Bridge disconnected: \(error.localizedDescription)"
+                    self.harnessRuntimeMonitor?.recordMilestone("bridgeDisconnected", message: self.lastActionMessage)
                 }
             }
         } catch {
             isBridgeReady = false
             lastActionMessage = "Failed to start local bridge: \(error.localizedDescription)"
+            harnessRuntimeMonitor?.recordMilestone("bridgeStartFailed", message: lastActionMessage)
         }
     }
 
@@ -693,6 +712,7 @@ final class AppModel {
         notchStatus = snapshot.notchStatus
         notchOpenReason = snapshot.notchOpenReason
         lastActionMessage = "Loaded debug scenario: \(snapshot.title)."
+        harnessRuntimeMonitor?.recordMilestone("scenarioLoaded", message: snapshot.title)
 
         if autoCollapseNotificationCards {
             updateNotificationAutoCollapse()
@@ -709,9 +729,11 @@ final class AppModel {
                 preferredScreenID: preferredOverlayScreenID
             )
             overlayPanelController.setInteractive(true)
+            harnessRuntimeMonitor?.recordMilestone("overlayPresented", message: snapshot.title)
         case .closed, .popping:
             overlayPanelController.setInteractive(false)
             refreshOverlayPlacement()
+            harnessRuntimeMonitor?.recordMilestone("overlayPresented", message: snapshot.title)
         }
     }
 
