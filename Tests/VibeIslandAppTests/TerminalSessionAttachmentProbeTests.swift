@@ -194,6 +194,47 @@ struct TerminalSessionAttachmentProbeTests {
         #expect(updates["session-1"] == .attached)
     }
 
+    @Test
+    func unknownTerminalSessionRehomesToGhosttyFromWorkingDirectory() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let session = AgentSession(
+            id: "claude-session",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .running,
+            summary: "Running Task tool",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude 12345678",
+                workingDirectory: "/tmp/vibe-island"
+            ),
+            claudeMetadata: ClaudeSessionMetadata(
+                transcriptPath: "/tmp/session.jsonl",
+                currentTool: "Task"
+            )
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [session],
+            ghosttyAvailability: .available(
+                [.init(sessionID: "ghostty-1", workingDirectory: "/tmp/vibe-island", title: "claude ~/tmp/vibe-island")],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            now: now
+        )
+
+        #expect(resolutions["claude-session"]?.attachmentState == .attached)
+        #expect(resolutions["claude-session"]?.correctedJumpTarget?.terminalApp == "Ghostty")
+        #expect(resolutions["claude-session"]?.correctedJumpTarget?.terminalSessionID == "ghostty-1")
+        #expect(resolutions["claude-session"]?.correctedJumpTarget?.workingDirectory == "/tmp/vibe-island")
+    }
+
     private func ghosttySession(
         id: String,
         updatedAt: Date,

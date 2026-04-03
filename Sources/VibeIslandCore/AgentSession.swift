@@ -354,6 +354,10 @@ public extension AgentSession {
         origin == .demo
     }
 
+    var isTrackedLiveSession: Bool {
+        !isDemoSession && (tool == .codex || tool == .claudeCode)
+    }
+
     var isTrackedLiveCodexSession: Bool {
         tool == .codex && !isDemoSession
     }

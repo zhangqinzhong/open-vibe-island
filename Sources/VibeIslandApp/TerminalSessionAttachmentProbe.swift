@@ -84,19 +84,27 @@ struct TerminalSessionAttachmentProbe {
 
         let ghosttySessions = sessions.filter { normalizedTerminalName(for: $0.jumpTarget?.terminalApp) == "ghostty" }
         let terminalSessions = sessions.filter { normalizedTerminalName(for: $0.jumpTarget?.terminalApp) == "terminal" }
+        let ambiguousSessions = sessions.filter { session in
+            guard let terminalName = normalizedTerminalName(for: session.jumpTarget?.terminalApp) else {
+                return true
+            }
+
+            return terminalName != "ghostty" && terminalName != "terminal"
+        }
         let attachedGhosttySessions = attachedGhosttySessions(
-            for: ghosttySessions,
+            for: ghosttySessions + ambiguousSessions,
             availability: ghosttyAvailability
         )
-        let attachedTerminalSessionIDs = attachedTerminalSessionIDs(
-            for: terminalSessions,
+        let attachedTerminalSessions = attachedTerminalSessions(
+            for: terminalSessions + ambiguousSessions,
             availability: terminalAvailability
         )
 
         var resolutions: [String: SessionResolution] = [:]
 
         for session in sessions {
-            if ghosttySessions.contains(where: { $0.id == session.id }) {
+            if ghosttySessions.contains(where: { $0.id == session.id })
+                || attachedGhosttySessions[session.id] != nil {
                 let matchedSnapshot = attachedGhosttySessions[session.id]
                 resolutions[session.id] = SessionResolution(
                     attachmentState: resolveAttachmentState(
@@ -110,15 +118,17 @@ struct TerminalSessionAttachmentProbe {
                 continue
             }
 
-            if terminalSessions.contains(where: { $0.id == session.id }) {
+            if terminalSessions.contains(where: { $0.id == session.id })
+                || attachedTerminalSessions[session.id] != nil {
+                let matchedSnapshot = attachedTerminalSessions[session.id]
                 resolutions[session.id] = SessionResolution(
                     attachmentState: resolveAttachmentState(
                         for: session,
-                        isMatched: attachedTerminalSessionIDs.contains(session.id),
+                        isMatched: matchedSnapshot != nil,
                         availability: terminalAvailability,
                         now: now
                     ),
-                    correctedJumpTarget: nil
+                    correctedJumpTarget: matchedSnapshot.flatMap { correctedTerminalJumpTarget(for: session, snapshot: $0) }
                 )
                 continue
             }
@@ -261,30 +271,43 @@ struct TerminalSessionAttachmentProbe {
         URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent
     }
 
-    private func attachedTerminalSessionIDs(
+    private func attachedTerminalSessions(
         for sessions: [AgentSession],
         availability: SnapshotAvailability<TerminalTabSnapshot>
-    ) -> Set<String> {
+    ) -> [String: TerminalTabSnapshot] {
         guard let snapshots = availability.snapshots else {
-            return []
+            return [:]
         }
 
-        return Set(snapshots.compactMap { snapshot in
-            preferredSession(
+        return snapshots.reduce(into: [String: TerminalTabSnapshot]()) { partialResult, snapshot in
+            guard let session = preferredSession(
                 from: sessions.filter { terminalSnapshot(snapshot, matches: $0) }
-            )?.id
-        })
+            ) else {
+                return
+            }
+
+            partialResult[session.id] = snapshot
+        }
     }
 
     private func correctedGhosttyJumpTarget(
         for session: AgentSession,
         snapshot: GhosttyTerminalSnapshot
     ) -> JumpTarget? {
-        guard var jumpTarget = session.jumpTarget else {
-            return nil
-        }
+        var jumpTarget = session.jumpTarget ?? JumpTarget(
+            terminalApp: "Ghostty",
+            workspaceName: URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent,
+            paneTitle: snapshot.title,
+            workingDirectory: snapshot.workingDirectory,
+            terminalSessionID: snapshot.sessionID
+        )
 
         var changed = false
+
+        if normalizedTerminalName(for: jumpTarget.terminalApp) != "ghostty" {
+            jumpTarget.terminalApp = "Ghostty"
+            changed = true
+        }
 
         if nonEmptyValue(jumpTarget.terminalSessionID) != snapshot.sessionID {
             jumpTarget.terminalSessionID = snapshot.sessionID
@@ -304,6 +327,35 @@ struct TerminalSessionAttachmentProbe {
         let workspaceName = URL(fileURLWithPath: snapshot.workingDirectory).lastPathComponent
         if !workspaceName.isEmpty, workspaceName != jumpTarget.workspaceName {
             jumpTarget.workspaceName = workspaceName
+            changed = true
+        }
+
+        return changed ? jumpTarget : nil
+    }
+
+    private func correctedTerminalJumpTarget(
+        for session: AgentSession,
+        snapshot: TerminalTabSnapshot
+    ) -> JumpTarget? {
+        guard var jumpTarget = session.jumpTarget else {
+            return nil
+        }
+
+        var changed = false
+
+        if normalizedTerminalName(for: jumpTarget.terminalApp) != "terminal" {
+            jumpTarget.terminalApp = "Terminal"
+            changed = true
+        }
+
+        if nonEmptyValue(jumpTarget.terminalTTY) != snapshot.tty {
+            jumpTarget.terminalTTY = snapshot.tty
+            changed = true
+        }
+
+        if let title = nonEmptyValue(snapshot.customTitle),
+           title != jumpTarget.paneTitle {
+            jumpTarget.paneTitle = title
             changed = true
         }
 

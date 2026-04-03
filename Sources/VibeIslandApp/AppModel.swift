@@ -1387,7 +1387,7 @@ final class AppModel {
     }
 
     private func reconcileSessionAttachments() {
-        let sessions = state.sessions.filter(\.isTrackedLiveCodexSession)
+        let sessions = state.sessions.filter(\.isTrackedLiveSession)
         guard !sessions.isEmpty else {
             return
         }
