@@ -56,6 +56,8 @@ The supported surface area is intentionally narrower than the current source tre
 - supported terminals: `Terminal.app`, `Ghostty`
 - currently implemented real adapter: `Codex` only
 
+For the planned Claude adapter runtime model and matching strategy, see [claude-code-runtime-plan.md](./claude-code-runtime-plan.md).
+
 If other terminal or agent-specific code paths exist, treat them as experiments or fallback scaffolding, not committed support.
 
 The hook helper also enriches Codex payloads with local runtime hints from the terminal environment. That allows the app to record a probable terminal app, working directory, and terminal-specific locators such as iTerm session IDs or Terminal TTYs even though Codex hooks do not directly expose a native macOS window handle.
