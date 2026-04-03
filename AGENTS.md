@@ -61,6 +61,17 @@ See [docs/worktree-workflow.md](/Users/wangruobing/Personal/open-island/docs/wor
 - Do not count partial or experimental code paths for other terminals or agents as supported scope.
 - Do not broaden the reproduction scope to other tools, runtimes, platforms, or environments unless the user explicitly asks to expand it.
 
+## App Targets And Naming
+
+- Treat the repository executable product `OpenIslandApp` as the canonical OSS app runtime.
+- Treat `swift run OpenIslandApp` and the Xcode app target as the source-of-truth way to run the current branch's app code.
+- Treat `~/Applications/Open Island Dev.app` as a local development bundle wrapper around the repo-built `OpenIslandApp`, not as a separate product line.
+- Use `Open Island Dev.app` for manual OSS app verification when bundle semantics, LaunchServices, or installed-hook behavior matter.
+- Use `scripts/harness.sh smoke` or `scripts/smoke-dev-app.sh` only for deterministic harness runs; those commands intentionally launch the repo executable directly rather than the installed dev bundle.
+- Treat any in-app label such as `Open Island OSS` as UI copy only, not as evidence of a third app target.
+- Treat `/Applications/Vibe Island.app` and `https://vibeisland.app/` as closed-source reference baselines only. They are behavior benchmarks, not the development runtime for this repository.
+- Unless the user explicitly asks otherwise, build, debug, and verify OSS changes against `OpenIslandApp`, then compare behavior against the reference app separately when needed.
+
 ## Reference Baselines
 
 - Official product reference: `https://vibeisland.app/`
