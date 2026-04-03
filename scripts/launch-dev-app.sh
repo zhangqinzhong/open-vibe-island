@@ -7,6 +7,8 @@ build_root="$repo_root/.build/arm64-apple-macosx/release"
 app_binary="$build_root/VibeIslandApp"
 hooks_binary="$build_root/VibeIslandHooks"
 setup_binary="$build_root/VibeIslandSetup"
+brand_script="$repo_root/scripts/generate_brand_icons.py"
+brand_icon="$repo_root/Assets/Brand/VibeIsland.icns"
 bundle_dir="$HOME/Applications/Vibe Island OSS Dev.app"
 plist_path="$bundle_dir/Contents/Info.plist"
 bundle_binary="$bundle_dir/Contents/MacOS/VibeIslandApp"
@@ -17,10 +19,12 @@ swift build -c release --product VibeIslandApp
 swift build -c release --product VibeIslandHooks
 swift build -c release --product VibeIslandSetup
 
+python3 "$brand_script"
 "$setup_binary" install --hooks-binary "$hooks_binary"
 
 mkdir -p "$bundle_dir/Contents/MacOS" "$bundle_dir/Contents/Resources"
 cp "$app_binary" "$bundle_binary"
+cp "$brand_icon" "$bundle_dir/Contents/Resources/VibeIsland.icns"
 chmod +x "$bundle_binary"
 
 cat > "$plist_path" <<EOF
@@ -36,6 +40,8 @@ cat > "$plist_path" <<EOF
     <string>app.vibeisland.oss.dev</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
+    <key>CFBundleIconFile</key>
+    <string>VibeIsland</string>
     <key>CFBundleName</key>
     <string>Vibe Island OSS Dev</string>
     <key>CFBundlePackageType</key>

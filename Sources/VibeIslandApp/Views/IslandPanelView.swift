@@ -1418,22 +1418,12 @@ private struct VibeIslandIcon: View {
     var tint: Color = .mint
 
     var body: some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 2) {
-                iconBlock
-                iconBlock
-            }
-            HStack(spacing: 2) {
-                iconBlock
-                iconBlock
-            }
-        }
-        .frame(width: size, height: size)
-    }
-
-    private var iconBlock: some View {
-        RoundedRectangle(cornerRadius: 1.8, style: .continuous)
-            .fill(tint.opacity(isAnimating ? 1.0 : 0.82))
+        VibeIslandBrandMark(
+            size: size,
+            tint: tint,
+            isAnimating: isAnimating,
+            style: .duotone
+        )
     }
 }
 

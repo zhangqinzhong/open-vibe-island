@@ -1,0 +1,34 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bezel" x1="152" y1="140" x2="824" y2="824" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B3B8BF"/>
+      <stop offset="1" stop-color="#585E65"/>
+    </linearGradient>
+    <linearGradient id="face" x1="176" y1="164" x2="176" y2="848" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#34373C"/>
+      <stop offset="1" stop-color="#080A0D"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="white" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="shadow" x="92" y="108" width="840" height="860" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="36" stdDeviation="38" flood-color="black" flood-opacity="0.34"/>
+    </filter>
+    <filter id="markShadow" x="216" y="256" width="566" height="488" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="12" dy="12" stdDeviation="0" flood-color="black" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <ellipse cx="512" cy="830" rx="274" ry="94" fill="black" fill-opacity="0.26"/>
+  <g filter="url(#shadow)">
+    <rect x="140" y="128" width="744" height="744" rx="178" fill="url(#bezel)"/>
+    <rect x="166" y="154" width="692" height="692" rx="154" fill="url(#face)"/>
+    <rect x="166" y="154" width="692" height="324" rx="154" fill="url(#gloss)"/>
+    <rect x="166.5" y="154.5" width="691" height="691" rx="153.5" stroke="white" stroke-opacity="0.08"/>
+    <rect x="140.5" y="128.5" width="743" height="743" rx="177.5" stroke="white" stroke-opacity="0.14"/>
+  </g>
+  <g filter="url(#markShadow)">
+    <rect x="364" y="286" width="58" height="58" fill="#F2F1EE"/><rect x="538" y="286" width="58" height="58" fill="#F2F1EE"/><rect x="364" y="344" width="58" height="58" fill="#F2F1EE"/><rect x="422" y="344" width="58" height="58" fill="#F2F1EE"/><rect x="480" y="344" width="58" height="58" fill="#F2F1EE"/><rect x="538" y="344" width="58" height="58" fill="#F2F1EE"/><rect x="306" y="402" width="58" height="58" fill="#F2F1EE"/><rect x="364" y="402" width="58" height="58" fill="#FFFFFF"/><rect x="422" y="402" width="58" height="58" fill="#FFFFFF"/><rect x="480" y="402" width="58" height="58" fill="#FFFFFF"/><rect x="538" y="402" width="58" height="58" fill="#FFFFFF"/><rect x="596" y="402" width="58" height="58" fill="#F2F1EE"/><rect x="248" y="460" width="58" height="58" fill="#F2F1EE"/><rect x="306" y="460" width="58" height="58" fill="#F2F1EE"/><rect x="364" y="460" width="58" height="58" fill="#FFFFFF"/><rect x="422" y="460" width="58" height="58" fill="#1A1C20"/><rect x="480" y="460" width="58" height="58" fill="#FFFFFF"/><rect x="538" y="460" width="58" height="58" fill="#1A1C20"/><rect x="596" y="460" width="58" height="58" fill="#F2F1EE"/><rect x="654" y="460" width="58" height="58" fill="#F2F1EE"/><rect x="306" y="518" width="58" height="58" fill="#F2F1EE"/><rect x="364" y="518" width="58" height="58" fill="#FFFFFF"/><rect x="422" y="518" width="58" height="58" fill="#FFFFFF"/><rect x="480" y="518" width="58" height="58" fill="#FFFFFF"/><rect x="538" y="518" width="58" height="58" fill="#FFFFFF"/><rect x="596" y="518" width="58" height="58" fill="#F2F1EE"/><rect x="364" y="576" width="58" height="58" fill="#F2F1EE"/><rect x="422" y="576" width="58" height="58" fill="#F2F1EE"/><rect x="480" y="576" width="58" height="58" fill="#F2F1EE"/><rect x="538" y="576" width="58" height="58" fill="#F2F1EE"/><rect x="306" y="634" width="58" height="58" fill="#F2F1EE"/><rect x="596" y="634" width="58" height="58" fill="#F2F1EE"/>
+    <rect x="886" y="344" width="58" height="58" fill="#F7F7F3"/><rect x="886" y="460" width="58" height="58" fill="#F7F7F3"/><rect x="886" y="576" width="58" height="58" fill="#F7F7F3"/>
+  </g>
+</svg>

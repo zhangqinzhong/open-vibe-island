@@ -38,8 +38,11 @@ struct VibeIslandApp: App {
             ControlCenterView(model: appDelegate.model)
         }
 
-        MenuBarExtra("Vibe Island", systemImage: "circle.hexagongrid.circle.fill") {
+        MenuBarExtra {
             MenuBarContentView(model: appDelegate.model)
+        } label: {
+            VibeIslandBrandMark(size: 18, style: .template)
+                .accessibilityLabel("Vibe Island")
         }
         .menuBarExtraStyle(.window)
 
