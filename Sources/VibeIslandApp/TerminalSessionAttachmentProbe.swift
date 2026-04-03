@@ -567,6 +567,7 @@ struct TerminalSessionAttachmentProbe {
         for sessions: [AgentSession],
         activeProcesses: [ActiveProcessSnapshot]
     ) -> [String: ActiveProcessSnapshot] {
+        var assignments: [String: ActiveProcessSnapshot] = [:]
         let activeCodexSessionIDs = Set(
             activeProcesses
                 .filter { $0.tool == .codex }
@@ -574,22 +575,38 @@ struct TerminalSessionAttachmentProbe {
         )
         let activeClaudeProcesses = activeProcesses.filter { $0.tool == .claudeCode }
 
-        return sessions.reduce(into: [String: ActiveProcessSnapshot]()) { partialResult, session in
+        for session in sessions {
             if session.tool == .codex,
                activeCodexSessionIDs.contains(session.id),
                let matchedProcess = activeProcesses.first(where: { $0.tool == .codex && $0.sessionID == session.id }) {
-                partialResult[session.id] = matchedProcess
-                return
-            }
-
-            if session.tool == .claudeCode,
-               let workingDirectory = normalizedPathForMatching(session.jumpTarget?.workingDirectory),
-               let matchedProcess = activeClaudeProcesses.first(where: {
-                   normalizedPathForMatching($0.workingDirectory) == workingDirectory
-               }) {
-                partialResult[session.id] = matchedProcess
+                assignments[session.id] = matchedProcess
             }
         }
+
+        var claimedClaudeSessionIDs = Set(assignments.keys)
+        for process in activeClaudeProcesses {
+            guard let processWorkingDirectory = normalizedPathForMatching(process.workingDirectory) else {
+                continue
+            }
+
+            let candidates = sessions.filter { session in
+                guard session.tool == .claudeCode,
+                      !claimedClaudeSessionIDs.contains(session.id) else {
+                    return false
+                }
+
+                return normalizedPathForMatching(session.jumpTarget?.workingDirectory) == processWorkingDirectory
+            }
+
+            guard let preferred = preferredSession(from: candidates) else {
+                continue
+            }
+
+            assignments[preferred.id] = process
+            claimedClaudeSessionIDs.insert(preferred.id)
+        }
+
+        return assignments
     }
 
     private func preferredSession(
