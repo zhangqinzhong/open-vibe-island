@@ -3,6 +3,8 @@ import VibeIslandCore
 
 @main
 struct VibeIslandHooksCLI {
+    private static let interactiveClaudeHookTimeout: TimeInterval = 24 * 60 * 60
+
     private enum HookSource: String {
         case codex
         case claude
@@ -37,7 +39,11 @@ struct VibeIslandHooksCLI {
                     .decode(ClaudeHookPayload.self, from: input)
                     .withRuntimeContext(environment: ProcessInfo.processInfo.environment)
 
-                guard let response = try? client.send(.processClaudeHook(payload)) else {
+                let timeout = payload.hookEventName == .permissionRequest
+                    ? interactiveClaudeHookTimeout
+                    : 45
+
+                guard let response = try? client.send(.processClaudeHook(payload), timeout: timeout) else {
                     return
                 }
 

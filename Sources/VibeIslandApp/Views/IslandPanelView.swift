@@ -912,13 +912,21 @@ private struct IslandSessionRow: View {
     }
 
     private func statusTint(for presence: IslandSessionPresence) -> Color {
+        if session.phase == .waitingForApproval {
+            return .orange.opacity(0.94)
+        }
+
+        if session.phase == .waitingForAnswer {
+            return .yellow.opacity(0.96)
+        }
+
         switch presence {
         case .running:
-            Color(red: 0.34, green: 0.61, blue: 0.99)
+            return Color(red: 0.34, green: 0.61, blue: 0.99)
         case .active:
-            Color(red: 0.29, green: 0.86, blue: 0.46)
+            return Color(red: 0.29, green: 0.86, blue: 0.46)
         case .inactive:
-            .white.opacity(0.38)
+            return .white.opacity(0.38)
         }
     }
 
@@ -1222,10 +1230,12 @@ private struct StructuredQuestionPromptView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(prompt?.title.trimmedForNotificationCard ?? "Answer needed")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.yellow.opacity(0.96))
-                .fixedSize(horizontal: false, vertical: true)
+            if showsPromptTitle {
+                Text(promptTitle)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.yellow.opacity(0.96))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             if structuredQuestions.isEmpty {
                 HStack(spacing: 10) {
@@ -1237,38 +1247,40 @@ private struct StructuredQuestionPromptView: View {
                     }
                 }
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(structuredQuestions, id: \.question) { question in
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(question.header)
-                                .font(.system(size: 10.5, weight: .bold))
-                                .foregroundStyle(.white.opacity(0.5))
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(structuredQuestions, id: \.question) { question in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(question.header)
+                                    .font(.system(size: 10.5, weight: .bold))
+                                    .foregroundStyle(.white.opacity(0.5))
 
-                            Text(question.question)
-                                .font(.system(size: 12.5, weight: .medium))
-                                .foregroundStyle(.white.opacity(0.88))
-                                .fixedSize(horizontal: false, vertical: true)
+                                Text(question.question)
+                                    .font(.system(size: 12.5, weight: .medium))
+                                    .foregroundStyle(.white.opacity(0.88))
+                                    .fixedSize(horizontal: false, vertical: true)
 
-                            HStack(spacing: 8) {
-                                ForEach(question.options.prefix(4), id: \.label) { option in
-                                    Button(option.label) {
-                                        toggle(option: option.label, for: question)
-                                    }
-                                    .buttonStyle(
-                                        IslandWideButtonStyle(
-                                            kind: selectedLabels(for: question).contains(option.label) ? .primary : .secondary
+                                HStack(spacing: 8) {
+                                    ForEach(question.options.prefix(4), id: \.label) { option in
+                                        Button(option.label) {
+                                            toggle(option: option.label, for: question)
+                                        }
+                                        .buttonStyle(
+                                            IslandWideButtonStyle(
+                                                kind: selectedLabels(for: question).contains(option.label) ? .primary : .secondary
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    Button("Submit Answers") {
-                        onAnswer(QuestionPromptResponse(answers: answerMap))
+                        Button("Submit Answers") {
+                            onAnswer(QuestionPromptResponse(answers: answerMap))
+                        }
+                        .buttonStyle(IslandWideButtonStyle(kind: .primary))
+                        .disabled(!hasCompleteSelection)
                     }
-                    .buttonStyle(IslandWideButtonStyle(kind: .primary))
-                    .disabled(!hasCompleteSelection)
                 }
             }
         }
@@ -1287,6 +1299,23 @@ private struct StructuredQuestionPromptView: View {
 
     private var structuredQuestions: [QuestionPromptItem] {
         prompt?.questions ?? []
+    }
+
+    private var promptTitle: String {
+        prompt?.title.trimmedForNotificationCard ?? "Answer needed"
+    }
+
+    private var showsPromptTitle: Bool {
+        guard !promptTitle.isEmpty else {
+            return false
+        }
+
+        guard structuredQuestions.count == 1,
+              let questionTitle = structuredQuestions.first?.question.trimmedForNotificationCard else {
+            return true
+        }
+
+        return questionTitle.caseInsensitiveCompare(promptTitle) != .orderedSame
     }
 
     private var answerMap: [String: String] {

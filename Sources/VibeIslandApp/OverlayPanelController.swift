@@ -19,7 +19,10 @@ final class OverlayPanelController {
     private static let openedContentVerticalInsets: CGFloat = 28
     private static let openedEmptyStateHeight: CGFloat = 108
     private static let approvalCardHeight: CGFloat = 288
-    private static let questionCardHeight: CGFloat = 232
+    private static let simpleQuestionCardHeight: CGFloat = 248
+    private static let structuredQuestionCardBaseHeight: CGFloat = 312
+    private static let structuredQuestionCardPerQuestionHeight: CGFloat = 82
+    private static let structuredQuestionCardMaximumHeight: CGFloat = 448
     private static let completionCardHeight: CGFloat = 214
 
     private var panel: NotchPanel?
@@ -399,7 +402,7 @@ final class OverlayPanelController {
             case .approvalCard:
                 return Self.approvalCardHeight
             case .questionCard:
-                return Self.questionCardHeight
+                return questionCardHeight(for: model.activeIslandCardSession?.questionPrompt)
             case .completionCard:
                 return Self.completionCardHeight
             case .sessionList:
@@ -430,6 +433,23 @@ final class OverlayPanelController {
         let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
         let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * Self.openedRowSpacing
         return rowsHeight + spacingHeight + Self.openedContentVerticalInsets
+    }
+
+    private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {
+        guard let prompt else {
+            return Self.simpleQuestionCardHeight
+        }
+
+        let structuredQuestionCount = prompt.questions.count
+        guard structuredQuestionCount > 0 else {
+            return Self.simpleQuestionCardHeight
+        }
+
+        let questionBlocksHeight = CGFloat(structuredQuestionCount) * Self.structuredQuestionCardPerQuestionHeight
+        return min(
+            Self.structuredQuestionCardMaximumHeight,
+            Self.structuredQuestionCardBaseHeight + questionBlocksHeight
+        )
     }
 
     private func openedSessionListPresentation(

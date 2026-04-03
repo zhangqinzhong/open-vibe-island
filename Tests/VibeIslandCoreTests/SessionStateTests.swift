@@ -106,6 +106,52 @@ struct SessionStateTests {
     }
 
     @Test
+    func keepsQuestionStateWhileIncidentalRunningUpdatesArrive() {
+        let startedAt = Date(timeIntervalSince1970: 2_500)
+        var state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "claude-question",
+                    title: "Claude · repo",
+                    tool: .claudeCode,
+                    attachmentState: .attached,
+                    phase: .waitingForAnswer,
+                    summary: "Which environment?",
+                    updatedAt: startedAt,
+                    questionPrompt: QuestionPrompt(
+                        title: "Which environment?",
+                        questions: [
+                            QuestionPromptItem(
+                                question: "Which environment?",
+                                header: "Env",
+                                options: [
+                                    QuestionOption(label: "Production"),
+                                    QuestionOption(label: "Staging"),
+                                ]
+                            )
+                        ]
+                    )
+                )
+            ]
+        )
+
+        state.apply(
+            .activityUpdated(
+                SessionActivityUpdated(
+                    sessionID: "claude-question",
+                    summary: "Claude is still waiting for your answer.",
+                    phase: .running,
+                    timestamp: startedAt.addingTimeInterval(5)
+                )
+            )
+        )
+
+        #expect(state.session(id: "claude-question")?.phase == .waitingForAnswer)
+        #expect(state.session(id: "claude-question")?.summary == "Which environment?")
+        #expect(state.session(id: "claude-question")?.questionPrompt?.title == "Which environment?")
+    }
+
+    @Test
     func preservesLiveSessionOriginFromStartEvent() {
         var state = SessionState()
 

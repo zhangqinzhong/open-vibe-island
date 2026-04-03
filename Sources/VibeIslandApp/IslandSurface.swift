@@ -25,6 +25,15 @@ enum IslandSurface: Equatable {
         }
     }
 
+    var autoDismissesWhenPresentedAsNotification: Bool {
+        switch self {
+        case .completionCard:
+            true
+        case .sessionList, .approvalCard, .questionCard:
+            false
+        }
+    }
+
     static func notificationSurface(for event: AgentEvent) -> IslandSurface? {
         switch event {
         case let .permissionRequested(payload):

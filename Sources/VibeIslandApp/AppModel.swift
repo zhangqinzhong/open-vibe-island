@@ -356,7 +356,9 @@ final class AppModel {
     }
 
     var shouldAutoCollapseOnMouseLeave: Bool {
-        notchStatus == .opened && notchOpenReason == .notification && showsNotificationCard
+        notchStatus == .opened
+            && notchOpenReason == .notification
+            && islandSurface.autoDismissesWhenPresentedAsNotification
     }
 
     var hasAnySession: Bool {
@@ -727,10 +729,14 @@ final class AppModel {
             return
         }
 
+        let resolution = permissionResolution(for: approved)
         dismissNotificationSurfaceIfPresent(for: sessionID)
+        state.resolvePermission(sessionID: session.id, resolution: resolution)
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
 
         send(
-            .resolvePermission(sessionID: session.id, resolution: permissionResolution(for: approved)),
+            .resolvePermission(sessionID: session.id, resolution: resolution),
             userMessage: approved
                 ? "Approving permission for \(session.title)."
                 : "Denying permission for \(session.title)."
@@ -743,6 +749,9 @@ final class AppModel {
         }
 
         dismissNotificationSurfaceIfPresent(for: sessionID)
+        state.answerQuestion(sessionID: session.id, response: answer)
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
 
         send(
             .answerQuestion(sessionID: session.id, response: answer),
@@ -1038,7 +1047,7 @@ final class AppModel {
 
         guard notchStatus == .opened,
               notchOpenReason == .notification,
-              islandSurface.isNotificationCard else {
+              islandSurface.autoDismissesWhenPresentedAsNotification else {
             return
         }
 
@@ -1048,7 +1057,7 @@ final class AppModel {
             guard let self,
                   self.notchStatus == .opened,
                   self.notchOpenReason == .notification,
-                  self.islandSurface.isNotificationCard else {
+                  self.islandSurface.autoDismissesWhenPresentedAsNotification else {
                 return
             }
 

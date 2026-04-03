@@ -70,4 +70,11 @@ struct IslandSurfaceTests {
 
         #expect(IslandSurface.notificationSurface(for: event) == .completionCard(sessionID: "session-3"))
     }
+
+    @Test
+    func onlyCompletionCardsAutoDismissAsNotifications() {
+        #expect(!IslandSurface.approvalCard(sessionID: "session-1").autoDismissesWhenPresentedAsNotification)
+        #expect(!IslandSurface.questionCard(sessionID: "session-2").autoDismissesWhenPresentedAsNotification)
+        #expect(IslandSurface.completionCard(sessionID: "session-3").autoDismissesWhenPresentedAsNotification)
+    }
 }

@@ -76,15 +76,26 @@ public struct SessionState: Equatable, Sendable {
                 return
             }
 
-            session.phase = payload.phase
-            session.summary = payload.summary
+            let keepsPendingApproval = payload.phase == .running
+                && session.phase == .waitingForApproval
+                && session.permissionRequest != nil
+            let keepsPendingQuestion = payload.phase == .running
+                && session.phase == .waitingForAnswer
+                && session.questionPrompt != nil
+            let preservesActionableState = keepsPendingApproval || keepsPendingQuestion
+
+            if !preservesActionableState {
+                session.phase = payload.phase
+                session.summary = payload.summary
+                if payload.phase != .waitingForApproval {
+                    session.permissionRequest = nil
+                }
+                if payload.phase != .waitingForAnswer {
+                    session.questionPrompt = nil
+                }
+            }
+
             session.updatedAt = payload.timestamp
-            if payload.phase != .waitingForApproval {
-                session.permissionRequest = nil
-            }
-            if payload.phase != .waitingForAnswer {
-                session.questionPrompt = nil
-            }
             upsert(session)
 
         case let .permissionRequested(payload):

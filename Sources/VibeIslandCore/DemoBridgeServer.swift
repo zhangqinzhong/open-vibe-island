@@ -35,6 +35,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
     private let socketURL: URL
     private let approvalTimeout: TimeInterval
+    private let claudeInteractionTimeout: TimeInterval
     private let queue = DispatchQueue(label: "app.vibeisland.bridge.server")
     private let queueKey = DispatchSpecificKey<Void>()
 
@@ -49,10 +50,12 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
     public init(
         socketURL: URL = BridgeSocketLocation.defaultURL,
-        approvalTimeout: TimeInterval = 45
+        approvalTimeout: TimeInterval = 45,
+        claudeInteractionTimeout: TimeInterval = 24 * 60 * 60
     ) {
         self.socketURL = socketURL
         self.approvalTimeout = approvalTimeout
+        self.claudeInteractionTimeout = claudeInteractionTimeout
         queue.setSpecific(key: queueKey, value: ())
     }
 
@@ -601,7 +604,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     timeoutItem: timeoutItem,
                     kind: .question(payload, prompt)
                 )
-                queue.asyncAfter(deadline: .now() + approvalTimeout, execute: timeoutItem)
+                queue.asyncAfter(deadline: .now() + claudeInteractionTimeout, execute: timeoutItem)
             } else {
                 emit(
                     .permissionRequested(
@@ -631,7 +634,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     timeoutItem: timeoutItem,
                     kind: .permission(payload)
                 )
-                queue.asyncAfter(deadline: .now() + approvalTimeout, execute: timeoutItem)
+                queue.asyncAfter(deadline: .now() + claudeInteractionTimeout, execute: timeoutItem)
             }
 
         case .postToolUse:
