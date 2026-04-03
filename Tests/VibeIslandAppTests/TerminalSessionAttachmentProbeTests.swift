@@ -253,7 +253,7 @@ struct TerminalSessionAttachmentProbeTests {
     }
 
     @Test
-    func activeClaudeProcessOnlyAttachesNewestSessionInSameWorkingDirectory() {
+    func activeClaudeProcessDoesNotAttachAmbiguousSameDirectorySessionsWithoutStrongerSignals() {
         let now = Date(timeIntervalSince1970: 1_000)
         let probe = TerminalSessionAttachmentProbe()
         let currentSession = AgentSession(
@@ -286,6 +286,115 @@ struct TerminalSessionAttachmentProbeTests {
                 workspaceName: "vibe-island",
                 paneTitle: "Claude older",
                 workingDirectory: "/tmp/vibe-island"
+            )
+        )
+
+        let updates = probe.attachmentStates(
+            for: [currentSession, olderSession],
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .claudeCode, sessionID: nil, workingDirectory: "/tmp/vibe-island", terminalTTY: "/dev/ttys002"),
+            ],
+            now: now
+        )
+
+        #expect(updates["claude-current"] != .attached)
+        #expect(updates["claude-older"] != .attached)
+    }
+
+    @Test
+    func activeClaudeProcessMatchesExactSessionIDBeforeWorkingDirectoryFallback() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let resumedSession = AgentSession(
+            id: "9df061a9-6836-4ccb-b83b-aea3196eca43",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Resumed session",
+            updatedAt: now.addingTimeInterval(-18 * 3_600),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude resumed",
+                workingDirectory: "/tmp/vibe-island"
+            )
+        )
+        let newerSession = AgentSession(
+            id: "claude-current",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Current session",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude current",
+                workingDirectory: "/tmp/vibe-island"
+            )
+        )
+
+        let updates = probe.attachmentStates(
+            for: [resumedSession, newerSession],
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(
+                    tool: .claudeCode,
+                    sessionID: "9df061a9-6836-4ccb-b83b-aea3196eca43",
+                    workingDirectory: "/tmp/vibe-island",
+                    terminalTTY: "/dev/ttys002"
+                ),
+            ],
+            now: now
+        )
+
+        #expect(updates["9df061a9-6836-4ccb-b83b-aea3196eca43"] == .attached)
+        #expect(updates["claude-current"] != .attached)
+    }
+
+    @Test
+    func activeClaudeProcessCanFallbackToUniqueTTYMatch() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let currentSession = AgentSession(
+            id: "claude-current",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Current session",
+            updatedAt: now.addingTimeInterval(-600),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude current",
+                workingDirectory: "/tmp/vibe-island",
+                terminalTTY: "/dev/ttys002"
+            )
+        )
+        let olderSession = AgentSession(
+            id: "claude-older",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Older session",
+            updatedAt: now.addingTimeInterval(-18 * 3_600),
+            jumpTarget: JumpTarget(
+                terminalApp: "Unknown",
+                workspaceName: "vibe-island",
+                paneTitle: "Claude older",
+                workingDirectory: "/tmp/vibe-island",
+                terminalTTY: "/dev/ttys099"
             )
         )
 

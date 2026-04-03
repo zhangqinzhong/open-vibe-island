@@ -55,4 +55,35 @@ struct ActiveAgentProcessDiscoveryTests {
             terminalTTY: "/dev/ttys001"
         )))
     }
+
+    @Test
+    func discoverClaudeSessionIDFromResumeFlagWhenTranscriptIsNotOpen() {
+        let discovery = ActiveAgentProcessDiscovery { executablePath, _ in
+            if executablePath == "/bin/ps" {
+                return """
+                  102 ttys002 /Users/test/.local/bin/claude --resume 9df061a9-6836-4ccb-b83b-aea3196eca43 --permission-mode acceptEdits
+                """
+            }
+
+            guard executablePath == "/usr/sbin/lsof" else {
+                return nil
+            }
+
+            return """
+            fcwd
+            n/tmp/vibe-island
+            """
+        }
+
+        let snapshots = discovery.discover()
+
+        #expect(snapshots == [
+            .init(
+                tool: .claudeCode,
+                sessionID: "9df061a9-6836-4ccb-b83b-aea3196eca43",
+                workingDirectory: "/tmp/vibe-island",
+                terminalTTY: "/dev/ttys002"
+            ),
+        ])
+    }
 }

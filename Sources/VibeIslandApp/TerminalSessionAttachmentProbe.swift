@@ -401,6 +401,18 @@ struct TerminalSessionAttachmentProbe {
         return URL(fileURLWithPath: normalized).standardizedFileURL.path.lowercased()
     }
 
+    private func normalizedTTYForMatching(_ value: String?) -> String? {
+        guard let normalized = nonEmptyValue(value) else {
+            return nil
+        }
+
+        if normalized.hasPrefix("/dev/") {
+            return normalized
+        }
+
+        return "/dev/\(normalized)"
+    }
+
     private func hintedTool(for title: String) -> AgentTool? {
         let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if normalizedTitle.contains("codex") {
@@ -584,29 +596,109 @@ struct TerminalSessionAttachmentProbe {
         }
 
         var claimedClaudeSessionIDs = Set(assignments.keys)
-        for process in activeClaudeProcesses {
-            guard let processWorkingDirectory = normalizedPathForMatching(process.workingDirectory) else {
+        var claimedClaudeProcessIndexes: Set<Int> = []
+
+        for (index, process) in activeClaudeProcesses.enumerated() {
+            guard let processSessionID = nonEmptyValue(process.sessionID),
+                  let matchedSession = sessions.first(where: {
+                      $0.tool == .claudeCode
+                          && !claimedClaudeSessionIDs.contains($0.id)
+                          && $0.id == processSessionID
+                  }) else {
                 continue
             }
 
-            let candidates = sessions.filter { session in
-                guard session.tool == .claudeCode,
-                      !claimedClaudeSessionIDs.contains(session.id) else {
-                    return false
-                }
+            assignments[matchedSession.id] = process
+            claimedClaudeSessionIDs.insert(matchedSession.id)
+            claimedClaudeProcessIndexes.insert(index)
+        }
 
-                return normalizedPathForMatching(session.jumpTarget?.workingDirectory) == processWorkingDirectory
-            }
-
-            guard let preferred = preferredSession(from: candidates) else {
+        for (index, process) in activeClaudeProcesses.enumerated() where !claimedClaudeProcessIndexes.contains(index) {
+            guard let matchedSession = uniqueClaudeFallbackCandidate(
+                for: process,
+                sessions: sessions,
+                claimedSessionIDs: claimedClaudeSessionIDs
+            ) else {
                 continue
             }
 
-            assignments[preferred.id] = process
-            claimedClaudeSessionIDs.insert(preferred.id)
+            assignments[matchedSession.id] = process
+            claimedClaudeSessionIDs.insert(matchedSession.id)
+            claimedClaudeProcessIndexes.insert(index)
         }
 
         return assignments
+    }
+
+    private func uniqueClaudeFallbackCandidate(
+        for process: ActiveProcessSnapshot,
+        sessions: [AgentSession],
+        claimedSessionIDs: Set<String>
+    ) -> AgentSession? {
+        if let terminalTTY = normalizedTTYForMatching(process.terminalTTY),
+           let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            let candidates = claudeCandidates(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: terminalTTY,
+                workingDirectory: workingDirectory
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        if let terminalTTY = normalizedTTYForMatching(process.terminalTTY) {
+            let candidates = claudeCandidates(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: terminalTTY,
+                workingDirectory: nil
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        if let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            let candidates = claudeCandidates(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: nil,
+                workingDirectory: workingDirectory
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        return nil
+    }
+
+    private func claudeCandidates(
+        in sessions: [AgentSession],
+        claimedSessionIDs: Set<String>,
+        terminalTTY: String?,
+        workingDirectory: String?
+    ) -> [AgentSession] {
+        sessions.filter { session in
+            guard session.tool == .claudeCode,
+                  !claimedSessionIDs.contains(session.id) else {
+                return false
+            }
+
+            if let terminalTTY,
+               normalizedTTYForMatching(session.jumpTarget?.terminalTTY) != terminalTTY {
+                return false
+            }
+
+            if let workingDirectory,
+               normalizedPathForMatching(session.jumpTarget?.workingDirectory) != workingDirectory {
+                return false
+            }
+
+            return true
+        }
     }
 
     private func preferredSession(

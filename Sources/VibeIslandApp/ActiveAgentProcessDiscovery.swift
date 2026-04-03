@@ -124,15 +124,17 @@ struct ActiveAgentProcessDiscovery {
         let transcriptPath = lsofOutput.flatMap {
             matchingPath(in: $0, containing: "/.claude/projects/", suffix: ".jsonl")
         }
+        let sessionID = transcriptPath.flatMap(firstUUID(in:))
+            ?? claudeSessionID(from: process.command)
 
         let workingDirectory = lsofOutput.flatMap(workingDirectory(from:))
-        guard workingDirectory != nil || transcriptPath != nil else {
+        guard workingDirectory != nil || sessionID != nil else {
             return nil
         }
 
         return ProcessSnapshot(
             tool: .claudeCode,
-            sessionID: transcriptPath.flatMap(firstUUID(in:)),
+            sessionID: sessionID,
             workingDirectory: workingDirectory,
             terminalTTY: process.terminalTTY
         )
@@ -194,6 +196,37 @@ struct ActiveAgentProcessDiscovery {
         }
 
         return String(text[matchRange]).lowercased()
+    }
+
+    private func claudeSessionID(from command: String) -> String? {
+        let tokens = command.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard !tokens.isEmpty else {
+            return nil
+        }
+
+        for index in tokens.indices {
+            let token = tokens[index]
+
+            if token == "--resume" || token == "-r" || token == "--session-id" {
+                let nextIndex = tokens.index(after: index)
+                guard tokens.indices.contains(nextIndex) else {
+                    continue
+                }
+
+                if let sessionID = firstUUID(in: tokens[nextIndex]) {
+                    return sessionID
+                }
+            }
+
+            if token.hasPrefix("--resume=") || token.hasPrefix("--session-id=") {
+                let value = String(token.split(separator: "=", maxSplits: 1).last ?? "")
+                if let sessionID = firstUUID(in: value) {
+                    return sessionID
+                }
+            }
+        }
+
+        return nil
     }
 
     private func normalizedTTY(_ rawValue: String?) -> String? {
