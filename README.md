@@ -3,7 +3,7 @@
 > 我不想在自己的电脑上运行一个闭源、付费的软件来监视我所有的生产过程。<br>
 > 所以我 build 了这个开源的版本。<br>
 >
-> To all vibe coders: 我们自己构建自己的产品。
+> you don’t need to pay for a product you can vibe since you are a vibe coder
 
 The open-source macOS companion for terminal-native AI coding.
 
