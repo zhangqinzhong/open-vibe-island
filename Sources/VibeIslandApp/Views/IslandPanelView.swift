@@ -11,6 +11,11 @@ private let popAnimation = Animation.spring(response: 0.3, dampingFraction: 0.5)
 
 struct IslandPanelView: View {
     private static let maxVisibleSessionRows = 6
+    private static let headerControlButtonSize: CGFloat = 22
+    private static let headerControlSpacing: CGFloat = 8
+    private static let headerHorizontalPadding: CGFloat = 18
+    private static let headerTopPadding: CGFloat = 2
+    private static let notchLaneSafetyInset: CGFloat = 12
 
     var model: AppModel
 
@@ -59,6 +64,24 @@ struct IslandPanelView: View {
 
     private var sideWidth: CGFloat {
         max(0, closedNotchHeight - 12) + 10
+    }
+
+    private var targetOverlayScreen: NSScreen? {
+        if let targetScreenID = model.overlayPlacementDiagnostics?.targetScreenID,
+           let screen = NSScreen.screens.first(where: { screenID(for: $0) == targetScreenID }) {
+            return screen
+        }
+
+        return NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }) ?? NSScreen.main
+    }
+
+    private var usesNotchAwareOpenedHeader: Bool {
+        model.overlayPlacementDiagnostics?.mode == .notch
+            || targetOverlayScreen?.safeAreaInsets.top ?? 0 > 0
+    }
+
+    private var openedHeaderButtonsWidth: CGFloat {
+        (Self.headerControlButtonSize * 2) + Self.headerControlSpacing
     }
 
     var body: some View {
@@ -150,11 +173,11 @@ struct IslandPanelView: View {
     // MARK: - Closed state
 
     private var closedNotchWidth: CGFloat {
-        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.notchSize.width ?? 224
+        (targetOverlayScreen ?? NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }))?.notchSize.width ?? 224
     }
 
     private var closedNotchHeight: CGFloat {
-        NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 })?.notchSize.height ?? 38
+        (targetOverlayScreen ?? NSScreen.screens.first(where: { $0.safeAreaInsets.top > 0 }))?.islandClosedHeight ?? 24
     }
 
     // MARK: - Header row (shared between closed and opened)
@@ -206,26 +229,54 @@ struct IslandPanelView: View {
 
     @ViewBuilder
     private var openedHeaderContent: some View {
-        HStack(spacing: 12) {
-            openedUsageSummary
-                .frame(maxWidth: .infinity, alignment: .leading)
+        if usesNotchAwareOpenedHeader {
+            GeometryReader { geometry in
+                let providers = openedUsageProviders
+                let providerGroups = splitUsageProviders(providers)
+                let metrics = openedHeaderMetrics(for: geometry.size.width)
 
-            HStack(spacing: 8) {
-                headerIconButton(
-                    systemName: model.isSoundMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                    tint: model.isSoundMuted ? .orange.opacity(0.92) : .white.opacity(0.62)
-                ) {
-                    model.toggleSoundMuted()
-                }
+                HStack(spacing: 0) {
+                    usageLaneView(providerGroups.left, alignment: .leading)
+                        .frame(width: metrics.leftUsageWidth, alignment: .leading)
 
-                headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
-                    model.showControlCenter()
+                    Color.clear
+                        .frame(width: metrics.centerGapWidth)
+
+                    HStack(spacing: Self.headerControlSpacing) {
+                        usageLaneView(providerGroups.right, alignment: .trailing)
+                        openedHeaderButtons
+                    }
+                    .frame(width: metrics.rightLaneWidth, alignment: .trailing)
                 }
+                .padding(.horizontal, Self.headerHorizontalPadding)
+                .padding(.top, Self.headerTopPadding)
+            }
+        } else {
+            HStack(spacing: 12) {
+                openedUsageSummary
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                openedHeaderButtons
+            }
+            .padding(.leading, Self.headerHorizontalPadding)
+            .padding(.trailing, Self.headerHorizontalPadding)
+            .padding(.top, Self.headerTopPadding)
+        }
+    }
+
+    private var openedHeaderButtons: some View {
+        HStack(spacing: Self.headerControlSpacing) {
+            headerIconButton(
+                systemName: model.isSoundMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                tint: model.isSoundMuted ? .orange.opacity(0.92) : .white.opacity(0.62)
+            ) {
+                model.toggleSoundMuted()
+            }
+
+            headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
+                model.showControlCenter()
             }
         }
-        .padding(.leading, 18)
-        .padding(.trailing, 18)
-        .padding(.top, 2)
     }
 
     private func headerIconButton(
@@ -237,7 +288,7 @@ struct IslandPanelView: View {
             Image(systemName: systemName)
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(tint)
-                .frame(width: 22, height: 22)
+                .frame(width: Self.headerControlButtonSize, height: Self.headerControlButtonSize)
                 .background(.white.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
@@ -345,16 +396,12 @@ struct IslandPanelView: View {
         let providers = openedUsageProviders
 
         if providers.isEmpty == false {
-            HStack(spacing: 8) {
-                ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
-                    if index > 0 {
-                        usageSeparator(opacity: 0.2)
-                    }
-
-                    usageProviderView(provider)
-                }
+            ViewThatFits(in: .horizontal) {
+                usageSummaryView(providers, layout: .full)
+                usageSummaryView(providers, layout: .compact)
+                usageSummaryView(providers, layout: .condensed)
+                usageSummaryView(providers, layout: .minimal)
             }
-            .lineLimit(1)
         } else {
             HStack(spacing: 8) {
                 Text("Vibe Island")
@@ -434,33 +481,144 @@ struct IslandPanelView: View {
         return providers
     }
 
-    private func usageProviderView(_ provider: UsageProviderPresentation) -> some View {
+    private func splitUsageProviders(
+        _ providers: [UsageProviderPresentation]
+    ) -> (left: [UsageProviderPresentation], right: [UsageProviderPresentation]) {
+        switch providers.count {
+        case 0:
+            return ([], [])
+        case 1:
+            return ([providers[0]], [])
+        case 2:
+            return ([providers[0]], [providers[1]])
+        default:
+            let splitIndex = Int(ceil(Double(providers.count) / 2.0))
+            return (
+                Array(providers.prefix(splitIndex)),
+                Array(providers.dropFirst(splitIndex))
+            )
+        }
+    }
+
+    @ViewBuilder
+    private func usageLaneView(
+        _ providers: [UsageProviderPresentation],
+        alignment: Alignment
+    ) -> some View {
+        if providers.isEmpty {
+            Color.clear
+                .frame(maxWidth: .infinity)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                usageSummaryView(providers, layout: .full)
+                usageSummaryView(providers, layout: .compact)
+                usageSummaryView(providers, layout: .condensed)
+                usageSummaryView(providers, layout: .minimal)
+            }
+            .frame(maxWidth: .infinity, alignment: alignment)
+        }
+    }
+
+    private func openedHeaderMetrics(for totalWidth: CGFloat) -> OpenedHeaderMetrics {
+        let contentWidth = max(0, totalWidth - (Self.headerHorizontalPadding * 2))
+        guard usesNotchAwareOpenedHeader,
+              let screen = targetOverlayScreen else {
+            let rightLaneWidth = min(contentWidth, openedHeaderButtonsWidth + (contentWidth / 2))
+            let leftUsageWidth = max(0, contentWidth - rightLaneWidth)
+            return OpenedHeaderMetrics(
+                leftUsageWidth: leftUsageWidth,
+                centerGapWidth: 0,
+                rightLaneWidth: rightLaneWidth
+            )
+        }
+
+        let panelMinX = screen.frame.midX - (totalWidth / 2)
+        let panelMaxX = panelMinX + totalWidth
+        let contentMinX = panelMinX + Self.headerHorizontalPadding
+        let contentMaxX = panelMaxX - Self.headerHorizontalPadding
+
+        let fallbackNotchHalfWidth = screen.notchSize.width / 2
+        let notchLeftEdge = screen.frame.midX - fallbackNotchHalfWidth
+        let notchRightEdge = screen.frame.midX + fallbackNotchHalfWidth
+        let leftVisibleMaxX = screen.auxiliaryTopLeftArea?.maxX ?? notchLeftEdge
+        let rightVisibleMinX = screen.auxiliaryTopRightArea?.minX ?? notchRightEdge
+
+        let rawLeftWidth = max(0, min(contentMaxX, leftVisibleMaxX) - contentMinX)
+        let rawRightWidth = max(0, contentMaxX - max(contentMinX, rightVisibleMinX))
+
+        let leftUsageWidth = max(0, rawLeftWidth - Self.notchLaneSafetyInset)
+        let rightLaneWidth = max(0, rawRightWidth - Self.notchLaneSafetyInset)
+        let centerGapWidth = max(0, contentWidth - leftUsageWidth - rightLaneWidth)
+
+        return OpenedHeaderMetrics(
+            leftUsageWidth: leftUsageWidth,
+            centerGapWidth: centerGapWidth,
+            rightLaneWidth: rightLaneWidth
+        )
+    }
+
+    private func usageSummaryView(
+        _ providers: [UsageProviderPresentation],
+        layout: UsageSummaryLayout
+    ) -> some View {
+        HStack(spacing: layout.providerSpacing) {
+            ForEach(Array(providers.enumerated()), id: \.element.id) { index, provider in
+                if index > 0 {
+                    usageSeparator(layout.providerSeparator, opacity: layout.providerSeparatorOpacity)
+                }
+
+                usageProviderView(provider, layout: layout)
+            }
+        }
+        .lineLimit(1)
+        .fixedSize(horizontal: true, vertical: false)
+    }
+
+    private func usageProviderView(
+        _ provider: UsageProviderPresentation,
+        layout: UsageSummaryLayout
+    ) -> some View {
         HStack(spacing: 8) {
-            Text(provider.title)
+            Text(layout.usesShortProviderTitle ? provider.shortTitle : provider.title)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))
 
             ForEach(Array(provider.windows.enumerated()), id: \.element.id) { index, window in
                 if index > 0 {
-                    usageSeparator(opacity: 0.16)
+                    usageSeparator(layout.windowSeparator, opacity: layout.windowSeparatorOpacity)
                 }
 
-                usageWindowView(window: window)
+                usageWindowView(window: window, layout: layout)
             }
         }
     }
 
-    private func usageWindowView(window: UsageWindowPresentation) -> some View {
+    private func screenID(for screen: NSScreen) -> String {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        if let number = screen.deviceDescription[key] as? NSNumber {
+            return "display-\(number.uint32Value)"
+        }
+
+        return screen.localizedName
+    }
+
+    private func usageWindowView(
+        window: UsageWindowPresentation,
+        layout: UsageSummaryLayout
+    ) -> some View {
         HStack(spacing: 4) {
-            Text(window.label)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.55))
+            if layout.showsWindowLabel {
+                Text(window.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+            }
 
             Text("\(window.roundedUsedPercentage)%")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(usageColor(for: window.usedPercentage))
 
-            if let resetsAt = window.resetsAt,
+            if layout.showsResetTime,
+               let resetsAt = window.resetsAt,
                let remaining = remainingDurationString(until: resetsAt) {
                 Text(remaining)
                     .font(.system(size: 11, weight: .medium))
@@ -469,8 +627,8 @@ struct IslandPanelView: View {
         }
     }
 
-    private func usageSeparator(opacity: Double) -> some View {
-        Text("|")
+    private func usageSeparator(_ title: String, opacity: Double) -> some View {
+        Text(title)
             .font(.system(size: 11, weight: .medium))
             .foregroundStyle(.white.opacity(opacity))
     }
@@ -528,6 +686,17 @@ private struct UsageProviderPresentation: Identifiable {
     let id: String
     let title: String
     let windows: [UsageWindowPresentation]
+
+    var shortTitle: String {
+        switch id {
+        case "claude":
+            "Cl"
+        case "codex":
+            "Cx"
+        default:
+            String(title.prefix(2))
+        }
+    }
 }
 
 private struct UsageWindowPresentation: Identifiable {
@@ -539,6 +708,81 @@ private struct UsageWindowPresentation: Identifiable {
     var roundedUsedPercentage: Int {
         Int(usedPercentage.rounded())
     }
+}
+
+private enum UsageSummaryLayout {
+    case full
+    case compact
+    case condensed
+    case minimal
+
+    var showsResetTime: Bool {
+        switch self {
+        case .full:
+            true
+        case .compact, .condensed, .minimal:
+            false
+        }
+    }
+
+    var showsWindowLabel: Bool {
+        switch self {
+        case .full, .compact:
+            true
+        case .condensed, .minimal:
+            false
+        }
+    }
+
+    var usesShortProviderTitle: Bool {
+        self == .minimal
+    }
+
+    var providerSpacing: CGFloat {
+        switch self {
+        case .full, .compact:
+            8
+        case .condensed, .minimal:
+            6
+        }
+    }
+
+    var providerSeparator: String {
+        "|"
+    }
+
+    var providerSeparatorOpacity: Double {
+        switch self {
+        case .full, .compact:
+            0.2
+        case .condensed, .minimal:
+            0.12
+        }
+    }
+
+    var windowSeparator: String {
+        switch self {
+        case .full, .compact:
+            "|"
+        case .condensed, .minimal:
+            "/"
+        }
+    }
+
+    var windowSeparatorOpacity: Double {
+        switch self {
+        case .full, .compact:
+            0.16
+        case .condensed, .minimal:
+            0.28
+        }
+    }
+}
+
+private struct OpenedHeaderMetrics {
+    let leftUsageWidth: CGFloat
+    let centerGapWidth: CGFloat
+    let rightLaneWidth: CGFloat
 }
 
 // MARK: - Session row (opened state)

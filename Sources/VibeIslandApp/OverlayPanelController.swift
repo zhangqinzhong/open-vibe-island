@@ -300,14 +300,14 @@ final class OverlayPanelController {
         case .closed, .popping:
             return CGSize(
                 width: closedPanelWidth(for: model, on: screen),
-                height: screen.notchSize.height
+                height: screen.islandClosedHeight
             )
         }
     }
 
     private func closedPanelWidth(for model: AppModel, on screen: NSScreen) -> CGFloat {
         let notchWidth = screen.notchSize.width
-        let notchHeight = screen.notchSize.height
+        let notchHeight = screen.islandClosedHeight
         let spotlightSession = model.surfacedSessions.first(where: { $0.phase.requiresAttention })
             ?? model.surfacedSessions.first(where: { $0.phase == .running })
             ?? model.surfacedSessions.first
@@ -511,5 +511,22 @@ extension NSScreen {
         let notchWidth = frame.width - leftPadding - rightPadding + 4
 
         return CGSize(width: notchWidth, height: notchHeight)
+    }
+
+    var topStatusBarHeight: CGFloat {
+        let reservedTopInset = max(0, frame.maxY - visibleFrame.maxY)
+        if reservedTopInset > 0 {
+            return reservedTopInset
+        }
+
+        if safeAreaInsets.top > 0 {
+            return safeAreaInsets.top
+        }
+
+        return 24
+    }
+
+    var islandClosedHeight: CGFloat {
+        topStatusBarHeight
     }
 }
