@@ -9,10 +9,13 @@ struct ActiveAgentProcessDiscoveryTests {
         let discovery = ActiveAgentProcessDiscovery { executablePath, arguments in
             if executablePath == "/bin/ps" {
                 return """
-                  101 ?? /Users/test/.local/bin/claude --resume abc
-                  102 ttys002 claude
-                  201 ttys000 node /Users/test/.nvm/versions/node/v22/bin/codex
-                  202 ttys001 /Users/test/.nvm/versions/node/v22/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex
+                  101 1 ?? /Users/test/.local/bin/claude --resume abc
+                  102 301 ttys002 claude
+                  201 1 ttys000 node /Users/test/.nvm/versions/node/v22/bin/codex
+                  202 401 ttys001 /Users/test/.nvm/versions/node/v22/lib/node_modules/@openai/codex/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/codex/codex
+                  301 900 ttys002 -/opt/homebrew/bin/fish
+                  401 900 ttys001 -/opt/homebrew/bin/fish
+                  900 1 ?? /Applications/Ghostty.app/Contents/MacOS/ghostty
                 """
             }
 
@@ -46,13 +49,15 @@ struct ActiveAgentProcessDiscoveryTests {
             tool: .claudeCode,
             sessionID: nil,
             workingDirectory: "/tmp/vibe-island",
-            terminalTTY: "/dev/ttys002"
+            terminalTTY: "/dev/ttys002",
+            terminalApp: "Ghostty"
         )))
         #expect(snapshots.contains(.init(
             tool: .codex,
             sessionID: "019d516f-71ee-7e40-bcff-502fedac0928",
             workingDirectory: "/tmp/vibe-island",
-            terminalTTY: "/dev/ttys001"
+            terminalTTY: "/dev/ttys001",
+            terminalApp: "Ghostty"
         )))
     }
 
@@ -61,7 +66,9 @@ struct ActiveAgentProcessDiscoveryTests {
         let discovery = ActiveAgentProcessDiscovery { executablePath, _ in
             if executablePath == "/bin/ps" {
                 return """
-                  102 ttys002 /Users/test/.local/bin/claude --resume 9df061a9-6836-4ccb-b83b-aea3196eca43 --permission-mode acceptEdits
+                  102 301 ttys002 /Users/test/.local/bin/claude --resume 9df061a9-6836-4ccb-b83b-aea3196eca43 --permission-mode acceptEdits
+                  301 900 ttys002 -/opt/homebrew/bin/fish
+                  900 1 ?? /Applications/Ghostty.app/Contents/MacOS/ghostty
                 """
             }
 
@@ -82,7 +89,8 @@ struct ActiveAgentProcessDiscoveryTests {
                 tool: .claudeCode,
                 sessionID: "9df061a9-6836-4ccb-b83b-aea3196eca43",
                 workingDirectory: "/tmp/vibe-island",
-                terminalTTY: "/dev/ttys002"
+                terminalTTY: "/dev/ttys002",
+                terminalApp: "Ghostty"
             ),
         ])
     }

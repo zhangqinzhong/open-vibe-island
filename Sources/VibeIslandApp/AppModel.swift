@@ -21,9 +21,11 @@ enum NotchOpenReason: Equatable {
 final class AppModel {
     private static let overlayDisplayPreferenceDefaultsKey = "overlay.display.preference"
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
+    private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     private static let notificationSurfaceAutoCollapseDelay: TimeInterval = 10
     static let hoverOpenDelay: TimeInterval = 0.7
+    typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
 
     struct AcceptanceStep: Identifiable {
         let id: String
@@ -1444,12 +1446,21 @@ final class AppModel {
     }
 
     private func reconcileSessionAttachments() {
+        let activeProcesses = activeAgentProcessDiscovery.discover()
+        let mergedSessions = mergedWithSyntheticClaudeSessions(
+            existingSessions: state.sessions,
+            activeProcesses: activeProcesses
+        )
+        let syntheticSessionsChanged = mergedSessions != state.sessions
+        if syntheticSessionsChanged {
+            state = SessionState(sessions: mergedSessions)
+        }
+
         let sessions = state.sessions.filter(\.isTrackedLiveSession)
         guard !sessions.isEmpty else {
             return
         }
 
-        let activeProcesses = activeAgentProcessDiscovery.discover()
         let resolutions = terminalSessionAttachmentProbe.sessionResolutions(
             for: sessions,
             activeProcesses: activeProcesses
@@ -1463,7 +1474,7 @@ final class AppModel {
 
         let attachmentsChanged = state.reconcileAttachmentStates(attachmentUpdates)
         let jumpTargetsChanged = state.reconcileJumpTargets(jumpTargetUpdates)
-        guard attachmentsChanged || jumpTargetsChanged else {
+        guard syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged else {
             return
         }
 
@@ -1537,6 +1548,7 @@ final class AppModel {
             .filter {
                 $0.tool == .claudeCode
                     && $0.isTrackedLiveSession
+                    && !$0.id.hasPrefix(Self.syntheticClaudeSessionPrefix)
                     && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
                     && ($0.jumpTarget != nil || $0.claudeMetadata?.transcriptPath != nil)
             }
@@ -1546,6 +1558,182 @@ final class AppModel {
         claudeSessionPersistenceTask = Task.detached(priority: .utility) {
             try? await Task.sleep(for: .milliseconds(250))
             try? registry.save(records)
+        }
+    }
+
+    func mergedWithSyntheticClaudeSessions(
+        existingSessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot],
+        now: Date = .now
+    ) -> [AgentSession] {
+        let baseSessions = existingSessions.filter { !isSyntheticClaudeSession($0) }
+        let syntheticSessions = syntheticClaudeSessions(
+            existingSessions: baseSessions,
+            activeProcesses: activeProcesses,
+            now: now
+        )
+
+        return baseSessions + syntheticSessions
+    }
+
+    private func syntheticClaudeSessions(
+        existingSessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot],
+        now: Date
+    ) -> [AgentSession] {
+        let attachedClaudeSessions = existingSessions.filter { session in
+            session.tool == .claudeCode && session.isAttachedToTerminal
+        }
+
+        var exactMatchedProcessKeys: Set<String> = []
+        let activeClaudeProcesses = activeProcesses.filter { process in
+            process.tool == .claudeCode && supportedTerminalApp(for: process.terminalApp) != nil
+        }
+
+        for process in activeClaudeProcesses {
+            if let sessionID = process.sessionID,
+               attachedClaudeSessions.contains(where: { $0.id == sessionID }) {
+                exactMatchedProcessKeys.insert(processIdentityKey(process))
+                continue
+            }
+
+            if let terminalTTY = normalizedTTYForMatching(process.terminalTTY),
+               attachedClaudeSessions.contains(where: {
+                   normalizedTTYForMatching($0.jumpTarget?.terminalTTY) == terminalTTY
+               }) {
+                exactMatchedProcessKeys.insert(processIdentityKey(process))
+            }
+        }
+
+        let unmatchedProcesses = activeClaudeProcesses.filter {
+            !exactMatchedProcessKeys.contains(processIdentityKey($0))
+        }
+
+        let groupedProcesses = Dictionary(grouping: unmatchedProcesses, by: syntheticClaudeGroupKey(for:))
+
+        return groupedProcesses.values.flatMap { processes -> [AgentSession] in
+            guard let firstProcess = processes.first,
+                  let groupKey = syntheticClaudeGroupKey(for: firstProcess),
+                  let terminalApp = supportedTerminalApp(for: firstProcess.terminalApp) else {
+                return []
+            }
+
+            let representedCount = attachedClaudeSessions.filter { session in
+                supportedTerminalApp(for: session.jumpTarget?.terminalApp) == terminalApp
+                    && syntheticClaudeGroupKey(for: session) == groupKey
+            }.count
+
+            let syntheticCount = max(0, processes.count - representedCount)
+            guard syntheticCount > 0 else {
+                return []
+            }
+
+            return processes
+                .sorted { processIdentityKey($0) < processIdentityKey($1) }
+                .prefix(syntheticCount)
+                .map { syntheticClaudeSession(for: $0, now: now) }
+        }
+    }
+
+    private func syntheticClaudeSession(
+        for process: ActiveProcessSnapshot,
+        now: Date
+    ) -> AgentSession {
+        let workingDirectory = process.workingDirectory
+        let workspaceName = workingDirectory.map { URL(fileURLWithPath: $0).lastPathComponent }.flatMap { value in
+            value.isEmpty ? nil : value
+        } ?? "Workspace"
+        let terminalApp = supportedTerminalApp(for: process.terminalApp) ?? "Unknown"
+        let identity = processIdentityKey(process)
+
+        return AgentSession(
+            id: "\(Self.syntheticClaudeSessionPrefix)\(identity)",
+            title: "Claude · \(workspaceName)",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Active Claude session detected from \(terminalApp).",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: terminalApp,
+                workspaceName: workspaceName,
+                paneTitle: "Claude \(workspaceName)",
+                workingDirectory: workingDirectory,
+                terminalTTY: process.terminalTTY
+            )
+        )
+    }
+
+    private func isSyntheticClaudeSession(_ session: AgentSession) -> Bool {
+        session.tool == .claudeCode && session.id.hasPrefix(Self.syntheticClaudeSessionPrefix)
+    }
+
+    private func processIdentityKey(_ process: ActiveProcessSnapshot) -> String {
+        [
+            process.sessionID,
+            normalizedTTYForMatching(process.terminalTTY),
+            normalizedPathForMatching(process.workingDirectory),
+            supportedTerminalApp(for: process.terminalApp),
+        ]
+        .compactMap { $0 }
+        .joined(separator: "|")
+    }
+
+    private func syntheticClaudeGroupKey(for process: ActiveProcessSnapshot) -> String? {
+        if let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            return "cwd:\(workingDirectory)"
+        }
+
+        if let terminalTTY = normalizedTTYForMatching(process.terminalTTY) {
+            return "tty:\(terminalTTY)"
+        }
+
+        return nil
+    }
+
+    private func syntheticClaudeGroupKey(for session: AgentSession) -> String? {
+        if let workingDirectory = normalizedPathForMatching(session.jumpTarget?.workingDirectory) {
+            return "cwd:\(workingDirectory)"
+        }
+
+        if let terminalTTY = normalizedTTYForMatching(session.jumpTarget?.terminalTTY) {
+            return "tty:\(terminalTTY)"
+        }
+
+        return nil
+    }
+
+    private func normalizedPathForMatching(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: value).standardizedFileURL.path.lowercased()
+    }
+
+    private func normalizedTTYForMatching(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+
+        return value.hasPrefix("/dev/") ? value : "/dev/\(value)"
+    }
+
+    private func supportedTerminalApp(for value: String?) -> String? {
+        guard let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() else {
+            return nil
+        }
+
+        switch normalized {
+        case "ghostty":
+            return "Ghostty"
+        case "terminal", "apple_terminal":
+            return "Terminal"
+        default:
+            return nil
         }
     }
 

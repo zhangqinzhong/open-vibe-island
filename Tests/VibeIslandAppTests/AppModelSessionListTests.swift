@@ -173,4 +173,151 @@ struct AppModelSessionListTests {
         #expect(merged.first?.claudeMetadata?.lastUserPrompt == "Check the Claude session registry.")
         #expect(merged.first?.phase == .running)
     }
+
+    @Test
+    func mergedWithSyntheticClaudeSessionsAddsGhosttyClaudeProcessWhenNoTrackedSessionExists() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+
+        let merged = model.mergedWithSyntheticClaudeSessions(
+            existingSessions: [],
+            activeProcesses: [
+                .init(
+                    tool: .claudeCode,
+                    sessionID: nil,
+                    workingDirectory: "/tmp/vibe-island",
+                    terminalTTY: "/dev/ttys002",
+                    terminalApp: "Ghostty"
+                ),
+            ],
+            now: now
+        )
+
+        #expect(merged.count == 1)
+        #expect(merged.first?.id.hasPrefix("claude-process:") == true)
+        #expect(merged.first?.attachmentState == .attached)
+        #expect(merged.first?.jumpTarget?.terminalApp == "Ghostty")
+        #expect(merged.first?.jumpTarget?.terminalTTY == "/dev/ttys002")
+    }
+
+    @Test
+    func mergedWithSyntheticClaudeSessionsSkipsSyntheticWhenAttachedClaudeAlreadyRepresentsGroup() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        let existing = AgentSession(
+            id: "e45d5e87-66d0-4f67-8399-6ebc02f3d453",
+            title: "Claude · vibe-island",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "vibe-island",
+                paneTitle: "vibe-island · hi · e45d5e87",
+                workingDirectory: "/tmp/vibe-island",
+                terminalSessionID: "ghostty-claude"
+            )
+        )
+
+        let merged = model.mergedWithSyntheticClaudeSessions(
+            existingSessions: [existing],
+            activeProcesses: [
+                .init(
+                    tool: .claudeCode,
+                    sessionID: nil,
+                    workingDirectory: "/tmp/vibe-island",
+                    terminalTTY: "/dev/ttys002",
+                    terminalApp: "Ghostty"
+                ),
+            ],
+            now: now
+        )
+
+        #expect(merged.map(\.id) == [existing.id])
+    }
+
+    @Test
+    func syntheticClaudeSessionWinsOverRecoveredUnknownSessionsForLiveGhosttyProcess() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        let recoveredSessions = [
+            AgentSession(
+                id: "e45d5e87-66d0-4f67-8399-6ebc02f3d453",
+                title: "Claude · vibe-island",
+                tool: .claudeCode,
+                origin: .live,
+                attachmentState: .stale,
+                phase: .completed,
+                summary: "Recovered transcript",
+                updatedAt: now.addingTimeInterval(-10_800),
+                jumpTarget: JumpTarget(
+                    terminalApp: "Unknown",
+                    workspaceName: "vibe-island",
+                    paneTitle: "Claude e45d5e87",
+                    workingDirectory: "/tmp/vibe-island"
+                )
+            ),
+            AgentSession(
+                id: "c9a48d05-c1f9-4e39-ab66-19edef0c2bc9",
+                title: "Claude · vibe-island",
+                tool: .claudeCode,
+                origin: .live,
+                attachmentState: .stale,
+                phase: .completed,
+                summary: "Recovered transcript",
+                updatedAt: now.addingTimeInterval(-64_800),
+                jumpTarget: JumpTarget(
+                    terminalApp: "Unknown",
+                    workspaceName: "vibe-island",
+                    paneTitle: "Claude c9a48d05",
+                    workingDirectory: "/tmp/vibe-island"
+                )
+            ),
+        ]
+        let activeProcesses: [AppModel.ActiveProcessSnapshot] = [
+            .init(
+                tool: .claudeCode,
+                sessionID: nil,
+                workingDirectory: "/tmp/vibe-island",
+                terminalTTY: "/dev/ttys002",
+                terminalApp: "Ghostty"
+            ),
+        ]
+
+        let merged = model.mergedWithSyntheticClaudeSessions(
+            existingSessions: recoveredSessions,
+            activeProcesses: activeProcesses,
+            now: now
+        )
+        let probe = TerminalSessionAttachmentProbe()
+        let resolutions = probe.sessionResolutions(
+            for: merged,
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: activeProcesses,
+            now: now
+        )
+
+        model.state = SessionState(sessions: merged)
+        _ = model.state.reconcileAttachmentStates(resolutions.mapValues(\.attachmentState))
+        _ = model.state.reconcileJumpTargets(
+            resolutions.reduce(into: [String: JumpTarget]()) { partialResult, entry in
+                if let correctedJumpTarget = entry.value.correctedJumpTarget {
+                    partialResult[entry.key] = correctedJumpTarget
+                }
+            }
+        )
+
+        let attachedClaudeSessions = model.state.sessions.filter {
+            $0.tool == .claudeCode && $0.attachmentState == .attached
+        }
+
+        #expect(attachedClaudeSessions.count == 1)
+        #expect(attachedClaudeSessions.first?.id.hasPrefix("claude-process:") == true)
+        #expect(attachedClaudeSessions.first?.jumpTarget?.terminalApp == "Ghostty")
+        #expect(attachedClaudeSessions.first?.jumpTarget?.terminalTTY == "/dev/ttys002")
+    }
 }

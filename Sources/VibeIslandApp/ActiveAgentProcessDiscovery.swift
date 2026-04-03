@@ -14,10 +14,26 @@ struct ActiveAgentProcessDiscovery {
         var sessionID: String?
         var workingDirectory: String?
         var terminalTTY: String?
+        var terminalApp: String?
+
+        init(
+            tool: AgentTool,
+            sessionID: String?,
+            workingDirectory: String?,
+            terminalTTY: String?,
+            terminalApp: String? = nil
+        ) {
+            self.tool = tool
+            self.sessionID = sessionID
+            self.workingDirectory = workingDirectory
+            self.terminalTTY = terminalTTY
+            self.terminalApp = terminalApp
+        }
     }
 
     private struct RunningProcess {
         var pid: String
+        var parentPID: String
         var terminalTTY: String?
         var command: String
     }
@@ -36,6 +52,8 @@ struct ActiveAgentProcessDiscovery {
             return []
         }
 
+        let processesByPID = Dictionary(uniqueKeysWithValues: processes.map { ($0.pid, $0) })
+
         var snapshots: [ProcessSnapshot] = []
         var claimedKeys: Set<String> = []
 
@@ -45,7 +63,7 @@ struct ActiveAgentProcessDiscovery {
             }
 
             if isCodexProcess(command: process.command) {
-                guard let snapshot = codexSnapshot(for: process) else {
+                guard let snapshot = codexSnapshot(for: process, processesByPID: processesByPID) else {
                     continue
                 }
 
@@ -59,7 +77,7 @@ struct ActiveAgentProcessDiscovery {
             }
 
             if isClaudeProcess(command: process.command) {
-                guard let snapshot = claudeSnapshot(for: process) else {
+                guard let snapshot = claudeSnapshot(for: process, processesByPID: processesByPID) else {
                     continue
                 }
 
@@ -76,7 +94,7 @@ struct ActiveAgentProcessDiscovery {
     }
 
     private func runningProcesses() -> [RunningProcess] {
-        guard let output = commandRunner("/bin/ps", ["-Ao", "pid=,tty=,command="]) else {
+        guard let output = commandRunner("/bin/ps", ["-Ao", "pid=,ppid=,tty=,command="]) else {
             return []
         }
 
@@ -88,23 +106,27 @@ struct ActiveAgentProcessDiscovery {
                     return nil
                 }
 
-                let components = trimmed.split(maxSplits: 2, whereSeparator: \.isWhitespace)
-                guard components.count == 3 else {
+                let components = trimmed.split(maxSplits: 3, whereSeparator: \.isWhitespace)
+                guard components.count == 4 else {
                     return nil
                 }
 
                 let pid = String(components[0])
-                let tty = normalizedTTY(String(components[1]))
-                let command = String(components[2]).trimmingCharacters(in: .whitespacesAndNewlines)
+                let parentPID = String(components[1])
+                let tty = normalizedTTY(String(components[2]))
+                let command = String(components[3]).trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !command.isEmpty else {
                     return nil
                 }
 
-                return RunningProcess(pid: pid, terminalTTY: tty, command: command)
+                return RunningProcess(pid: pid, parentPID: parentPID, terminalTTY: tty, command: command)
             }
     }
 
-    private func codexSnapshot(for process: RunningProcess) -> ProcessSnapshot? {
+    private func codexSnapshot(
+        for process: RunningProcess,
+        processesByPID: [String: RunningProcess]
+    ) -> ProcessSnapshot? {
         guard let lsofOutput = lsofOutput(pid: process.pid),
               let transcriptPath = matchingPath(in: lsofOutput, containing: "/.codex/sessions/", suffix: ".jsonl"),
               let sessionID = firstUUID(in: transcriptPath) else {
@@ -115,11 +137,15 @@ struct ActiveAgentProcessDiscovery {
             tool: .codex,
             sessionID: sessionID,
             workingDirectory: workingDirectory(from: lsofOutput),
-            terminalTTY: process.terminalTTY
+            terminalTTY: process.terminalTTY,
+            terminalApp: terminalApp(for: process, processesByPID: processesByPID)
         )
     }
 
-    private func claudeSnapshot(for process: RunningProcess) -> ProcessSnapshot? {
+    private func claudeSnapshot(
+        for process: RunningProcess,
+        processesByPID: [String: RunningProcess]
+    ) -> ProcessSnapshot? {
         let lsofOutput = lsofOutput(pid: process.pid)
         let transcriptPath = lsofOutput.flatMap {
             matchingPath(in: $0, containing: "/.claude/projects/", suffix: ".jsonl")
@@ -136,8 +162,49 @@ struct ActiveAgentProcessDiscovery {
             tool: .claudeCode,
             sessionID: sessionID,
             workingDirectory: workingDirectory,
-            terminalTTY: process.terminalTTY
+            terminalTTY: process.terminalTTY,
+            terminalApp: terminalApp(for: process, processesByPID: processesByPID)
         )
+    }
+
+    private func terminalApp(
+        for process: RunningProcess,
+        processesByPID: [String: RunningProcess]
+    ) -> String? {
+        var currentParentPID = process.parentPID
+        var visited: Set<String> = []
+
+        while !currentParentPID.isEmpty,
+              currentParentPID != "0",
+              currentParentPID != "1",
+              visited.insert(currentParentPID).inserted,
+              let parent = processesByPID[currentParentPID] {
+            if let terminalApp = recognizedTerminalApp(for: parent.command) {
+                return terminalApp
+            }
+
+            currentParentPID = parent.parentPID
+        }
+
+        return nil
+    }
+
+    private func recognizedTerminalApp(for command: String) -> String? {
+        let lowered = command.lowercased()
+
+        if lowered.contains("/ghostty.app/contents/macos/ghostty") || lowered.hasSuffix("/ghostty") {
+            return "Ghostty"
+        }
+
+        if lowered.contains("/terminal.app/contents/macos/terminal") {
+            return "Terminal"
+        }
+
+        if lowered.contains("/iterm.app/contents/macos/iterm2") {
+            return "iTerm"
+        }
+
+        return nil
     }
 
     private func lsofOutput(pid: String) -> String? {
