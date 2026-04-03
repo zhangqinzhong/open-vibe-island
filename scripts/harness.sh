@@ -31,6 +31,10 @@ run_step() {
             echo "==> smoke"
             zsh "$repo_root/scripts/smoke-dev-app.sh"
             ;;
+        smoke-all)
+            echo "==> smoke-all"
+            zsh "$repo_root/scripts/smoke-all-scenarios.sh"
+            ;;
         ci)
             run_step docs
             run_step test
@@ -40,10 +44,10 @@ run_step() {
             run_step docs
             run_step test
             run_step build
-            run_step smoke
+            run_step smoke-all
             ;;
         *)
-            echo "usage: scripts/harness.sh [docs|test|build|smoke|ci|all] ..." >&2
+            echo "usage: scripts/harness.sh [docs|test|build|smoke|smoke-all|ci|all] ..." >&2
             exit 64
             ;;
     esac

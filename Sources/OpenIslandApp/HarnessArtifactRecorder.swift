@@ -118,7 +118,8 @@ enum HarnessArtifactRecorder {
             try imageData.write(to: imageURL)
 
             let accessibilityFileName = accessibilityFileName(for: window, ordinal: windows.count + 1)
-            let accessibilitySnapshot = snapshotAccessibilityTree(for: window)
+            let viewAccessibilitySnapshot = snapshotViewAccessibilityTree(for: window)
+            let accessibilitySnapshot = snapshotAXTree(for: window) ?? viewAccessibilitySnapshot
             if let accessibilitySnapshot {
                 let accessibilityURL = directoryURL.appendingPathComponent(accessibilityFileName)
                 let encoder = JSONEncoder()
@@ -133,7 +134,10 @@ enum HarnessArtifactRecorder {
                     frame: .init(window.frame),
                     imagePath: imageName,
                     accessibilityPath: accessibilitySnapshot == nil ? nil : accessibilityFileName,
-                    accessibilitySummary: accessibilitySnapshot.map(accessibilitySummary(from:))
+                    accessibilitySummary: mergedAccessibilitySummary(
+                        primary: accessibilitySnapshot,
+                        secondary: viewAccessibilitySnapshot
+                    )
                 )
             )
         }
@@ -289,11 +293,7 @@ enum HarnessArtifactRecorder {
         }
     }
 
-    private static func snapshotAccessibilityTree(for window: NSWindow) -> HarnessArtifactReport.AccessibilityNode? {
-        if let node = snapshotAXTree(for: window) {
-            return node
-        }
-
+    private static func snapshotViewAccessibilityTree(for window: NSWindow) -> HarnessArtifactReport.AccessibilityNode? {
         window.displayIfNeeded()
 
         if let contentView = window.contentView,
@@ -302,6 +302,35 @@ enum HarnessArtifactRecorder {
         }
 
         return snapshotAccessibilityNode(from: window, fallbackChildren: [])
+    }
+
+    private static func mergedAccessibilitySummary(
+        primary: HarnessArtifactReport.AccessibilityNode?,
+        secondary: HarnessArtifactReport.AccessibilityNode?
+    ) -> HarnessArtifactReport.AccessibilitySummary? {
+        let roots = [primary, secondary].compactMap { $0 }
+        guard roots.isEmpty == false else {
+            return nil
+        }
+
+        var labels = Set<String>()
+        var buttonLabels = Set<String>()
+        var textValues = Set<String>()
+
+        for root in roots {
+            collectAccessibilityStrings(
+                from: root,
+                labels: &labels,
+                buttonLabels: &buttonLabels,
+                textValues: &textValues
+            )
+        }
+
+        return HarnessArtifactReport.AccessibilitySummary(
+            labels: labels.sorted(),
+            buttonLabels: buttonLabels.sorted(),
+            textValues: textValues.sorted()
+        )
     }
 
     private static func snapshotAccessibilityNode(

@@ -9,6 +9,7 @@ The repository harness exists to make a round of work mechanically checkable. Th
 - `scripts/harness.sh` runs the baseline checks. With no arguments it runs `docs`, `test`, and `build`.
 - `scripts/harness.sh ci` is the non-GUI path used by CI.
 - `scripts/harness.sh smoke` launches the macOS app in harness mode, loads a deterministic debug scenario, captures local artifacts, and auto-exits after a short timeout.
+- `scripts/harness.sh smoke-all` runs the full debug-scenario suite and validates each artifact set.
 - `scripts/check-docs.sh` enforces the minimum doc map and required links.
 
 ## Current Guarantees
@@ -39,10 +40,12 @@ The default smoke path writes artifacts under `output/harness/`.
 
 For the default `approvalCard` smoke scenario, the harness now performs a minimal semantic check against the accessibility snapshot:
 
-- overlay artifact exists
-- notch stays open
-- active surface is an approval card
-- accessibility tree contains `Deny` plus an allow-style button label
+- `closed`: compact geometry remains in the closed-notch range
+- `sessionList`: expanded geometry is present and the list exposes multiple actionable rows
+- `approvalCard`: overlay stays open and the accessibility tree contains `Deny` plus an allow-style button label
+- `questionCard`: overlay stays open and the three answer choices appear as buttons
+- `completionCard`: overlay stays open and exposes the `Done` completion copy
+- `longCompletionCard`: overlay stays open and exposes the long completion response text instead of collapsing away
 
 ## Evidence Expectations
 

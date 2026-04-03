@@ -211,6 +211,10 @@ final class OverlayPanelController {
     // MARK: - Mouse event monitoring
 
     private func startEventMonitoring() {
+        if model?.disablesOverlayEventMonitoringDuringHarness == true {
+            return
+        }
+
         guard !eventMonitors.isActive else { return }
 
         eventMonitors.start { [weak self] location in

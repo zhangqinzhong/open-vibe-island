@@ -75,6 +75,8 @@ final class AppModel {
             refreshOverlayPlacement()
         }
     }
+    var ignoresPointerExitDuringHarness = false
+    var disablesOverlayEventMonitoringDuringHarness = false
 
     @ObservationIgnored
     private var bridgeTask: Task<Void, Never>?
@@ -374,6 +376,10 @@ final class AppModel {
     }
 
     var shouldAutoCollapseOnMouseLeave: Bool {
+        if ignoresPointerExitDuringHarness {
+            return false
+        }
+
         guard notchStatus == .opened else {
             return false
         }

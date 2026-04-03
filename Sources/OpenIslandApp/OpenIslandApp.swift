@@ -15,6 +15,8 @@ final class OpenIslandAppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
 
         DispatchQueue.main.async { [self] in
+            model.ignoresPointerExitDuringHarness = harnessLaunchConfiguration.scenario != nil
+            model.disablesOverlayEventMonitoringDuringHarness = harnessLaunchConfiguration.scenario != nil
             model.startIfNeeded(
                 startBridge: harnessLaunchConfiguration.shouldStartBridge,
                 shouldPerformBootAnimation: harnessLaunchConfiguration.shouldPerformBootAnimation,
