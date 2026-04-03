@@ -23,7 +23,7 @@ final class AppModel {
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     private static let notificationSurfaceAutoCollapseDelay: TimeInterval = 10
-    static let hoverOpenDelay: TimeInterval = 1.0
+    static let hoverOpenDelay: TimeInterval = 0.7
 
     struct AcceptanceStep: Identifiable {
         let id: String
@@ -129,7 +129,7 @@ final class AppModel {
     private var notificationAutoCollapseTask: Task<Void, Never>?
 
     @ObservationIgnored
-    private var notificationSurfaceHasBeenHovered = false
+    private var autoCollapseSurfaceHasBeenEntered = false
 
     @ObservationIgnored
     private var codexUsageMonitorTask: Task<Void, Never>?
@@ -363,8 +363,20 @@ final class AppModel {
     }
 
     var shouldAutoCollapseOnMouseLeave: Bool {
-        notchStatus == .opened
-            && notchOpenReason == .notification
+        guard notchStatus == .opened else {
+            return false
+        }
+
+        if notchOpenReason == .hover && islandSurface == .sessionList {
+            return true
+        }
+
+        return notchOpenReason == .notification
+            && islandSurface.autoDismissesWhenPresentedAsNotification
+    }
+
+    private var autoCollapseOnMouseLeaveRequiresPriorSurfaceEntry: Bool {
+        notchOpenReason == .notification
             && islandSurface.autoDismissesWhenPresentedAsNotification
     }
 
@@ -528,7 +540,7 @@ final class AppModel {
         islandSurface = surface
         notchOpenReason = reason
         notchStatus = .opened
-        notificationSurfaceHasBeenHovered = false
+        autoCollapseSurfaceHasBeenEntered = false
         updateNotificationAutoCollapse()
 
         overlayPlacementDiagnostics = overlayPanelController.show(
@@ -546,7 +558,7 @@ final class AppModel {
         notchStatus = .closed
         notchOpenReason = nil
         islandSurface = .sessionList
-        notificationSurfaceHasBeenHovered = false
+        autoCollapseSurfaceHasBeenEntered = false
         notificationAutoCollapseTask?.cancel()
         notificationAutoCollapseTask = nil
         overlayPanelController.setInteractive(false)
@@ -630,7 +642,7 @@ final class AppModel {
     ) {
         notificationAutoCollapseTask?.cancel()
         notificationAutoCollapseTask = nil
-        notificationSurfaceHasBeenHovered = false
+        autoCollapseSurfaceHasBeenEntered = false
 
         state = SessionState(sessions: snapshot.sessions)
         selectedSessionID = snapshot.selectedSessionID ?? snapshot.sessions.first?.id
@@ -665,12 +677,16 @@ final class AppModel {
             return
         }
 
-        notificationSurfaceHasBeenHovered = true
+        autoCollapseSurfaceHasBeenEntered = true
     }
 
     func handlePointerExitedIslandSurface() {
-        guard shouldAutoCollapseOnMouseLeave,
-              notificationSurfaceHasBeenHovered else {
+        guard shouldAutoCollapseOnMouseLeave else {
+            return
+        }
+
+        guard !autoCollapseOnMouseLeaveRequiresPriorSurfaceEntry
+                || autoCollapseSurfaceHasBeenEntered else {
             return
         }
 
