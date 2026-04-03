@@ -412,7 +412,7 @@ final class OverlayPanelController {
 
         let now = Date.now
         let presentation = openedSessionListPresentation(
-            sessions: model.surfacedSessions,
+            sessions: model.islandListSessions,
             referenceDate: now
         )
 

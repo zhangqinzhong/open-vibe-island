@@ -303,7 +303,7 @@ struct IslandPanelView: View {
             if let session = model.activeIslandCardSession,
                model.showsNotificationCard {
                 notificationCard(session: session)
-            } else if model.surfacedSessions.isEmpty {
+            } else if displayedSessions.isEmpty {
                 emptyState
             } else {
                 sessionList
@@ -362,7 +362,7 @@ struct IslandPanelView: View {
     }
 
     private var displayedSessions: [AgentSession] {
-        model.surfacedSessions
+        model.islandListSessions
     }
 
     private func sessionListPresentation(at referenceDate: Date) -> SessionListPresentation {

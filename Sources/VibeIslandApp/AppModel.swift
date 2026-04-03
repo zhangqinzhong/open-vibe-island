@@ -158,6 +158,10 @@ final class AppModel {
         sessionBuckets.overflow
     }
 
+    var islandListSessions: [AgentSession] {
+        sessionBuckets.primary + sessionBuckets.overflow
+    }
+
     var recentSessionCount: Int {
         recentSessions.count
     }
