@@ -60,4 +60,58 @@ struct AppModelSessionListTests {
         #expect(model.recentSessions.map(\.id) == ["recent-session"])
         #expect(model.islandListSessions.map(\.id) == ["live-session"])
     }
+
+    @Test
+    func hoverOpenedSessionListAutoCollapsesOnPointerExit() {
+        let model = AppModel()
+        model.notchStatus = .opened
+        model.notchOpenReason = .hover
+        model.islandSurface = .sessionList
+
+        #expect(model.shouldAutoCollapseOnMouseLeave)
+
+        model.handlePointerExitedIslandSurface()
+
+        #expect(model.notchStatus == .closed)
+        #expect(model.notchOpenReason == nil)
+        #expect(model.islandSurface == .sessionList)
+    }
+
+    @Test
+    func clickedSessionListDoesNotAutoCollapseOnPointerExit() {
+        let model = AppModel()
+        model.notchStatus = .opened
+        model.notchOpenReason = .click
+        model.islandSurface = .sessionList
+
+        #expect(!model.shouldAutoCollapseOnMouseLeave)
+
+        model.notePointerInsideIslandSurface()
+        model.handlePointerExitedIslandSurface()
+
+        #expect(model.notchStatus == .opened)
+        #expect(model.notchOpenReason == .click)
+        #expect(model.islandSurface == .sessionList)
+    }
+
+    @Test
+    func completionNotificationRequiresSurfaceEntryBeforePointerExitCollapse() {
+        let model = AppModel()
+        model.notchStatus = .opened
+        model.notchOpenReason = .notification
+        model.islandSurface = .completionCard(sessionID: "session-1")
+
+        #expect(model.shouldAutoCollapseOnMouseLeave)
+
+        model.handlePointerExitedIslandSurface()
+
+        #expect(model.notchStatus == .opened)
+        #expect(model.notchOpenReason == .notification)
+
+        model.notePointerInsideIslandSurface()
+        model.handlePointerExitedIslandSurface()
+
+        #expect(model.notchStatus == .closed)
+        #expect(model.notchOpenReason == nil)
+    }
 }
