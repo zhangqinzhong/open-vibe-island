@@ -137,6 +137,12 @@ public struct CodexTrackedSessionRecord: Equatable, Codable, Sendable {
 }
 
 public extension CodexTrackedSessionRecord {
+    var restorableSession: AgentSession {
+        var session = session
+        session.attachmentState = .stale
+        return session
+    }
+
     var shouldRestoreToLiveState: Bool {
         origin != .demo && !LegacyMockSessionIDs.all.contains(sessionID)
     }

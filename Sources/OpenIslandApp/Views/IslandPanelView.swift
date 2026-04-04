@@ -303,6 +303,8 @@ struct IslandPanelView: View {
             if let session = model.activeIslandCardSession,
                model.showsNotificationCard {
                 notificationCard(session: session)
+            } else if model.shouldShowSessionBootstrapPlaceholder {
+                sessionBootstrapPlaceholder
             } else if displayedSessions.isEmpty {
                 emptyState
             } else {
@@ -311,6 +313,24 @@ struct IslandPanelView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
+    }
+
+    private var sessionBootstrapPlaceholder: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            ProgressView()
+                .progressViewStyle(.circular)
+                .tint(.white.opacity(0.7))
+                .scaleEffect(0.8)
+            Text("Checking open terminal sessions")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(.white.opacity(0.58))
+            Text("Open Island will show live agents after terminal ownership is confirmed")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.28))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var emptyState: some View {

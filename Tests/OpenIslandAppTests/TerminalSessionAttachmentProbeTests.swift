@@ -195,6 +195,29 @@ struct TerminalSessionAttachmentProbeTests {
     }
 
     @Test
+    func coldStartProbeDoesNotReviveRecentSessionWithoutAuthoritativeTerminalData() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let session = ghosttySession(
+            id: "session-1",
+            updatedAt: now.addingTimeInterval(-30),
+            phase: .running,
+            terminalSessionID: "ghostty-1"
+        )
+
+        let report = probe.sessionResolutionReport(
+            for: [session],
+            ghosttyAvailability: .unavailable(appIsRunning: true),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            allowRecentAttachmentGrace: false,
+            now: now
+        )
+
+        #expect(report.isAuthoritative == false)
+        #expect(report.resolutions["session-1"]?.attachmentState == .stale)
+    }
+
+    @Test
     func unavailableGhosttyProbeStillAttachesActiveCompletedCodexSession() {
         let now = Date(timeIntervalSince1970: 1_000)
         let probe = TerminalSessionAttachmentProbe()

@@ -94,6 +94,22 @@ struct CodexSessionTrackingTests {
     }
 
     @Test
+    func codexRestorableSessionAlwaysStartsStale() {
+        let record = CodexTrackedSessionRecord(
+            sessionID: "codex-live-1",
+            title: "Codex · open-island",
+            origin: .live,
+            attachmentState: .attached,
+            summary: "Working",
+            phase: .running,
+            updatedAt: .now
+        )
+
+        #expect(record.session.attachmentState == .attached)
+        #expect(record.restorableSession.attachmentState == .stale)
+    }
+
+    @Test
     func codexSessionStoreLoadsLegacyRecordsWithoutAttachmentState() throws {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("open-island-legacy-tracking-\(UUID().uuidString)", isDirectory: true)

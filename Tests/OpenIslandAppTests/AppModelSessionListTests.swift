@@ -62,6 +62,54 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func sessionBootstrapPlaceholderAppearsWhileStartupResolutionIsPending() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        model.isResolvingInitialLiveSessions = true
+        model.state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "recovered-session",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .stale,
+                    phase: .running,
+                    summary: "Recovered from cache",
+                    updatedAt: now
+                ),
+            ]
+        )
+
+        #expect(model.liveSessionCount == 0)
+        #expect(model.shouldShowSessionBootstrapPlaceholder)
+    }
+
+    @Test
+    func sessionBootstrapPlaceholderClearsOnceALiveSessionIsConfirmed() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        model.isResolvingInitialLiveSessions = true
+        model.state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "live-session",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .attached,
+                    phase: .running,
+                    summary: "Working",
+                    updatedAt: now
+                ),
+            ]
+        )
+
+        #expect(model.liveSessionCount == 1)
+        #expect(!model.shouldShowSessionBootstrapPlaceholder)
+    }
+
+    @Test
     func hoverOpenedSessionListAutoCollapsesOnPointerExit() {
         let model = AppModel()
         model.notchStatus = .opened

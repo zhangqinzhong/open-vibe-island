@@ -8,6 +8,11 @@ struct TerminalSessionAttachmentProbe {
         var correctedJumpTarget: JumpTarget?
     }
 
+    struct ResolutionReport {
+        var resolutions: [String: SessionResolution]
+        var isAuthoritative: Bool
+    }
+
     typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
 
     struct GhosttyTerminalSnapshot {
@@ -49,6 +54,14 @@ struct TerminalSessionAttachmentProbe {
 
             return nil
         }
+
+        var isAuthoritative: Bool {
+            if case .available = self {
+                return true
+            }
+
+            return false
+        }
     }
 
     private static let liveGraceWindow: TimeInterval = 120
@@ -62,38 +75,60 @@ struct TerminalSessionAttachmentProbe {
         activeProcesses: [ActiveProcessSnapshot] = [],
         now: Date = .now
     ) -> [String: SessionAttachmentState] {
-        sessionResolutions(
+        sessionResolutionReport(
             for: sessions,
             ghosttyAvailability: ghosttySnapshotAvailability(),
             terminalAvailability: terminalSnapshotAvailability(),
             activeProcesses: activeProcesses,
             now: now
-        ).mapValues(\.attachmentState)
+        ).resolutions.mapValues(\.attachmentState)
     }
 
     func sessionResolutions(
         for sessions: [AgentSession],
         activeProcesses: [ActiveProcessSnapshot] = [],
+        allowRecentAttachmentGrace: Bool = true,
         now: Date = .now
     ) -> [String: SessionResolution] {
-        sessionResolutions(
+        sessionResolutionReport(
             for: sessions,
             ghosttyAvailability: ghosttySnapshotAvailability(),
             terminalAvailability: terminalSnapshotAvailability(),
             activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: allowRecentAttachmentGrace,
+            now: now
+        ).resolutions
+    }
+
+    func sessionResolutionReport(
+        for sessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot] = [],
+        allowRecentAttachmentGrace: Bool = true,
+        now: Date = .now
+    ) -> ResolutionReport {
+        sessionResolutionReport(
+            for: sessions,
+            ghosttyAvailability: ghosttySnapshotAvailability(),
+            terminalAvailability: terminalSnapshotAvailability(),
+            activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: allowRecentAttachmentGrace,
             now: now
         )
     }
 
-    func sessionResolutions(
+    func sessionResolutionReport(
         for sessions: [AgentSession],
         ghosttyAvailability: SnapshotAvailability<GhosttyTerminalSnapshot>,
         terminalAvailability: SnapshotAvailability<TerminalTabSnapshot>,
         activeProcesses: [ActiveProcessSnapshot] = [],
+        allowRecentAttachmentGrace: Bool = true,
         now: Date = .now
-    ) -> [String: SessionResolution] {
+    ) -> ResolutionReport {
         guard !sessions.isEmpty else {
-            return [:]
+            return ResolutionReport(
+                resolutions: [:],
+                isAuthoritative: ghosttyAvailability.isAuthoritative && terminalAvailability.isAuthoritative
+            )
         }
 
         let ghosttySessions = sessions.filter { normalizedTerminalName(for: $0.jumpTarget?.terminalApp) == "ghostty" }
@@ -134,6 +169,7 @@ struct TerminalSessionAttachmentProbe {
                         isMatched: matchedSnapshot != nil,
                         isActiveProcess: activeProcessesBySessionID[session.id] != nil,
                         availability: ghosttyAvailability,
+                        allowRecentAttachmentGrace: allowRecentAttachmentGrace,
                         now: now
                     ),
                     correctedJumpTarget: matchedSnapshot.flatMap { correctedGhosttyJumpTarget(for: session, snapshot: $0) }
@@ -150,6 +186,7 @@ struct TerminalSessionAttachmentProbe {
                         isMatched: matchedSnapshot != nil,
                         isActiveProcess: activeProcessesBySessionID[session.id] != nil,
                         availability: terminalAvailability,
+                        allowRecentAttachmentGrace: allowRecentAttachmentGrace,
                         now: now
                     ),
                     correctedJumpTarget: matchedSnapshot.flatMap { correctedTerminalJumpTarget(for: session, snapshot: $0) }
@@ -163,14 +200,35 @@ struct TerminalSessionAttachmentProbe {
                     : fallbackAttachmentState(
                         for: session,
                         appIsRunning: nil,
-                        allowRecentAttachmentGrace: true,
+                        allowRecentAttachmentGrace: allowRecentAttachmentGrace,
                         now: now
                     ),
                 correctedJumpTarget: nil
             )
         }
 
-        return resolutions
+        return ResolutionReport(
+            resolutions: resolutions,
+            isAuthoritative: ghosttyAvailability.isAuthoritative && terminalAvailability.isAuthoritative
+        )
+    }
+
+    func sessionResolutions(
+        for sessions: [AgentSession],
+        ghosttyAvailability: SnapshotAvailability<GhosttyTerminalSnapshot>,
+        terminalAvailability: SnapshotAvailability<TerminalTabSnapshot>,
+        activeProcesses: [ActiveProcessSnapshot] = [],
+        allowRecentAttachmentGrace: Bool = true,
+        now: Date = .now
+    ) -> [String: SessionResolution] {
+        sessionResolutionReport(
+            for: sessions,
+            ghosttyAvailability: ghosttyAvailability,
+            terminalAvailability: terminalAvailability,
+            activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: allowRecentAttachmentGrace,
+            now: now
+        ).resolutions
     }
 
     func attachmentStates(
@@ -178,15 +236,17 @@ struct TerminalSessionAttachmentProbe {
         ghosttyAvailability: SnapshotAvailability<GhosttyTerminalSnapshot>,
         terminalAvailability: SnapshotAvailability<TerminalTabSnapshot>,
         activeProcesses: [ActiveProcessSnapshot] = [],
+        allowRecentAttachmentGrace: Bool = true,
         now: Date = .now
     ) -> [String: SessionAttachmentState] {
-        sessionResolutions(
+        sessionResolutionReport(
             for: sessions,
             ghosttyAvailability: ghosttyAvailability,
             terminalAvailability: terminalAvailability,
             activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: allowRecentAttachmentGrace,
             now: now
-        ).mapValues(\.attachmentState)
+        ).resolutions.mapValues(\.attachmentState)
     }
 
     private func resolveAttachmentState<Snapshot>(
@@ -194,6 +254,7 @@ struct TerminalSessionAttachmentProbe {
         isMatched: Bool,
         isActiveProcess: Bool,
         availability: SnapshotAvailability<Snapshot>,
+        allowRecentAttachmentGrace: Bool,
         now: Date
     ) -> SessionAttachmentState {
         if isMatched {
@@ -207,7 +268,7 @@ struct TerminalSessionAttachmentProbe {
         return fallbackAttachmentState(
             for: session,
             appIsRunning: availability.appIsRunning,
-            allowRecentAttachmentGrace: !availability.hasExplicitSnapshotData,
+            allowRecentAttachmentGrace: allowRecentAttachmentGrace && !availability.hasExplicitSnapshotData,
             now: now
         )
     }

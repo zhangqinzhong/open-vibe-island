@@ -59,6 +59,7 @@ final class AppModel {
     var claudeUsageSnapshot: ClaudeUsageSnapshot?
     var codexUsageSnapshot: CodexUsageSnapshot?
     var hooksBinaryURL: URL?
+    var isResolvingInitialLiveSessions = false
     var overlayDisplayOptions: [OverlayDisplayOption] = []
     var overlayPlacementDiagnostics: OverlayPlacementDiagnostics?
     var isSoundMuted = false {
@@ -203,6 +204,12 @@ final class AppModel {
 
     var liveRunningCount: Int {
         state.liveRunningCount
+    }
+
+    var shouldShowSessionBootstrapPlaceholder: Bool {
+        isResolvingInitialLiveSessions
+            && liveSessionCount == 0
+            && state.sessions.contains(where: \.isTrackedLiveSession)
     }
 
     var codexHooksInstalled: Bool {
@@ -502,6 +509,7 @@ final class AppModel {
         hasStarted = true
 
         if loadRuntimeState {
+            isResolvingInitialLiveSessions = true
             restorePersistedCodexSessions()
             restorePersistedClaudeSessions()
             discoverRecentCodexSessions()
@@ -516,6 +524,8 @@ final class AppModel {
             refreshCodexUsageState()
             startCodexUsageMonitoringIfNeeded()
             refreshCodexRolloutTracking()
+        } else {
+            isResolvingInitialLiveSessions = false
         }
         refreshOverlayDisplayConfiguration()
         ensureOverlayPanel()
@@ -1185,7 +1195,7 @@ final class AppModel {
                 return
             }
 
-            state = SessionState(sessions: records.map(\.session))
+            state = SessionState(sessions: records.map(\.restorableSession))
             synchronizeSelection()
             refreshOverlayPlacementIfVisible()
             lastActionMessage = "Restored \(records.count) recent Codex session(s) from local cache."
@@ -1514,14 +1524,17 @@ final class AppModel {
 
         let sessions = state.sessions.filter(\.isTrackedLiveSession)
         guard !sessions.isEmpty else {
+            isResolvingInitialLiveSessions = false
             return
         }
 
-        let resolutions = terminalSessionAttachmentProbe.sessionResolutions(
+        let resolutionReport = terminalSessionAttachmentProbe.sessionResolutionReport(
             for: sessions,
-            activeProcesses: activeProcesses
+            activeProcesses: activeProcesses,
+            allowRecentAttachmentGrace: !isResolvingInitialLiveSessions
         )
-        let attachmentUpdates = resolutions.mapValues(\.attachmentState)
+        let resolutions = resolutionReport.resolutions
+        let attachmentUpdates = resolutions.mapValues { $0.attachmentState }
         let jumpTargetUpdates = resolutions.reduce(into: [String: JumpTarget]()) { partialResult, entry in
             if let correctedJumpTarget = entry.value.correctedJumpTarget {
                 partialResult[entry.key] = correctedJumpTarget
@@ -1531,9 +1544,15 @@ final class AppModel {
         let attachmentsChanged = state.reconcileAttachmentStates(attachmentUpdates)
         let jumpTargetsChanged = state.reconcileJumpTargets(jumpTargetUpdates)
         guard syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged else {
+            if resolutionReport.isAuthoritative {
+                isResolvingInitialLiveSessions = false
+            }
             return
         }
 
+        if resolutionReport.isAuthoritative {
+            isResolvingInitialLiveSessions = false
+        }
         synchronizeSelection()
         refreshOverlayPlacementIfVisible()
         scheduleCodexSessionPersistence()
