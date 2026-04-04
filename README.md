@@ -32,6 +32,13 @@ This app may install hooks for Claude Code or Codex, so you may see hook-related
 
 TBD
 
+## Community
+
+The project is still at an early stage. Issues and pull requests are welcome.
+If you want to start contributing right away, you can join the WeChat group first:
+
+<img src="docs/images/wechat-group.jpg" alt="Open Island WeChat group QR code" width="360">
+
 ## Agent Parts
 
 This section is written for agents.
@@ -163,4 +170,4 @@ That means:
 
 ## Contributing
 
-Issues and pull requests are welcome. Small focused changes are preferred.
+The project is still at an early stage. Issues and pull requests are welcome.
