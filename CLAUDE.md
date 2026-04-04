@@ -73,10 +73,11 @@ Default finish order: **implement → verify → summarize → commit**.
 - If a conflict makes the task ambiguous or risky, stop and ask before proceeding.
 - Never use destructive Git commands such as `git reset --hard` without explicit approval.
 
-## Parallel Work
+## Branching Rules
 
-- `main` is the shared integration branch. All feature development happens on dedicated branches, regardless of whether parallel work is active.
-- When parallel work is needed, use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) rather than manually managing worktrees.
+- `main` is the shared integration branch. **Never commit directly to `main`.**
+- All feature branches must be created from the latest local `main` (`git checkout -b <branch> main`).
+- Use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) for parallel work. Do not manually manage worktrees.
 - Each agent or workstream should work on its own branch, named to match the topic (e.g. `feat/<topic>`, `fix/<topic>`).
 - Integrate completed work back to `main` after verification.
 
