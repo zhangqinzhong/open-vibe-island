@@ -7,6 +7,14 @@ private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.
 private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
 private let popAnimation = Animation.spring(response: 0.3, dampingFraction: 0.5)
 
+/// Composite equatable key so `hasClosedPresence` and `expansionWidth` share
+/// a single `.animation(.smooth, value:)` modifier instead of two separate
+/// ones that can conflict when both change simultaneously.
+private struct ClosedPresenceKey: Equatable {
+    var present: Bool
+    var width: CGFloat
+}
+
 // MARK: - Main island view
 
 struct IslandPanelView: View {
@@ -60,6 +68,14 @@ struct IslandPanelView: View {
         let rightWidth = max(sideWidth, countBadgeWidth)
         let hasPending = closedSpotlightSession?.phase.requiresAttention == true
         return leftWidth + rightWidth + 16 + (hasPending ? 6 : 0)
+    }
+
+    /// Composite key combining `hasClosedPresence` and `expansionWidth` so a
+    /// single `.animation(.smooth)` modifier drives both values.  Previously
+    /// they had two separate `.animation(.smooth, value:)` modifiers that
+    /// could conflict when they changed in the same runloop pass.
+    private var closedPresenceAnimationKey: ClosedPresenceKey {
+        ClosedPresenceKey(present: hasClosedPresence, width: expansionWidth)
     }
 
     private var sideWidth: CGFloat {
@@ -158,8 +174,7 @@ struct IslandPanelView: View {
         .padding(.horizontal, panelShadowHorizontalInset)
         .padding(.bottom, panelShadowBottomInset)
         .animation(isOpened ? openAnimation : closeAnimation, value: model.notchStatus)
-        .animation(.smooth, value: hasClosedPresence)
-        .animation(.smooth, value: expansionWidth)
+        .animation(.smooth, value: closedPresenceAnimationKey)
         .animation(popAnimation, value: isPopping)
         .contentShape(Rectangle())
         .onHover { hovering in
