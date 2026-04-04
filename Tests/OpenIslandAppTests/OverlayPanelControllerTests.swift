@@ -32,4 +32,17 @@ struct OverlayPanelControllerTests {
         #expect(!rect.contains(NSPoint(x: rect.minX - 1, y: rect.midY)))
         #expect(!rect.contains(NSPoint(x: rect.maxX + 1, y: rect.midY)))
     }
+
+    @Test
+    func clickOpensActivateThePanel() {
+        #expect(OverlayPanelController.shouldActivatePanel(for: .click))
+    }
+
+    @Test
+    func passiveOpensDoNotActivateThePanel() {
+        #expect(!OverlayPanelController.shouldActivatePanel(for: .hover))
+        #expect(!OverlayPanelController.shouldActivatePanel(for: .notification))
+        #expect(!OverlayPanelController.shouldActivatePanel(for: .boot))
+        #expect(!OverlayPanelController.shouldActivatePanel(for: nil))
+    }
 }

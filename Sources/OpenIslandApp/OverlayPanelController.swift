@@ -35,6 +35,10 @@ final class OverlayPanelController {
         panel?.isVisible == true
     }
 
+    nonisolated static func shouldActivatePanel(for reason: NotchOpenReason?) -> Bool {
+        reason == .click
+    }
+
     func availableDisplayOptions() -> [OverlayDisplayOption] {
         OverlayDisplayResolver.availableDisplayOptions()
     }
@@ -55,7 +59,7 @@ final class OverlayPanelController {
         let panel = self.panel ?? makePanel(model: model)
         self.panel = panel
         let diagnostics = positionPanel(panel, preferredScreenID: preferredScreenID, animated: true)
-        panel.makeKeyAndOrderFront(nil)
+        presentPanel(panel, activates: Self.shouldActivatePanel(for: model.notchOpenReason))
         panel.ignoresMouseEvents = false
         panel.acceptsMouseMovedEvents = true
         startEventMonitoring()
@@ -76,7 +80,7 @@ final class OverlayPanelController {
         panel.acceptsMouseMovedEvents = interactive
 
         if interactive {
-            panel.makeKeyAndOrderFront(nil)
+            presentPanel(panel, activates: Self.shouldActivatePanel(for: model?.notchOpenReason))
         }
     }
 
@@ -168,6 +172,14 @@ final class OverlayPanelController {
             0.26
         case nil:
             0
+        }
+    }
+
+    private func presentPanel(_ panel: NSPanel, activates: Bool) {
+        if activates {
+            panel.makeKeyAndOrderFront(nil)
+        } else {
+            panel.orderFrontRegardless()
         }
     }
 
