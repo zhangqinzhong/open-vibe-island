@@ -49,11 +49,12 @@ Open `Package.swift` in Xcode for the app target. Requires macOS 14+, Swift 6.2.
 ## Required Workflow
 
 1. Start each round by checking the current repository state with `git status -sb`.
-2. Read the relevant files before editing. Do not guess repository structure or behavior.
-3. Keep each round focused on a single coherent change.
-4. After making changes, run the most relevant verification available for that round.
-5. Summarize what changed, including any verification gaps.
-6. Commit the round before stopping.
+2. Verify you are on the correct feature branch. If on `main`, create or switch to a feature branch before making any edits.
+3. Read the relevant files before editing. Do not guess repository structure or behavior.
+4. Keep each round focused on a single coherent change.
+5. After making changes, run the most relevant verification available for that round.
+6. Summarize what changed, including any verification gaps.
+7. Commit the round before stopping.
 
 Default finish order: **implement → verify → summarize → commit**.
 
