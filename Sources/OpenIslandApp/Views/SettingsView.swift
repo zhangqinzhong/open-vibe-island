@@ -127,7 +127,7 @@ struct SettingsView: View {
         case .shortcuts:
             PlaceholderSettingsPane(title: "快捷键", subtitle: "快捷键设置即将推出。")
         case .lab:
-            LabSettingsPane(model: model)
+            PlaceholderSettingsPane(title: "实验室", subtitle: "实验性功能即将推出。")
         case .about:
             AboutSettingsPane()
         }
@@ -278,31 +278,6 @@ struct AboutSettingsPane: View {
         }
         .frame(maxWidth: .infinity)
         .navigationTitle("关于")
-    }
-}
-
-// MARK: - Lab
-
-struct LabSettingsPane: View {
-    var model: AppModel
-
-    var body: some View {
-        Form {
-            #if DEBUG
-            Section("调试") {
-                Button("打开调试面板") {
-                    model.showControlCenter()
-                }
-            }
-            #endif
-
-            Section {
-                Text("实验性功能即将推出。")
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .navigationTitle("实验室")
     }
 }
 
