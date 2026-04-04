@@ -575,12 +575,16 @@ public final class DemoBridgeServer: @unchecked Sendable {
                 return payload.implicitStartSummary
             }()
 
+            // PostToolUse marks the session as completed (idle). If Claude
+            // immediately invokes another tool, the next PreToolUse will
+            // flip it back to running. This avoids a lingering blue/running
+            // indicator when Claude is between tools or waiting for input.
             emit(
                 .activityUpdated(
                     SessionActivityUpdated(
                         sessionID: payload.sessionID,
                         summary: summary,
-                        phase: .running,
+                        phase: .completed,
                         timestamp: .now
                     )
                 )

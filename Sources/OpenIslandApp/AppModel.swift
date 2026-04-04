@@ -1685,9 +1685,12 @@ final class AppModel {
     private func displayPriority(for session: AgentSession, now: Date) -> Int {
         var score = 0
 
+        let presence = session.islandPresence(at: now)
+
         switch session.attachmentState {
         case .attached:
-            score += 12_000
+            // Inactive attached sessions rank below active ones.
+            score += presence == .inactive ? 3_000 : 12_000
         case .stale:
             score += 1_000
         case .detached:
