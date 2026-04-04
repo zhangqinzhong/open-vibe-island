@@ -100,11 +100,22 @@ struct OpenIslandApp: App {
     @NSApplicationDelegateAdaptor(OpenIslandAppDelegate.self)
     private var appDelegate
 
+    @Environment(\.openWindow) private var openWindow
+
     var body: some Scene {
         Window("Open Island Settings", id: "settings") {
-            SettingsView(model: appDelegate.model)
+            SettingsWindowContent(model: appDelegate.model)
         }
         .windowResizability(.contentSize)
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    openWindow(id: "settings")
+                    appDelegate.model.showSettings()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
 
         #if DEBUG
         WindowGroup("Open Island Debug") {
@@ -119,5 +130,22 @@ struct OpenIslandApp: App {
                 .accessibilityLabel("Open Island")
         }
         .menuBarExtraStyle(.window)
+    }
+}
+
+/// Injects the SwiftUI `openWindow` action into `AppModel` so that
+/// `model.showSettings()` can materialize the window even if it has
+/// never been shown before (SwiftUI `Window` scenes are lazy).
+private struct SettingsWindowContent: View {
+    var model: AppModel
+    @Environment(\.openWindow) private var openWindow
+
+    var body: some View {
+        SettingsView(model: model)
+            .onAppear {
+                model.openSettingsWindow = { [openWindow] in
+                    openWindow(id: "settings")
+                }
+            }
     }
 }

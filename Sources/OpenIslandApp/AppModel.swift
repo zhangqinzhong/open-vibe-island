@@ -94,6 +94,9 @@ final class AppModel {
             refreshOverlayPlacement()
         }
     }
+    @ObservationIgnored
+    var openSettingsWindow: (() -> Void)?
+
     var ignoresPointerExitDuringHarness = false
     var disablesOverlayEventMonitoringDuringHarness = false
 
@@ -802,6 +805,7 @@ final class AppModel {
     }
 
     func showSettings() {
+        openSettingsWindow?()
         if let window = NSApp.windows.first(where: { $0.title == "Open Island Settings" }) {
             window.orderFrontRegardless()
             window.makeKey()
