@@ -1,9 +1,20 @@
 # Open Island
 
+## Human Parts
+
+This section is reserved for human-written context, narrative, screenshots, and project voice.
+
 > 我不想在自己的电脑上运行一个闭源、付费的软件来监视我所有的生产过程。<br>
 > 所以我 build 了这个开源的版本。<br>
 >
 > you don’t need to pay for a product you can vibe since you are a vibe coder
+
+- personal motivation
+- story behind the project
+- screenshots or demo framing
+- anything you want humans to feel before they parse the product details
+
+## Agent Parts
 
 The open-source macOS companion for terminal-native AI coding.
 
