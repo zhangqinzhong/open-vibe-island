@@ -736,7 +736,8 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     SessionCompleted(
                         sessionID: payload.sessionID,
                         summary: "Claude session ended.",
-                        timestamp: .now
+                        timestamp: .now,
+                        isInterrupt: true
                     )
                 )
             )
