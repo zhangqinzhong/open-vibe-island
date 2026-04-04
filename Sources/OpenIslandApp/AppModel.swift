@@ -1788,6 +1788,8 @@ final class AppModel {
             state = SessionState(sessions: mergedSessions)
         }
 
+        adoptProcessTTYsForClaudeSessions(activeProcesses: activeProcesses)
+
         let sessions = state.sessions.filter(\.isTrackedLiveSession)
         guard !sessions.isEmpty else {
             isResolvingInitialLiveSessions = false
@@ -2127,6 +2129,57 @@ final class AppModel {
             }
 
             return true
+        }
+    }
+
+    /// When a Claude session was matched to a process by cwd but has a nil or
+    /// mismatched TTY, adopt the process's TTY so that the subsequent terminal
+    /// attachment resolution can find and promote the session.
+    private func adoptProcessTTYsForClaudeSessions(activeProcesses: [ActiveProcessSnapshot]) {
+        let claudeProcesses = activeProcesses.filter { $0.tool == .claudeCode }
+        guard !claudeProcesses.isEmpty else { return }
+
+        var sessions = state.sessions
+        var changed = false
+
+        for process in claudeProcesses {
+            guard let processTTY = process.terminalTTY, !processTTY.isEmpty else { continue }
+            let processCWD = normalizedPathForMatching(process.workingDirectory)
+
+            for index in sessions.indices {
+                let session = sessions[index]
+                guard session.tool == .claudeCode,
+                      !isSyntheticClaudeSession(session),
+                      let jumpTarget = session.jumpTarget,
+                      normalizedPathForMatching(jumpTarget.workingDirectory) == processCWD,
+                      normalizedTTYForMatching(jumpTarget.terminalTTY) != normalizedTTYForMatching(processTTY) else {
+                    continue
+                }
+
+                // Only adopt if no other session already owns this TTY.
+                let ttyAlreadyClaimed = sessions.contains { other in
+                    other.id != session.id
+                        && other.tool == .claudeCode
+                        && normalizedTTYForMatching(other.jumpTarget?.terminalTTY) == normalizedTTYForMatching(processTTY)
+                }
+                guard !ttyAlreadyClaimed else { continue }
+
+                // Only adopt if no other process has the same cwd and already
+                // matches this session's TTY (would mean a different process owns it).
+                let sessionOwnedByOtherProcess = claudeProcesses.contains { other in
+                    normalizedTTYForMatching(other.terminalTTY) == normalizedTTYForMatching(session.jumpTarget?.terminalTTY)
+                        && normalizedPathForMatching(other.workingDirectory) == processCWD
+                }
+                guard !sessionOwnedByOtherProcess else { continue }
+
+                sessions[index].jumpTarget?.terminalTTY = processTTY
+                changed = true
+                break
+            }
+        }
+
+        if changed {
+            state = SessionState(sessions: sessions)
         }
     }
 
