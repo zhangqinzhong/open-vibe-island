@@ -1618,7 +1618,8 @@ final class AppModel {
             permissionMode: discovered.permissionMode ?? existing.permissionMode,
             agentID: discovered.agentID ?? existing.agentID,
             agentType: discovered.agentType ?? existing.agentType,
-            worktreeBranch: discovered.worktreeBranch ?? existing.worktreeBranch
+            worktreeBranch: discovered.worktreeBranch ?? existing.worktreeBranch,
+            activeSubagents: existing.activeSubagents.isEmpty ? discovered.activeSubagents : existing.activeSubagents
         )
         return merged.isEmpty ? nil : merged
     }

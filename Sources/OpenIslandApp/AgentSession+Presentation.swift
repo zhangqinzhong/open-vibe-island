@@ -127,6 +127,13 @@ extension AgentSession {
         claudeMetadata?.worktreeBranch
     }
 
+    var spotlightSubagentLabel: String? {
+        guard let subagents = claudeMetadata?.activeSubagents, !subagents.isEmpty else {
+            return nil
+        }
+        return "Subagents (\(subagents.count))"
+    }
+
     var spotlightHeadlineText: String {
         var headline = spotlightWorkspaceName
 

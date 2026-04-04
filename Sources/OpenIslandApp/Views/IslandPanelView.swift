@@ -873,6 +873,17 @@ private struct IslandSessionRow: View {
                         .foregroundStyle(activityColor(for: presence).opacity(0.94))
                         .lineLimit(1)
                 }
+
+                if showsExpandedContent,
+                   let subagentLabel = session.spotlightSubagentLabel {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 9, weight: .medium))
+                        Text(subagentLabel)
+                            .font(.system(size: 10.5, weight: .medium))
+                    }
+                    .foregroundStyle(.cyan.opacity(0.8))
+                }
             }
         }
         .padding(.horizontal, 14)

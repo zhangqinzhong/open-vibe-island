@@ -438,6 +438,16 @@ public final class DemoBridgeServer: @unchecked Sendable {
     }
 
     private func handleClaudeHook(_ payload: ClaudeHookPayload, from clientID: UUID) {
+        // Subagent processes fire their own hooks with agentID set.
+        // The parent session already receives SubagentStart/SubagentStop events,
+        // so we suppress subagent hooks to avoid creating duplicate sessions.
+        if payload.agentID != nil,
+           payload.hookEventName != .subagentStart,
+           payload.hookEventName != .subagentStop {
+            send(.response(.acknowledged), to: clientID)
+            return
+        }
+
         switch payload.hookEventName {
         case .sessionStart:
             emit(
@@ -676,6 +686,13 @@ public final class DemoBridgeServer: @unchecked Sendable {
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
 
+            if let agentID = payload.agentID {
+                addSubagent(
+                    ClaudeSubagentInfo(agentID: agentID, agentType: payload.agentType),
+                    toSession: payload.sessionID
+                )
+            }
+
             let summary = payload.agentType.map { "Started \($0) subagent." } ?? "Started Claude subagent."
             emit(
                 .activityUpdated(
@@ -693,6 +710,10 @@ public final class DemoBridgeServer: @unchecked Sendable {
             ensureClaudeSessionExists(for: payload)
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
+
+            if let agentID = payload.agentID {
+                removeSubagent(agentID: agentID, fromSession: payload.sessionID)
+            }
 
             let summary = payload.lastAssistantMessage ?? payload.assistantMessagePreview
                 ?? payload.agentType.map { "Finished \($0) subagent." }
@@ -973,7 +994,45 @@ public final class DemoBridgeServer: @unchecked Sendable {
             permissionMode: update.permissionMode ?? existing?.permissionMode,
             agentID: update.agentID ?? existing?.agentID,
             agentType: update.agentType ?? existing?.agentType,
-            worktreeBranch: update.worktreeBranch ?? existing?.worktreeBranch
+            worktreeBranch: update.worktreeBranch ?? existing?.worktreeBranch,
+            activeSubagents: existing?.activeSubagents ?? []
+        )
+    }
+
+    private func addSubagent(_ subagent: ClaudeSubagentInfo, toSession sessionID: String) {
+        guard var metadata = state.session(id: sessionID)?.claudeMetadata else {
+            return
+        }
+
+        metadata.activeSubagents.removeAll { $0.agentID == subagent.agentID }
+        metadata.activeSubagents.append(subagent)
+
+        emit(
+            .claudeSessionMetadataUpdated(
+                ClaudeSessionMetadataUpdated(
+                    sessionID: sessionID,
+                    claudeMetadata: metadata,
+                    timestamp: .now
+                )
+            )
+        )
+    }
+
+    private func removeSubagent(agentID: String, fromSession sessionID: String) {
+        guard var metadata = state.session(id: sessionID)?.claudeMetadata else {
+            return
+        }
+
+        metadata.activeSubagents.removeAll { $0.agentID == agentID }
+
+        emit(
+            .claudeSessionMetadataUpdated(
+                ClaudeSessionMetadataUpdated(
+                    sessionID: sessionID,
+                    claudeMetadata: metadata,
+                    timestamp: .now
+                )
+            )
         )
     }
 

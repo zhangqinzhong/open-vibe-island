@@ -145,12 +145,23 @@ struct ActiveAgentProcessDiscovery {
         )
     }
 
+    private func isClaudeSubagentWorktree(_ path: String) -> Bool {
+        path.contains("/.claude/worktrees/agent-")
+    }
+
     private func claudeSnapshot(
         for process: RunningProcess,
         processesByPID: [String: RunningProcess]
     ) -> ProcessSnapshot? {
         let lsofOutput = lsofOutput(pid: process.pid)
         let workingDirectory = lsofOutput.flatMap(workingDirectory(from:))
+
+        // Subagent processes run in .claude/worktrees/agent-*/ directories.
+        // They are tracked as metadata on the parent session, not as separate sessions.
+        if let cwd = workingDirectory, isClaudeSubagentWorktree(cwd) {
+            return nil
+        }
+
         let transcriptPath = lsofOutput.flatMap {
             bestClaudeTranscriptPath(in: $0, workingDirectory: workingDirectory)
         }

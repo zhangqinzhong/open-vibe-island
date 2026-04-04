@@ -137,6 +137,18 @@ public enum ClaudePermissionUpdate: Equatable, Codable, Sendable {
     }
 }
 
+public struct ClaudeSubagentInfo: Equatable, Codable, Sendable {
+    public var agentID: String
+    public var agentType: String?
+    public var summary: String?
+
+    public init(agentID: String, agentType: String? = nil, summary: String? = nil) {
+        self.agentID = agentID
+        self.agentType = agentType
+        self.summary = summary
+    }
+}
+
 public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
     public var transcriptPath: String?
     public var initialUserPrompt: String?
@@ -150,6 +162,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
     public var agentID: String?
     public var agentType: String?
     public var worktreeBranch: String?
+    public var activeSubagents: [ClaudeSubagentInfo]
 
     public init(
         transcriptPath: String? = nil,
@@ -163,7 +176,8 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         permissionMode: ClaudePermissionMode? = nil,
         agentID: String? = nil,
         agentType: String? = nil,
-        worktreeBranch: String? = nil
+        worktreeBranch: String? = nil,
+        activeSubagents: [ClaudeSubagentInfo] = []
     ) {
         self.transcriptPath = transcriptPath
         self.initialUserPrompt = initialUserPrompt
@@ -177,6 +191,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         self.agentID = agentID
         self.agentType = agentType
         self.worktreeBranch = worktreeBranch
+        self.activeSubagents = activeSubagents
     }
 
     public var isEmpty: Bool {
@@ -192,6 +207,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
             && agentID == nil
             && agentType == nil
             && worktreeBranch == nil
+            && activeSubagents.isEmpty
     }
 }
 
