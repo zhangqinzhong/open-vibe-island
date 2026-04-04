@@ -67,6 +67,7 @@ See [docs/worktree-workflow.md](/Users/wangruobing/Personal/open-island/docs/wor
 - Treat `swift run OpenIslandApp` and the Xcode app target as the source-of-truth way to run the current branch's app code.
 - Treat `~/Applications/Open Island Dev.app` as a local development bundle wrapper around the repo-built `OpenIslandApp`, not as a separate product line.
 - Use `Open Island Dev.app` for manual OSS app verification when bundle semantics, LaunchServices, or installed-hook behavior matter.
+- When the user asks to launch or restart `Open Island Dev.app`, refresh the bundle from the current repo first with `zsh scripts/launch-dev-app.sh` instead of only running `open -na`. Opening the bundle alone can relaunch a stale binary.
 - Use `scripts/harness.sh smoke` or `scripts/smoke-dev-app.sh` only for deterministic harness runs; those commands intentionally launch the repo executable directly rather than the installed dev bundle.
 - Treat any in-app label such as `Open Island OSS` as UI copy only, not as evidence of a third app target.
 - Treat `/Applications/Vibe Island.app` and `https://vibeisland.app/` as closed-source reference baselines only. They are behavior benchmarks, not the development runtime for this repository.
