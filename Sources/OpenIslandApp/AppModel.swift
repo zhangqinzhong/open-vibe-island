@@ -1981,6 +1981,10 @@ final class AppModel {
             if candidates.count == 1 {
                 return candidates[0]
             }
+
+            if candidates.count > 1 {
+                return candidates.max(by: { $0.updatedAt < $1.updatedAt })
+            }
         }
 
         return nil

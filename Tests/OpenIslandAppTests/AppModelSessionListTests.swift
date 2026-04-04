@@ -578,7 +578,7 @@ struct AppModelSessionListTests {
     }
 
     @Test
-    func syntheticClaudeSessionWinsOverRecoveredUnknownSessionsForLiveGhosttyProcess() {
+    func recoveredSessionMatchesLiveGhosttyProcessByCWDWhenMultipleCandidatesExist() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
         let recoveredSessions = [
@@ -630,6 +630,12 @@ struct AppModelSessionListTests {
             activeProcesses: activeProcesses,
             now: now
         )
+
+        // With relaxed CWD matching, recovered session matches the process
+        // so no synthetic session is created.
+        #expect(merged.count == 2)
+        #expect(merged.allSatisfy { !$0.id.hasPrefix("claude-process:") })
+
         let probe = TerminalSessionAttachmentProbe()
         let resolutions = probe.sessionResolutions(
             for: merged,
@@ -649,13 +655,7 @@ struct AppModelSessionListTests {
             }
         )
 
-        let attachedClaudeSessions = model.state.sessions.filter {
-            $0.tool == .claudeCode && $0.attachmentState == .attached
-        }
-
-        #expect(attachedClaudeSessions.count == 1)
-        #expect(attachedClaudeSessions.first?.id.hasPrefix("claude-process:") == true)
-        #expect(attachedClaudeSessions.first?.jumpTarget?.terminalApp == "Ghostty")
-        #expect(attachedClaudeSessions.first?.jumpTarget?.terminalTTY == "/dev/ttys002")
+        let claudeSessions = model.state.sessions.filter { $0.tool == .claudeCode }
+        #expect(claudeSessions.count == 2)
     }
 }
