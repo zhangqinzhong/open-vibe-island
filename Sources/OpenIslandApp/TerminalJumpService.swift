@@ -37,6 +37,8 @@ struct TerminalJumpService {
         ),
     ]
 
+    private static let ghosttyFocusSettleDelay = 0.15
+
     func jump(to target: JumpTarget) throws -> String {
         let descriptor = resolveTerminalApp(preferredName: target.terminalApp)
         let hasWorkingDirectory = target.workingDirectory.map { FileManager.default.fileExists(atPath: $0) } ?? false
@@ -105,34 +107,64 @@ struct TerminalJumpService {
     }
 
     private func jumpToGhosttyTerminal(_ target: JumpTarget) throws -> Bool {
-        let script = """
+        try runAppleScript(ghosttyJumpScript(for: target)) == "matched"
+    }
+
+    func ghosttyJumpScript(for target: JumpTarget) -> String {
+        let terminalSessionID = escapeAppleScript(target.terminalSessionID)
+        let workingDirectory = escapeAppleScript(target.workingDirectory)
+        let paneTitle = escapeAppleScript(target.paneTitle)
+
+        return """
         tell application "Ghostty"
             if not (it is running) then return ""
+            activate
+
+            set targetTerminal to missing value
+
             repeat with aTerminal in terminals
-                if "\(escapeAppleScript(target.terminalSessionID))" is not "" and (id of aTerminal as text) is "\(escapeAppleScript(target.terminalSessionID))" then
-                    focus aTerminal
-                    return "matched"
+                if "\(terminalSessionID)" is not "" and (id of aTerminal as text) is "\(terminalSessionID)" then
+                    set targetTerminal to aTerminal
+                    exit repeat
                 end if
             end repeat
 
-            repeat with aTerminal in terminals
-                if "\(escapeAppleScript(target.workingDirectory))" is not "" and (working directory of aTerminal as text) is "\(escapeAppleScript(target.workingDirectory))" then
-                    focus aTerminal
-                    return "matched"
-                end if
-            end repeat
+            if targetTerminal is missing value then
+                repeat with aTerminal in terminals
+                    if "\(workingDirectory)" is not "" and (working directory of aTerminal as text) is "\(workingDirectory)" then
+                        set targetTerminal to aTerminal
+                        exit repeat
+                    end if
+                end repeat
+            end if
 
-            repeat with aTerminal in terminals
-                if "\(escapeAppleScript(target.paneTitle))" is not "" and (name of aTerminal as text) contains "\(escapeAppleScript(target.paneTitle))" then
-                    focus aTerminal
+            if targetTerminal is missing value then
+                repeat with aTerminal in terminals
+                    if "\(paneTitle)" is not "" and (name of aTerminal as text) contains "\(paneTitle)" then
+                        set targetTerminal to aTerminal
+                        exit repeat
+                    end if
+                end repeat
+            end if
+
+            if targetTerminal is missing value then return ""
+
+            focus targetTerminal
+            -- Ghostty updates the focused split asynchronously after focus returns.
+            delay \(Self.ghosttyFocusSettleDelay)
+
+            if "\(terminalSessionID)" is "" then
+                return "matched"
+            end if
+
+            try
+                if (id of focused terminal of selected tab of front window as text) is "\(terminalSessionID)" then
                     return "matched"
                 end if
-            end repeat
+            end try
         end tell
         return ""
         """
-
-        return try runAppleScript(script) == "matched"
     }
 
     private func jumpToTerminalTab(_ target: JumpTarget) throws -> Bool {
