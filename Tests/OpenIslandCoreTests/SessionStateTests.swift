@@ -660,7 +660,7 @@ struct SessionStateTests {
     }
 
     @Test
-    func codexGhosttyRuntimeContextDoesNotTrustFocusedTerminalLocator() {
+    func codexGhosttyRuntimeContextUsesFocusedTerminalLocator() {
         let payload = CodexHookPayload(
             cwd: "/tmp/worktree",
             hookEventName: .sessionStart,
@@ -684,8 +684,8 @@ struct SessionStateTests {
 
         #expect(inferredGhostty.terminalApp == "Ghostty")
         #expect(inferredGhostty.terminalTTY == "/dev/ttys022")
-        #expect(inferredGhostty.terminalSessionID == nil)
-        #expect(inferredGhostty.terminalTitle == nil)
+        #expect(inferredGhostty.terminalSessionID == "ghostty-frontmost")
+        #expect(inferredGhostty.terminalTitle == "codex ~/tmp/other-worktree")
     }
 
     @Test

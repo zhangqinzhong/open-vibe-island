@@ -117,13 +117,11 @@ struct ClaudeHooksTests {
     }
 
     @Test
-    func claudeGhosttyRuntimeContextDoesNotTrustFocusedTerminalLocator() {
+    func claudeGhosttyRuntimeContextUsesFocusedTerminalLocator() {
         let payload = ClaudeHookPayload(
             cwd: "/tmp/worktree",
             hookEventName: .sessionStart,
-            sessionID: "claude-session-1",
-            terminalSessionID: "ghostty-frontmost",
-            terminalTitle: "codex ~/tmp/other-worktree"
+            sessionID: "claude-session-1"
         )
 
         let inferredGhostty = payload.withRuntimeContext(
@@ -140,8 +138,8 @@ struct ClaudeHooksTests {
 
         #expect(inferredGhostty.terminalApp == "Ghostty")
         #expect(inferredGhostty.terminalTTY == "/dev/ttys031")
-        #expect(inferredGhostty.terminalSessionID == nil)
-        #expect(inferredGhostty.terminalTitle == nil)
+        #expect(inferredGhostty.terminalSessionID == "ghostty-frontmost")
+        #expect(inferredGhostty.terminalTitle == "codex ~/tmp/other-worktree")
     }
 
     @Test
