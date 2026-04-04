@@ -63,7 +63,7 @@ Default finish order: **implement → verify → summarize → commit**.
 - Do not batch unrelated changes into one commit.
 - Use conventional-style commit messages: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`.
 - Do not amend existing commits unless explicitly requested.
-- Do not create branches unless explicitly requested.
+- Create a feature branch (e.g. `fix/<topic>`, `feat/<topic>`) for every independent change. Do not commit directly to `main`.
 
 ## Safety Rules
 
@@ -74,9 +74,9 @@ Default finish order: **implement → verify → summarize → commit**.
 
 ## Parallel Work
 
+- `main` is the shared integration branch. All feature development happens on dedicated branches, regardless of whether parallel work is active.
 - When parallel work is needed, use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) rather than manually managing worktrees.
-- Treat `main` as the shared integration branch. Do not do day-to-day feature development directly on `main` when parallel work is active.
-- Each parallel agent should work on its own branch, named to match the workstream (e.g. `feat/<topic>`, `fix/<topic>`).
+- Each agent or workstream should work on its own branch, named to match the topic (e.g. `feat/<topic>`, `fix/<topic>`).
 - Integrate completed work back to `main` after verification.
 
 ## App Targets And Naming
