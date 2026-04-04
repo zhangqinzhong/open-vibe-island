@@ -358,7 +358,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
             ensureSessionExists(for: payload)
             synchronizeJumpTarget(for: payload)
             synchronizeCodexMetadata(for: payload)
-            let prompt = payload.promptPreview ?? "User submitted a prompt to Codex."
+            let prompt = payload.prompt ?? payload.promptPreview ?? "User submitted a prompt to Codex."
             emit(
                 .activityUpdated(
                     SessionActivityUpdated(
@@ -422,7 +422,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
             ensureSessionExists(for: payload)
             synchronizeJumpTarget(for: payload)
             synchronizeCodexMetadata(for: payload)
-            let summary = payload.assistantMessagePreview ?? "Codex completed the turn."
+            let summary = payload.lastAssistantMessage ?? payload.assistantMessagePreview ?? "Codex completed the turn."
 
             emit(
                 .sessionCompleted(
@@ -694,7 +694,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
 
-            let summary = payload.assistantMessagePreview
+            let summary = payload.lastAssistantMessage ?? payload.assistantMessagePreview
                 ?? payload.agentType.map { "Finished \($0) subagent." }
                 ?? "Finished Claude subagent."
             emit(

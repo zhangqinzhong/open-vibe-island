@@ -273,8 +273,8 @@ public extension CodexHookPayload {
     var defaultCodexMetadata: CodexSessionMetadata {
         CodexSessionMetadata(
             transcriptPath: transcriptPath,
-            initialUserPrompt: promptPreview,
-            lastUserPrompt: promptPreview,
+            initialUserPrompt: prompt ?? promptPreview,
+            lastUserPrompt: prompt ?? promptPreview,
             lastAssistantMessage: lastAssistantMessage,
             currentTool: toolName,
             currentCommandPreview: commandPreview
