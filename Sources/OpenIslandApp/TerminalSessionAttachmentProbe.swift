@@ -114,7 +114,8 @@ struct TerminalSessionAttachmentProbe {
             for: ghosttySessions + ambiguousSessions,
             availability: ghosttyAvailability,
             activeSessionIDs: activeSessionIDs,
-            activeProcessesBySessionID: activeProcessesBySessionID
+            activeProcessesBySessionID: activeProcessesBySessionID,
+            now: now
         )
         let attachedTerminalSessions = attachedTerminalSessions(
             for: terminalSessions + ambiguousSessions,
@@ -215,7 +216,8 @@ struct TerminalSessionAttachmentProbe {
         for sessions: [AgentSession],
         availability: SnapshotAvailability<GhosttyTerminalSnapshot>,
         activeSessionIDs: Set<String>,
-        activeProcessesBySessionID: [String: ActiveProcessSnapshot]
+        activeProcessesBySessionID: [String: ActiveProcessSnapshot],
+        now: Date
     ) -> [String: GhosttyTerminalSnapshot] {
         guard let snapshots = availability.snapshots else {
             return [:]
@@ -245,28 +247,11 @@ struct TerminalSessionAttachmentProbe {
 
         for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
             let matches = sessions.filter { session in
-                nonEmptyValue(session.jumpTarget?.terminalSessionID) == snapshot.sessionID
-            }
-
-            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
-                continue
-            }
-
-            assignments[preferred.id] = snapshot
-            claimedSessionIDs.insert(preferred.id)
-            claimedSnapshotIDs.insert(snapshot.sessionID)
-        }
-
-        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
-            let matches = sessions.filter { session in
-                ghosttyFallbackCandidateMatches(
+                exactGhosttySnapshotMatches(
                     snapshot,
                     session: session,
-                    claimedSessionIDs: claimedSessionIDs,
-                    claimedSnapshotIDs: claimedSnapshotIDs,
                     activeSessionIDs: activeSessionIDs,
-                    activeProcessesBySessionID: activeProcessesBySessionID,
-                    requireActiveSession: true
+                    now: now
                 )
             }
 
@@ -288,7 +273,31 @@ struct TerminalSessionAttachmentProbe {
                     claimedSnapshotIDs: claimedSnapshotIDs,
                     activeSessionIDs: activeSessionIDs,
                     activeProcessesBySessionID: activeProcessesBySessionID,
-                    requireActiveSession: false
+                    requireActiveSession: true,
+                    now: now
+                )
+            }
+
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
+                continue
+            }
+
+            assignments[preferred.id] = snapshot
+            claimedSessionIDs.insert(preferred.id)
+            claimedSnapshotIDs.insert(snapshot.sessionID)
+        }
+
+        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
+            let matches = sessions.filter { session in
+                ghosttyFallbackCandidateMatches(
+                    snapshot,
+                    session: session,
+                    claimedSessionIDs: claimedSessionIDs,
+                    claimedSnapshotIDs: claimedSnapshotIDs,
+                    activeSessionIDs: activeSessionIDs,
+                    activeProcessesBySessionID: activeProcessesBySessionID,
+                    requireActiveSession: false,
+                    now: now
                 )
             }
 
@@ -311,7 +320,8 @@ struct TerminalSessionAttachmentProbe {
         claimedSnapshotIDs: Set<String>,
         activeSessionIDs: Set<String>,
         activeProcessesBySessionID: [String: ActiveProcessSnapshot],
-        requireActiveSession: Bool
+        requireActiveSession: Bool,
+        now: Date
     ) -> Bool {
         guard !claimedSessionIDs.contains(session.id) else {
             return false
@@ -319,6 +329,15 @@ struct TerminalSessionAttachmentProbe {
 
         let isActiveSession = activeSessionIDs.contains(session.id)
         if requireActiveSession && !isActiveSession {
+            return false
+        }
+
+        guard snapshotLikelyHostsSession(
+            snapshot,
+            session: session,
+            isActiveSession: isActiveSession,
+            now: now
+        ) else {
             return false
         }
 
@@ -347,6 +366,41 @@ struct TerminalSessionAttachmentProbe {
         }
 
         return sessionWorkspaceNameCandidates(for: session).contains(snapshotWorkspaceName(for: snapshot))
+    }
+
+    private func exactGhosttySnapshotMatches(
+        _ snapshot: GhosttyTerminalSnapshot,
+        session: AgentSession,
+        activeSessionIDs: Set<String>,
+        now: Date
+    ) -> Bool {
+        guard nonEmptyValue(session.jumpTarget?.terminalSessionID) == snapshot.sessionID else {
+            return false
+        }
+
+        return snapshotLikelyHostsSession(
+            snapshot,
+            session: session,
+            isActiveSession: activeSessionIDs.contains(session.id),
+            now: now
+        )
+    }
+
+    private func snapshotLikelyHostsSession(
+        _ snapshot: GhosttyTerminalSnapshot,
+        session: AgentSession,
+        isActiveSession: Bool,
+        now: Date
+    ) -> Bool {
+        if let hintedTool = hintedTool(for: snapshot.title) {
+            return hintedTool == session.tool
+        }
+
+        if isActiveSession {
+            return true
+        }
+
+        return recentAttachmentGraceApplies(to: session, now: now)
     }
 
     private func canFallbackFromRecordedGhosttySessionID(
@@ -745,18 +799,8 @@ struct TerminalSessionAttachmentProbe {
     ) -> SessionAttachmentState {
         let age = now.timeIntervalSince(session.updatedAt)
 
-        if session.phase.requiresAttention {
+        if allowRecentAttachmentGrace && recentAttachmentGraceApplies(to: session, now: now) {
             return .attached
-        }
-
-        if allowRecentAttachmentGrace {
-            if session.attachmentState == .attached && age <= Self.liveGraceWindow {
-                return .attached
-            }
-
-            if session.currentToolName?.isEmpty == false && age <= Self.liveGraceWindow {
-                return .attached
-            }
         }
 
         if let appIsRunning, appIsRunning == false {
@@ -764,6 +808,21 @@ struct TerminalSessionAttachmentProbe {
         }
 
         return age <= Self.staleGraceWindow ? .stale : .detached
+    }
+
+    private func recentAttachmentGraceApplies(
+        to session: AgentSession,
+        now: Date
+    ) -> Bool {
+        let age = now.timeIntervalSince(session.updatedAt)
+        guard age <= Self.liveGraceWindow else {
+            return false
+        }
+
+        return session.attachmentState == .attached
+            || session.phase == .running
+            || session.phase.requiresAttention
+            || session.currentToolName?.isEmpty == false
     }
 
     private func ghosttySnapshotAvailability() -> SnapshotAvailability<GhosttyTerminalSnapshot> {

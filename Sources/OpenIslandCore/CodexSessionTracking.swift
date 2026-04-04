@@ -147,6 +147,19 @@ private enum LegacyMockSessionIDs {
         "claude-fix-auth-bug",
         "codex-backend-server",
         "gemini-optimize-queries",
+        "session-running",
+        "session-recent",
+        "session-claude-research",
+        "session-personal",
+        "session-open-agent-sdk",
+        "session-voice-input",
+        "session-agents",
+        "session-claude",
+        "session-hooks",
+        "session-approval",
+        "session-question",
+        "session-completion",
+        "session-completion-long",
     ]
 }
 

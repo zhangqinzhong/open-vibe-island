@@ -77,10 +77,20 @@ struct CodexSessionTrackingTests {
             phase: .completed,
             updatedAt: .now
         )
+        let debugScenarioRecord = CodexTrackedSessionRecord(
+            sessionID: "session-approval",
+            title: "Codex · open-island",
+            origin: .live,
+            attachmentState: .attached,
+            summary: "Approval needed",
+            phase: .waitingForApproval,
+            updatedAt: .now
+        )
 
         #expect(liveRecord.shouldRestoreToLiveState)
         #expect(!demoRecord.shouldRestoreToLiveState)
         #expect(!legacyMockRecord.shouldRestoreToLiveState)
+        #expect(!debugScenarioRecord.shouldRestoreToLiveState)
     }
 
     @Test
