@@ -164,40 +164,56 @@ struct ControlCenterView: View {
     }
 
     private func scenarioButton(for scenario: IslandDebugScenario) -> some View {
-        Button {
-            selectedScenario = scenario
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Circle()
-                    .fill(selectedScenario == scenario ? .white.opacity(0.88) : .white.opacity(0.22))
-                    .frame(width: 8, height: 8)
-                    .padding(.top, 6)
+        HStack(alignment: .top, spacing: 0) {
+            Button {
+                selectedScenario = scenario
+            } label: {
+                HStack(alignment: .top, spacing: 12) {
+                    Circle()
+                        .fill(selectedScenario == scenario ? .white.opacity(0.88) : .white.opacity(0.22))
+                        .frame(width: 8, height: 8)
+                        .padding(.top, 6)
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(scenario.title)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(scenario.title)
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
 
-                    Text(scenario.summary)
-                        .font(.system(size: 11.5, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(scenario.summary)
+                            .font(.system(size: 11.5, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.5))
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(selectedScenario == scenario ? Color.white.opacity(0.08) : Color.white.opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(selectedScenario == scenario ? .white.opacity(0.18) : .white.opacity(0.05))
-            )
+            .buttonStyle(.plain)
+
+            Button {
+                let snapshot = scenario.snapshot()
+                model.loadDebugSnapshot(snapshot, presentOverlay: true, autoCollapseNotificationCards: false)
+            } label: {
+                Image(systemName: "play.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .frame(width: 28, height: 28)
+                    .background(Circle().fill(.white.opacity(0.08)))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 2)
+            .help("Trigger on island")
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(selectedScenario == scenario ? Color.white.opacity(0.08) : Color.white.opacity(0.03))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(selectedScenario == scenario ? .white.opacity(0.18) : .white.opacity(0.05))
+        )
     }
 
     private var actionCard: some View {
