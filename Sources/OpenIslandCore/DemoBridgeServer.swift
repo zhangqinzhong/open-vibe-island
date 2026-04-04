@@ -13,7 +13,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
     private struct PendingApproval {
         let clientID: UUID
-        let timeoutItem: DispatchWorkItem
     }
 
     private struct PendingClaudeToolContext {
@@ -29,13 +28,10 @@ public final class DemoBridgeServer: @unchecked Sendable {
         }
 
         let clientID: UUID
-        let timeoutItem: DispatchWorkItem
         let kind: Kind
     }
 
     private let socketURL: URL
-    private let approvalTimeout: TimeInterval
-    private let claudeInteractionTimeout: TimeInterval
     private let queue = DispatchQueue(label: "app.openisland.bridge.server")
     private let queueKey = DispatchSpecificKey<Void>()
 
@@ -45,17 +41,12 @@ public final class DemoBridgeServer: @unchecked Sendable {
     private var pendingApprovals: [String: PendingApproval] = [:]
     private var pendingClaudeToolContexts: [String: PendingClaudeToolContext] = [:]
     private var pendingClaudeInteractions: [String: PendingClaudeInteraction] = [:]
-    private var scheduledItems: [DispatchWorkItem] = []
     private var state = SessionState()
 
     public init(
-        socketURL: URL = BridgeSocketLocation.defaultURL,
-        approvalTimeout: TimeInterval = 45,
-        claudeInteractionTimeout: TimeInterval = 24 * 60 * 60
+        socketURL: URL = BridgeSocketLocation.defaultURL
     ) {
         self.socketURL = socketURL
-        self.approvalTimeout = approvalTimeout
-        self.claudeInteractionTimeout = claudeInteractionTimeout
         queue.setSpecific(key: queueKey, value: ())
     }
 
@@ -137,12 +128,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
     }
 
     private func stopLocked() {
-        scheduledItems.forEach { $0.cancel() }
-        scheduledItems.removeAll()
-
-        pendingApprovals.values.forEach { $0.timeoutItem.cancel() }
         pendingApprovals.removeAll()
-        pendingClaudeInteractions.values.forEach { $0.timeoutItem.cancel() }
         pendingClaudeInteractions.removeAll()
         pendingClaudeToolContexts.removeAll()
 
@@ -297,46 +283,25 @@ public final class DemoBridgeServer: @unchecked Sendable {
                 return
             }
 
-            let hasPendingHook = pendingApprovals[sessionID] != nil
-            let event: AgentEvent
-
-            if resolution.isApproved {
-                event = .activityUpdated(
-                    SessionActivityUpdated(
-                        sessionID: sessionID,
-                        summary: hasPendingHook
-                            ? "Permission approved. Codex continued the command."
-                            : "Permission approved. Agent resumed work.",
-                        phase: .running,
-                        timestamp: .now
+            state.resolvePermission(sessionID: sessionID, resolution: resolution)
+            broadcast([.event(
+                resolution.isApproved
+                    ? .activityUpdated(
+                        SessionActivityUpdated(
+                            sessionID: sessionID,
+                            summary: "Permission approved. Codex continued the command.",
+                            phase: .running,
+                            timestamp: .now
+                        )
                     )
-                )
-
-                if !hasPendingHook {
-                    schedule(
-                        event: .sessionCompleted(
-                            SessionCompleted(
-                                sessionID: sessionID,
-                                summary: "Auth middleware patch applied after approval.",
-                                timestamp: .now.addingTimeInterval(4)
-                            )
-                        ),
-                        after: 4
+                    : .sessionCompleted(
+                        SessionCompleted(
+                            sessionID: sessionID,
+                            summary: "Permission denied in Open Island.",
+                            timestamp: .now
+                        )
                     )
-                }
-            } else {
-                event = .sessionCompleted(
-                    SessionCompleted(
-                        sessionID: sessionID,
-                        summary: hasPendingHook
-                            ? "Permission denied in Open Island."
-                            : "Permission denied. Review the session in the terminal.",
-                        timestamp: .now
-                    )
-                )
-            }
-
-            emit(event)
+            )])
             resolvePendingApproval(sessionID: sessionID, approved: resolution.isApproved)
             send(.response(.acknowledged), to: clientID)
 
@@ -347,25 +312,18 @@ public final class DemoBridgeServer: @unchecked Sendable {
                 return
             }
 
-            let resumeEvent = AgentEvent.activityUpdated(
-                SessionActivityUpdated(
-                    sessionID: sessionID,
-                    summary: "Answered: \(response.displaySummary)",
-                    phase: .running,
-                    timestamp: .now
-                )
-            )
-
-            emit(resumeEvent)
-            schedule(
-                event: .sessionCompleted(
-                    SessionCompleted(
+            let summary = response.displaySummary.isEmpty
+                ? "Answered the question."
+                : "Answered: \(response.displaySummary)"
+            emit(
+                .activityUpdated(
+                    SessionActivityUpdated(
                         sessionID: sessionID,
-                        summary: "Slow query analysis finished after targeting \(response.displaySummary.lowercased()).",
-                        timestamp: .now.addingTimeInterval(4)
+                        summary: summary,
+                        phase: .running,
+                        timestamp: .now
                     )
-                ),
-                after: 4
+                )
             )
             send(.response(.acknowledged), to: clientID)
 
@@ -419,37 +377,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
             synchronizeCodexMetadata(for: payload)
 
             let command = payload.commandPreview ?? "Bash command"
-            guard !payload.permissionMode.bypassesIslandApproval else {
-                emit(
-                    .activityUpdated(
-                        SessionActivityUpdated(
-                            sessionID: payload.sessionID,
-                            summary: "Running Bash without approval: \(command)",
-                            phase: .running,
-                            timestamp: .now
-                        )
-                    )
-                )
-                send(.response(.acknowledged), to: clientID)
-                return
-            }
-
-            guard hasApprovalObserver(excluding: clientID) else {
-                emit(
-                    .activityUpdated(
-                        SessionActivityUpdated(
-                            sessionID: payload.sessionID,
-                            summary: "Running Bash: \(command)",
-                            phase: .running,
-                            timestamp: .now
-                        )
-                    )
-                )
-                send(.response(.acknowledged), to: clientID)
-                return
-            }
-
-            pendingApprovals[payload.sessionID]?.timeoutItem.cancel()
 
             let approvalEvent = AgentEvent.permissionRequested(
                 PermissionRequested(
@@ -467,18 +394,9 @@ public final class DemoBridgeServer: @unchecked Sendable {
 
             emit(approvalEvent)
 
-            let timeoutItem = DispatchWorkItem { [weak self] in
-                self?.resolveTimedOutApproval(
-                    sessionID: payload.sessionID,
-                    commandPreview: command
-                )
-            }
-
             pendingApprovals[payload.sessionID] = PendingApproval(
-                clientID: clientID,
-                timeoutItem: timeoutItem
+                clientID: clientID
             )
-            queue.asyncAfter(deadline: .now() + approvalTimeout, execute: timeoutItem)
 
         case .postToolUse:
             ensureSessionExists(for: payload)
@@ -582,8 +500,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
 
-            pendingClaudeInteractions[payload.sessionID]?.timeoutItem.cancel()
-
             if let prompt = payload.questionPrompt {
                 emit(
                     .questionAsked(
@@ -595,16 +511,10 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     )
                 )
 
-                let timeoutItem = DispatchWorkItem { [weak self] in
-                    self?.resolveTimedOutClaudeQuestion(sessionID: payload.sessionID)
-                }
-
                 pendingClaudeInteractions[payload.sessionID] = PendingClaudeInteraction(
                     clientID: clientID,
-                    timeoutItem: timeoutItem,
                     kind: .question(payload, prompt)
                 )
-                queue.asyncAfter(deadline: .now() + claudeInteractionTimeout, execute: timeoutItem)
             } else {
                 emit(
                     .permissionRequested(
@@ -625,16 +535,10 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     )
                 )
 
-                let timeoutItem = DispatchWorkItem { [weak self] in
-                    self?.resolveTimedOutClaudePermission(sessionID: payload.sessionID, payload: payload)
-                }
-
                 pendingClaudeInteractions[payload.sessionID] = PendingClaudeInteraction(
                     clientID: clientID,
-                    timeoutItem: timeoutItem,
                     kind: .permission(payload)
                 )
-                queue.asyncAfter(deadline: .now() + claudeInteractionTimeout, execute: timeoutItem)
             }
 
         case .postToolUse:
@@ -830,13 +734,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
         }
     }
 
-    private func hasApprovalObserver(excluding clientID: UUID) -> Bool {
-        if clients.values.contains(where: { $0.id != clientID && $0.role == .observer }) {
-            return true
-        }
 
-        return clients.values.contains(where: { $0.id != clientID })
-    }
 
     private func ensureSessionExists(for payload: CodexHookPayload) {
         guard state.session(id: payload.sessionID) == nil else {
@@ -1104,8 +1002,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
             return
         }
 
-        pendingApproval.timeoutItem.cancel()
-
         let response: BridgeResponse
         if approved {
             response = .acknowledged
@@ -1123,8 +1019,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
         guard let pendingInteraction = pendingClaudeInteractions.removeValue(forKey: sessionID) else {
             return
         }
-
-        pendingInteraction.timeoutItem.cancel()
 
         let directive: ClaudeHookDirective
         let summary: String
@@ -1192,8 +1086,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
             return
         }
 
-        pendingInteraction.timeoutItem.cancel()
-
         guard case let .question(payload, prompt) = pendingInteraction.kind else {
             return
         }
@@ -1222,82 +1114,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
             .response(
                 .claudeHookDirective(
                     .permissionRequest(.allow(updatedInput: updatedInput))
-                )
-            ),
-            to: pendingInteraction.clientID
-        )
-    }
-
-    private func resolveTimedOutApproval(sessionID: String, commandPreview: String) {
-        guard let pendingApproval = pendingApprovals.removeValue(forKey: sessionID) else {
-            return
-        }
-
-        emit(
-            .activityUpdated(
-                SessionActivityUpdated(
-                    sessionID: sessionID,
-                    summary: "Approval timed out. Codex continued Bash: \(commandPreview)",
-                    phase: .running,
-                    timestamp: .now
-                )
-            )
-        )
-
-        send(.response(.acknowledged), to: pendingApproval.clientID)
-    }
-
-    private func resolveTimedOutClaudePermission(
-        sessionID: String,
-        payload: ClaudeHookPayload
-    ) {
-        guard let pendingInteraction = pendingClaudeInteractions.removeValue(forKey: sessionID) else {
-            return
-        }
-
-        emit(
-            .sessionCompleted(
-                SessionCompleted(
-                    sessionID: sessionID,
-                    summary: "Permission request timed out for \(payload.toolName ?? "Claude tool").",
-                    timestamp: .now
-                )
-            )
-        )
-
-        send(
-            .response(
-                .claudeHookDirective(
-                    .permissionRequest(
-                        .deny(message: "Permission request timed out in Open Island.", interrupt: true)
-                    )
-                )
-            ),
-            to: pendingInteraction.clientID
-        )
-    }
-
-    private func resolveTimedOutClaudeQuestion(sessionID: String) {
-        guard let pendingInteraction = pendingClaudeInteractions.removeValue(forKey: sessionID) else {
-            return
-        }
-
-        emit(
-            .sessionCompleted(
-                SessionCompleted(
-                    sessionID: sessionID,
-                    summary: "Claude's question timed out in Open Island.",
-                    timestamp: .now
-                )
-            )
-        )
-
-        send(
-            .response(
-                .claudeHookDirective(
-                    .permissionRequest(
-                        .deny(message: "Claude's question timed out in Open Island.", interrupt: true)
-                    )
                 )
             ),
             to: pendingInteraction.clientID
@@ -1362,15 +1178,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
         broadcast([.event(event)])
     }
 
-    private func schedule(event: AgentEvent, after delay: TimeInterval) {
-        let item = DispatchWorkItem { [weak self] in
-            self?.emit(event)
-        }
-
-        scheduledItems.append(item)
-        queue.asyncAfter(deadline: .now() + delay, execute: item)
-    }
-
     private func send(_ envelope: BridgeEnvelope, to clientID: UUID) {
         guard let client = clients[clientID] else {
             return
@@ -1405,7 +1212,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
         }
 
         for sessionID in pendingSessionIDs {
-            pendingApprovals[sessionID]?.timeoutItem.cancel()
             pendingApprovals.removeValue(forKey: sessionID)
         }
 
@@ -1415,7 +1221,6 @@ public final class DemoBridgeServer: @unchecked Sendable {
         }
 
         for sessionID in pendingClaudeSessionIDs {
-            pendingClaudeInteractions[sessionID]?.timeoutItem.cancel()
             pendingClaudeInteractions.removeValue(forKey: sessionID)
         }
 

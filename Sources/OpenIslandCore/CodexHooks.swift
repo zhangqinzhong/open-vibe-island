@@ -16,16 +16,7 @@ public enum CodexPermissionMode: String, Codable, Sendable {
     case bypassPermissions
 }
 
-public extension CodexPermissionMode {
-    var bypassesIslandApproval: Bool {
-        switch self {
-        case .dontAsk, .bypassPermissions:
-            true
-        case .default, .acceptEdits, .plan:
-            false
-        }
-    }
-}
+
 
 public struct CodexHookToolInput: Equatable, Codable, Sendable {
     public var command: String
