@@ -66,6 +66,7 @@ struct TerminalSessionAttachmentProbe {
 
     private static let liveGraceWindow: TimeInterval = 120
     private static let staleGraceWindow: TimeInterval = 15 * 60
+    private static let inactiveClaudeMatchWindow: TimeInterval = 120
     private static let appleScriptTimeout: TimeInterval = 1.0
     private static let fieldSeparator = "\u{1f}"
     private static let recordSeparator = "\u{1e}"
@@ -258,13 +259,6 @@ struct TerminalSessionAttachmentProbe {
         now: Date
     ) -> SessionAttachmentState {
         if isMatched {
-            // A completed Claude Code session whose terminal tab is still open
-            // but whose process has exited should not stay attached — the user
-            // has finished that conversation and it would otherwise linger in the
-            // primary session list indefinitely.
-            if session.tool == .claudeCode && session.phase == .completed && !isActiveProcess {
-                return .stale
-            }
             return .attached
         }
 
@@ -358,6 +352,7 @@ struct TerminalSessionAttachmentProbe {
         for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
             let matches = sessions.filter { session in
                 !activeSessionIDs.contains(session.id)
+                    && isRecentEnoughForInactiveMatch(session, now: now)
                     && exactGhosttySnapshotMatches(
                         snapshot,
                         session: session,
@@ -377,16 +372,17 @@ struct TerminalSessionAttachmentProbe {
 
         for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
             let matches = sessions.filter { session in
-                ghosttyFallbackCandidateMatches(
-                    snapshot,
-                    session: session,
-                    claimedSessionIDs: claimedSessionIDs,
-                    claimedSnapshotIDs: claimedSnapshotIDs,
-                    activeSessionIDs: activeSessionIDs,
-                    activeProcessesBySessionID: activeProcessesBySessionID,
-                    requireActiveSession: false,
-                    now: now
-                )
+                isRecentEnoughForInactiveMatch(session, now: now)
+                    && ghosttyFallbackCandidateMatches(
+                        snapshot,
+                        session: session,
+                        claimedSessionIDs: claimedSessionIDs,
+                        claimedSnapshotIDs: claimedSnapshotIDs,
+                        activeSessionIDs: activeSessionIDs,
+                        activeProcessesBySessionID: activeProcessesBySessionID,
+                        requireActiveSession: false,
+                        now: now
+                    )
             }
 
             guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
@@ -877,6 +873,16 @@ struct TerminalSessionAttachmentProbe {
         case .completed:
             1
         }
+    }
+
+    /// Claude Code sessions without an active process should only match
+    /// Ghostty snapshots if they were updated very recently (within
+    /// `inactiveClaudeMatchWindow`). This prevents old completed sessions
+    /// from staying attached just because the terminal tab is still open.
+    /// Non-Claude sessions (Codex) are always eligible.
+    private func isRecentEnoughForInactiveMatch(_ session: AgentSession, now: Date) -> Bool {
+        guard session.tool == .claudeCode else { return true }
+        return now.timeIntervalSince(session.updatedAt) <= Self.inactiveClaudeMatchWindow
     }
 
     private func fallbackAttachmentState(
