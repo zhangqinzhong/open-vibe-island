@@ -406,6 +406,7 @@ public struct CodexRolloutSnapshot: Equatable, Sendable {
     public var currentTool: String?
     public var currentCommandPreview: String?
     public var isCompleted: Bool
+    public var isInterrupted: Bool
 
     public init(
         summary: String? = nil,
@@ -416,7 +417,8 @@ public struct CodexRolloutSnapshot: Equatable, Sendable {
         lastAssistantMessage: String? = nil,
         currentTool: String? = nil,
         currentCommandPreview: String? = nil,
-        isCompleted: Bool = false
+        isCompleted: Bool = false,
+        isInterrupted: Bool = false
     ) {
         self.summary = summary
         self.phase = phase
@@ -427,6 +429,7 @@ public struct CodexRolloutSnapshot: Equatable, Sendable {
         self.currentTool = currentTool
         self.currentCommandPreview = currentCommandPreview
         self.isCompleted = isCompleted
+        self.isInterrupted = isInterrupted
     }
 
     public var metadata: CodexSessionMetadata {
@@ -507,16 +510,18 @@ public enum CodexRolloutReducer {
         let oldSummary = oldSnapshot?.summary
         let oldPhase = oldSnapshot?.phase
         let oldCompleted = oldSnapshot?.isCompleted ?? false
+        let oldInterrupted = oldSnapshot?.isInterrupted ?? false
         let newSummary = newSnapshot.summary ?? oldSummary ?? "Codex updated the current turn."
 
         if newSnapshot.isCompleted {
-            if !oldCompleted || oldSummary != newSummary {
+            if !oldCompleted || oldSummary != newSummary || oldInterrupted != newSnapshot.isInterrupted {
                 events.append(
                     .sessionCompleted(
                         SessionCompleted(
                             sessionID: sessionID,
                             summary: newSummary,
-                            timestamp: timestamp
+                            timestamp: timestamp,
+                            isInterrupt: newSnapshot.isInterrupted
                         )
                     )
                 )
@@ -546,6 +551,7 @@ public enum CodexRolloutReducer {
         case "task_started":
             snapshot.phase = .running
             snapshot.isCompleted = false
+            snapshot.isInterrupted = false
             snapshot.summary = snapshot.summary ?? "Codex started a new turn."
         case "user_message":
             guard let message = clipped(payload["message"] as? String), !message.isEmpty else {
@@ -566,6 +572,7 @@ public enum CodexRolloutReducer {
             snapshot.currentCommandPreview = nil
             snapshot.phase = .completed
             snapshot.isCompleted = true
+            snapshot.isInterrupted = false
 
             if let message = payload["last_agent_message"] as? String, !message.isEmpty {
                 snapshot.lastAssistantMessage = message
@@ -578,6 +585,7 @@ public enum CodexRolloutReducer {
             snapshot.currentCommandPreview = nil
             snapshot.phase = .completed
             snapshot.isCompleted = true
+            snapshot.isInterrupted = true
             snapshot.summary = "Codex turn was interrupted."
         case "exec_command_end":
             snapshot.currentTool = nil
@@ -645,6 +653,7 @@ public enum CodexRolloutReducer {
         snapshot.currentCommandPreview = commandPreview(for: toolName, payload: payload)
         snapshot.phase = .running
         snapshot.isCompleted = false
+        snapshot.isInterrupted = false
         snapshot.summary = "Running \(displayName(for: toolName))."
 
         if let timestamp {
@@ -663,6 +672,7 @@ public enum CodexRolloutReducer {
         snapshot.currentCommandPreview = nil
         snapshot.phase = .running
         snapshot.isCompleted = false
+        snapshot.isInterrupted = false
         snapshot.summary = "Prompt: \(message)"
 
         if let timestamp {
@@ -681,6 +691,7 @@ public enum CodexRolloutReducer {
         snapshot.summary = message
         snapshot.phase = .running
         snapshot.isCompleted = false
+        snapshot.isInterrupted = false
 
         if let timestamp {
             snapshot.updatedAt = timestamp

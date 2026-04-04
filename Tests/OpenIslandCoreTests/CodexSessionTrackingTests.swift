@@ -200,8 +200,54 @@ struct CodexSessionTrackingTests {
         #expect(finalSnapshot.currentTool == nil)
         #expect(finalSnapshot.currentCommandPreview == nil)
         #expect(finalEvents.contains(where: { $0.trackedSessionCompletion?.summary == "Rollout watcher is wired and verified." }))
+        #expect(finalEvents.contains(where: { $0.trackedSessionCompletion?.isInterrupt != true }))
         #expect(finalEvents.contains(where: { $0.trackedMetadataUpdate?.codexMetadata.currentTool == nil }))
         #expect(finalEvents.contains(where: { $0.trackedMetadataUpdate?.codexMetadata.currentCommandPreview == nil }))
+    }
+
+    @Test
+    func codexRolloutReducerMarksTurnAbortedAsInterruptedCompletion() {
+        let initialSnapshot = CodexRolloutReducer.snapshot(for: [
+            rolloutLine(
+                timestamp: "2026-04-02T04:03:44.500Z",
+                type: "event_msg",
+                payload: [
+                    "type": "user_message",
+                    "message": "Inspect the completion notification behavior.",
+                ]
+            ),
+        ])
+        let interruptedSnapshot = CodexRolloutReducer.snapshot(for: [
+            rolloutLine(
+                timestamp: "2026-04-02T04:03:44.500Z",
+                type: "event_msg",
+                payload: [
+                    "type": "user_message",
+                    "message": "Inspect the completion notification behavior.",
+                ]
+            ),
+            rolloutLine(
+                timestamp: "2026-04-02T04:03:45.000Z",
+                type: "event_msg",
+                payload: [
+                    "type": "turn_aborted",
+                    "reason": "interrupted",
+                ]
+            ),
+        ])
+        let events = CodexRolloutReducer.events(
+            from: initialSnapshot,
+            to: interruptedSnapshot,
+            sessionID: "codex-session-1",
+            transcriptPath: "/tmp/rollout.jsonl"
+        )
+
+        #expect(interruptedSnapshot.phase == .completed)
+        #expect(interruptedSnapshot.isInterrupted)
+        #expect(events.contains(where: {
+            $0.trackedSessionCompletion?.summary == "Codex turn was interrupted."
+                && $0.trackedSessionCompletion?.isInterrupt == true
+        }))
     }
 
     @Test

@@ -72,6 +72,20 @@ struct IslandSurfaceTests {
     }
 
     @Test
+    func interruptedCompletionEventsDoNotRouteToCompletionCard() {
+        let event = AgentEvent.sessionCompleted(
+            SessionCompleted(
+                sessionID: "session-3",
+                summary: "Codex turn was interrupted.",
+                timestamp: .now,
+                isInterrupt: true
+            )
+        )
+
+        #expect(IslandSurface.notificationSurface(for: event) == nil)
+    }
+
+    @Test
     func onlyCompletionCardsAutoDismissAsNotifications() {
         #expect(!IslandSurface.approvalCard(sessionID: "session-1").autoDismissesWhenPresentedAsNotification)
         #expect(!IslandSurface.questionCard(sessionID: "session-2").autoDismissesWhenPresentedAsNotification)

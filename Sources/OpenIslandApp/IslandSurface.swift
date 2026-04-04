@@ -41,7 +41,7 @@ enum IslandSurface: Equatable {
         case let .questionAsked(payload):
             .questionCard(sessionID: payload.sessionID)
         case let .sessionCompleted(payload):
-            .completionCard(sessionID: payload.sessionID)
+            payload.isInterrupt == true ? nil : .completionCard(sessionID: payload.sessionID)
         default:
             nil
         }

@@ -733,7 +733,8 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     SessionCompleted(
                         sessionID: payload.sessionID,
                         summary: payload.assistantMessagePreview ?? "Claude completed the turn.",
-                        timestamp: .now
+                        timestamp: .now,
+                        isInterrupt: payload.isInterrupt
                     )
                 )
             )
@@ -749,7 +750,8 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     SessionCompleted(
                         sessionID: payload.sessionID,
                         summary: payload.error ?? payload.assistantMessagePreview ?? "Claude failed to finish the turn.",
-                        timestamp: .now
+                        timestamp: .now,
+                        isInterrupt: payload.isInterrupt
                     )
                 )
             )

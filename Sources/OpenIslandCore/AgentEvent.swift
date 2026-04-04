@@ -89,15 +89,18 @@ public struct SessionCompleted: Equatable, Codable, Sendable {
     public var sessionID: String
     public var summary: String
     public var timestamp: Date
+    public var isInterrupt: Bool?
 
     public init(
         sessionID: String,
         summary: String,
-        timestamp: Date
+        timestamp: Date,
+        isInterrupt: Bool? = nil
     ) {
         self.sessionID = sessionID
         self.summary = summary
         self.timestamp = timestamp
+        self.isInterrupt = isInterrupt
     }
 }
 
