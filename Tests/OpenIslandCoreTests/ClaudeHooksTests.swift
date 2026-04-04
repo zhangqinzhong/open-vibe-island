@@ -117,48 +117,40 @@ struct ClaudeHooksTests {
     }
 
     @Test
-    func claudeGhosttySessionStartUsesLocatorButLaterHooksClear() {
-        // SessionStart: Ghostty locator IS used (terminal is guaranteed focused).
-        let startPayload = ClaudeHookPayload(
-            cwd: "/tmp/worktree",
-            hookEventName: .sessionStart,
-            sessionID: "claude-session-1"
-        )
+    func claudeGhosttyLocatorUsedForSessionStartAndPromptButNotToolUse() {
+        let locator: (String) -> (sessionID: String?, tty: String?, title: String?) = { _ in
+            (sessionID: "ghostty-frontmost", tty: nil, title: "claude ~/tmp/worktree")
+        }
+        let env = ["TERM_PROGRAM": "ghostty"]
+        let ttyProvider: () -> String? = { "/dev/ttys031" }
 
-        let atStart = startPayload.withRuntimeContext(
-            environment: ["TERM_PROGRAM": "ghostty"],
-            currentTTYProvider: { "/dev/ttys031" },
-            terminalLocatorProvider: { _ in
-                (sessionID: "ghostty-frontmost", tty: nil, title: "codex ~/tmp/other-worktree")
-            }
-        )
+        // SessionStart: locator IS used.
+        let atStart = ClaudeHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .sessionStart, sessionID: "s1"
+        ).withRuntimeContext(environment: env, currentTTYProvider: ttyProvider, terminalLocatorProvider: locator)
 
-        #expect(atStart.terminalApp == "Ghostty")
-        #expect(atStart.terminalTTY == "/dev/ttys031")
         #expect(atStart.terminalSessionID == "ghostty-frontmost")
-        #expect(atStart.terminalTitle == "codex ~/tmp/other-worktree")
+        #expect(atStart.terminalTitle == "claude ~/tmp/worktree")
 
-        // Later hook (e.g. preToolUse): locator NOT used, values cleared.
-        let laterPayload = ClaudeHookPayload(
-            cwd: "/tmp/worktree",
-            hookEventName: .preToolUse,
-            sessionID: "claude-session-1",
-            terminalSessionID: "ghostty-frontmost",
-            terminalTitle: "codex ~/tmp/other-worktree"
+        // UserPromptSubmit: locator IS used (user just typed, terminal is focused).
+        let atPrompt = ClaudeHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .userPromptSubmit, sessionID: "s1"
+        ).withRuntimeContext(environment: env, currentTTYProvider: ttyProvider, terminalLocatorProvider: locator)
+
+        #expect(atPrompt.terminalSessionID == "ghostty-frontmost")
+        #expect(atPrompt.terminalTitle == "claude ~/tmp/worktree")
+
+        // PreToolUse: locator NOT used, values cleared.
+        let atTool = ClaudeHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .preToolUse, sessionID: "s1",
+            terminalSessionID: "ghostty-frontmost", terminalTitle: "claude ~/tmp/worktree"
+        ).withRuntimeContext(
+            environment: env, currentTTYProvider: ttyProvider,
+            terminalLocatorProvider: { _ in (sessionID: "ghostty-wrong", tty: nil, title: "wrong") }
         )
 
-        let atLater = laterPayload.withRuntimeContext(
-            environment: ["TERM_PROGRAM": "ghostty"],
-            currentTTYProvider: { "/dev/ttys031" },
-            terminalLocatorProvider: { _ in
-                (sessionID: "ghostty-wrong", tty: nil, title: "wrong title")
-            }
-        )
-
-        #expect(atLater.terminalApp == "Ghostty")
-        #expect(atLater.terminalTTY == "/dev/ttys031")
-        #expect(atLater.terminalSessionID == nil)
-        #expect(atLater.terminalTitle == nil)
+        #expect(atTool.terminalSessionID == nil)
+        #expect(atTool.terminalTitle == nil)
     }
 
     @Test

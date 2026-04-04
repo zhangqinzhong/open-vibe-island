@@ -396,11 +396,7 @@ public extension CodexHookPayload {
 
         let useLocator: Bool
         if let terminalApp = payload.terminalApp, isGhosttyTerminalApp(terminalApp) {
-            // Ghostty's AppleScript returns the *focused* terminal which is
-            // only reliable at session start — the user may have switched tabs
-            // by the time later hooks fire.  Clear any stale values on non-start
-            // hooks and only query the locator during SessionStart.
-            if payload.hookEventName == .sessionStart {
+            if payload.hookEventName == .sessionStart || payload.hookEventName == .userPromptSubmit {
                 useLocator = true
             } else {
                 payload.terminalSessionID = nil

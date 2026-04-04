@@ -660,50 +660,39 @@ struct SessionStateTests {
     }
 
     @Test
-    func codexGhosttySessionStartUsesLocatorButLaterHooksClear() {
-        let startPayload = CodexHookPayload(
-            cwd: "/tmp/worktree",
-            hookEventName: .sessionStart,
-            model: "gpt-5-codex",
-            permissionMode: .default,
-            sessionID: "session-1",
-            transcriptPath: nil
-        )
+    func codexGhosttyLocatorUsedForSessionStartAndPromptButNotToolUse() {
+        let locator: (String) -> (sessionID: String?, tty: String?, title: String?) = { _ in
+            (sessionID: "ghostty-frontmost", tty: nil, title: "codex ~/tmp/worktree")
+        }
+        let env = ["TERM_PROGRAM": "ghostty"]
+        let ttyProvider: () -> String? = { "/dev/ttys022" }
 
-        let atStart = startPayload.withRuntimeContext(
-            environment: ["TERM_PROGRAM": "ghostty"],
-            currentTTYProvider: { "/dev/ttys022" },
-            terminalLocatorProvider: { _ in
-                (sessionID: "ghostty-frontmost", tty: nil, title: "codex ~/tmp/other-worktree")
-            }
-        )
+        let atStart = CodexHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .sessionStart,
+            model: "gpt-5-codex", permissionMode: .default, sessionID: "s1", transcriptPath: nil
+        ).withRuntimeContext(environment: env, currentTTYProvider: ttyProvider, terminalLocatorProvider: locator)
 
-        #expect(atStart.terminalApp == "Ghostty")
-        #expect(atStart.terminalTTY == "/dev/ttys022")
         #expect(atStart.terminalSessionID == "ghostty-frontmost")
-        #expect(atStart.terminalTitle == "codex ~/tmp/other-worktree")
+        #expect(atStart.terminalTitle == "codex ~/tmp/worktree")
 
-        let laterPayload = CodexHookPayload(
-            cwd: "/tmp/worktree",
-            hookEventName: .preToolUse,
-            model: "gpt-5-codex",
-            permissionMode: .default,
-            sessionID: "session-1",
-            transcriptPath: nil
+        let atPrompt = CodexHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .userPromptSubmit,
+            model: "gpt-5-codex", permissionMode: .default, sessionID: "s1", transcriptPath: nil
+        ).withRuntimeContext(environment: env, currentTTYProvider: ttyProvider, terminalLocatorProvider: locator)
+
+        #expect(atPrompt.terminalSessionID == "ghostty-frontmost")
+        #expect(atPrompt.terminalTitle == "codex ~/tmp/worktree")
+
+        let atTool = CodexHookPayload(
+            cwd: "/tmp/worktree", hookEventName: .preToolUse,
+            model: "gpt-5-codex", permissionMode: .default, sessionID: "s1", transcriptPath: nil
+        ).withRuntimeContext(
+            environment: env, currentTTYProvider: ttyProvider,
+            terminalLocatorProvider: { _ in (sessionID: "ghostty-wrong", tty: nil, title: "wrong") }
         )
 
-        let atLater = laterPayload.withRuntimeContext(
-            environment: ["TERM_PROGRAM": "ghostty"],
-            currentTTYProvider: { "/dev/ttys022" },
-            terminalLocatorProvider: { _ in
-                (sessionID: "ghostty-wrong", tty: nil, title: "wrong title")
-            }
-        )
-
-        #expect(atLater.terminalApp == "Ghostty")
-        #expect(atLater.terminalTTY == "/dev/ttys022")
-        #expect(atLater.terminalSessionID == nil)
-        #expect(atLater.terminalTitle == nil)
+        #expect(atTool.terminalSessionID == nil)
+        #expect(atTool.terminalTitle == nil)
     }
 
     @Test
