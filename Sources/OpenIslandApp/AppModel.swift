@@ -29,7 +29,7 @@ final class AppModel {
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     private static let notificationSurfaceAutoCollapseDelay: TimeInterval = 10
-    private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(140)
+    private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(20)
     static let hoverOpenDelay: TimeInterval = 0.7
     typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
 

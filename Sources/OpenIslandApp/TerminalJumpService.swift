@@ -42,9 +42,9 @@ struct TerminalJumpService {
         ),
     ]
 
-    private static let ghosttyFocusSettleDelay = 0.15
-    private static let ghosttyWindowActivationDelay = 0.08
-    private static let ghosttyFocusAttempts = 6
+    private static let ghosttyFocusSettleDelay = 0.08
+    private static let ghosttyWindowActivationDelay = 0.04
+    private static let ghosttyFocusAttempts = 3
 
     private let applicationResolver: ApplicationResolver
     private let appRunningChecker: AppRunningChecker
