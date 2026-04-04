@@ -518,6 +518,55 @@ struct TerminalSessionAttachmentProbeTests {
     }
 
     @Test
+    func activeCodexSessionBeatsStaleExactGhosttyBinding() {
+        let now = Date(timeIntervalSince1970: 1_000)
+        let probe = TerminalSessionAttachmentProbe()
+        let primary = ghosttySession(
+            id: "primary",
+            updatedAt: now,
+            phase: .running,
+            terminalSessionID: "ghostty-1",
+            workingDirectory: "/tmp/open-island"
+        )
+        let activeRehomed = ghosttySession(
+            id: "active-rehomed",
+            updatedAt: now.addingTimeInterval(-30),
+            phase: .running,
+            terminalSessionID: "ghostty-frontmost",
+            workingDirectory: "/tmp/open-island"
+        )
+        let staleExact = ghosttySession(
+            id: "stale-exact",
+            updatedAt: now.addingTimeInterval(-18 * 3_600),
+            phase: .completed,
+            terminalSessionID: "ghostty-2",
+            workingDirectory: "/tmp/open-island"
+        )
+
+        let resolutions = probe.sessionResolutions(
+            for: [primary, activeRehomed, staleExact],
+            ghosttyAvailability: .available(
+                [
+                    .init(sessionID: "ghostty-1", workingDirectory: "/tmp/open-island", title: "codex ~/tmp/open-island"),
+                    .init(sessionID: "ghostty-2", workingDirectory: "/tmp/open-island", title: "codex ~/tmp/open-island"),
+                ],
+                appIsRunning: true
+            ),
+            terminalAvailability: .available([] as [TerminalSessionAttachmentProbe.TerminalTabSnapshot], appIsRunning: false),
+            activeProcesses: [
+                .init(tool: .codex, sessionID: "primary", workingDirectory: "/tmp/open-island", terminalTTY: "/dev/ttys000"),
+                .init(tool: .codex, sessionID: "active-rehomed", workingDirectory: "/tmp/open-island", terminalTTY: "/dev/ttys001"),
+            ],
+            now: now
+        )
+
+        #expect(resolutions["primary"]?.attachmentState == .attached)
+        #expect(resolutions["active-rehomed"]?.attachmentState == .attached)
+        #expect(resolutions["active-rehomed"]?.correctedJumpTarget?.terminalSessionID == "ghostty-2")
+        #expect(resolutions["stale-exact"]?.attachmentState != .attached)
+    }
+
+    @Test
     func claudeSessionIDPrefixInGhosttyTitleBeatsSameDirectoryCodexSession() {
         let now = Date(timeIntervalSince1970: 1_000)
         let probe = TerminalSessionAttachmentProbe()

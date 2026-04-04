@@ -313,7 +313,7 @@ struct TerminalSessionAttachmentProbe {
                     session: session,
                     activeSessionIDs: activeSessionIDs,
                     now: now
-                )
+                ) && activeSessionIDs.contains(session.id)
             }
 
             guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
@@ -337,6 +337,26 @@ struct TerminalSessionAttachmentProbe {
                     requireActiveSession: true,
                     now: now
                 )
+            }
+
+            guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
+                continue
+            }
+
+            assignments[preferred.id] = snapshot
+            claimedSessionIDs.insert(preferred.id)
+            claimedSnapshotIDs.insert(snapshot.sessionID)
+        }
+
+        for snapshot in snapshots where !claimedSnapshotIDs.contains(snapshot.sessionID) {
+            let matches = sessions.filter { session in
+                !activeSessionIDs.contains(session.id)
+                    && exactGhosttySnapshotMatches(
+                        snapshot,
+                        session: session,
+                        activeSessionIDs: activeSessionIDs,
+                        now: now
+                    )
             }
 
             guard let preferred = preferredSession(from: matches, activeSessionIDs: activeSessionIDs) else {
