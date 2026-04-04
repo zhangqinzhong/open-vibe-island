@@ -46,16 +46,67 @@ swift build -c release --product OpenIslandHooks   # build hook binary
 
 Open `Package.swift` in Xcode for the app target. Requires macOS 14+, Swift 6.2.
 
+## Required Workflow
+
+1. Start each round by checking the current repository state with `git status -sb`.
+2. Read the relevant files before editing. Do not guess repository structure or behavior.
+3. Keep each round focused on a single coherent change.
+4. After making changes, run the most relevant verification available for that round.
+5. Summarize what changed, including any verification gaps.
+6. Commit the round before stopping.
+
+Default finish order: **implement → verify → summarize → commit**.
+
+## Commit Policy
+
+- Every round that modifies files must end with a commit.
+- Do not batch unrelated changes into one commit.
+- Use conventional-style commit messages: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`.
+- Do not amend existing commits unless explicitly requested.
+- Do not create branches unless explicitly requested.
+
+## Safety Rules
+
+- Never revert or overwrite user changes unless explicitly requested.
+- If unexpected changes appear, inspect them and work around them when possible.
+- If a conflict makes the task ambiguous or risky, stop and ask before proceeding.
+- Never use destructive Git commands such as `git reset --hard` without explicit approval.
+
+## Parallel Work
+
+- When parallel work is needed, use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) rather than manually managing worktrees.
+- Treat `main` as the shared integration branch. Do not do day-to-day feature development directly on `main` when parallel work is active.
+- Each parallel agent should work on its own branch, named to match the workstream (e.g. `feat/<topic>`, `fix/<topic>`).
+- Integrate completed work back to `main` after verification.
+
+## App Targets And Naming
+
+- `OpenIslandApp` (via `swift run OpenIslandApp` or the Xcode target) is the canonical development runtime.
+- `~/Applications/Open Island Dev.app` is a local bundle wrapper around the repo-built binary, not a separate product.
+- When launching `Open Island Dev.app`, refresh the bundle first with `zsh scripts/launch-dev-app.sh` instead of only `open -na` (avoids stale binaries).
+- Use `scripts/harness.sh smoke` or `scripts/smoke-dev-app.sh` only for deterministic harness runs.
+- `/Applications/Vibe Island.app` and `https://vibeisland.app/` are closed-source reference baselines only — behavior benchmarks, not the development runtime.
+
+## Reference Baselines
+
+- Official product reference: `https://vibeisland.app/`
+- On Macs with a built-in notch, the island sits in the notch area; on external displays or non-notch Macs, it falls back to a compact top-center bar.
+- Community reference: `https://github.com/farouqaldori/claude-island` — useful for design patterns, not a product spec.
+- Do NOT import from `claude-island` unless explicitly asked: analytics (Mixpanel etc.), window-manager scope (`tmux`, `yabai`), Claude-only assumptions that weaken the shared agent model.
+
 ## Conventions
 
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `docs:`, `chore:`
-- Each round of changes should be a single focused commit
 - Prefer small end-to-end slices over speculative scaffolding
 - Native macOS APIs over cross-platform abstractions
 - Hooks fail open — if app/bridge unavailable, agents keep running unchanged
 - The `SessionState.apply(_:)` reducer is the single source of truth for session mutations
 - Bridge protocol uses newline-delimited JSON envelopes (`BridgeCodec`)
 - All models are `Sendable` and `Codable`
+
+## Verification
+
+- Run targeted checks that match the change (`swift build`, `swift test`, or manual verification).
+- If no automated verification exists yet, state that explicitly in the summary and still commit.
 
 ## Important files
 
