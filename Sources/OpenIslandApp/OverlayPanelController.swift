@@ -227,11 +227,11 @@ final class OverlayPanelController {
     private func handleMouseMoved(_ screenLocation: NSPoint) {
         guard let model else { return }
 
-        let inNotchArea = isPointInNotchArea(screenLocation)
+        let inClosedSurfaceArea = isPointInClosedSurfaceArea(screenLocation)
 
-        if model.notchStatus == .closed && inNotchArea {
+        if model.notchStatus == .closed && inClosedSurfaceArea {
             scheduleHoverOpen()
-        } else if model.notchStatus == .closed && !inNotchArea {
+        } else if model.notchStatus == .closed && !inClosedSurfaceArea {
             cancelHoverOpen()
         }
 
@@ -247,9 +247,9 @@ final class OverlayPanelController {
     private func handleMouseDown(_ screenLocation: NSPoint) {
         guard let model else { return }
 
-        let inNotchArea = isPointInNotchArea(screenLocation)
+        let inClosedSurfaceArea = isPointInClosedSurfaceArea(screenLocation)
 
-        if model.notchStatus == .closed && inNotchArea {
+        if model.notchStatus == .closed && inClosedSurfaceArea {
             cancelHoverOpen()
             model.notchOpen(reason: .click)
         } else if model.notchStatus == .opened {
@@ -282,14 +282,20 @@ final class OverlayPanelController {
 
     // MARK: - Hit testing geometry
 
-    func isPointInNotchArea(_ screenPoint: NSPoint) -> Bool {
+    func isPointInClosedSurfaceArea(_ screenPoint: NSPoint) -> Bool {
+        guard let model else { return false }
+
+        if let closedSurfaceRect = closedSurfaceRect(for: model) {
+            return closedSurfaceRect.contains(screenPoint)
+        }
+
         let expandedNotch = notchRect.insetBy(dx: -20, dy: -10)
         return expandedNotch.contains(screenPoint)
     }
 
     func isPointInExpandedArea(_ screenPoint: NSPoint) -> Bool {
         guard let model, model.notchStatus == .opened else {
-            return isPointInNotchArea(screenPoint)
+            return isPointInClosedSurfaceArea(screenPoint)
         }
 
         guard let panel else {
@@ -322,6 +328,29 @@ final class OverlayPanelController {
             y: bounds.minY + insets.bottom,
             width: max(0, bounds.width - (insets.horizontal * 2)),
             height: max(0, bounds.height - insets.bottom)
+        )
+    }
+
+    nonisolated static func closedSurfaceRect(
+        for panelFrame: NSRect,
+        shadowInsets: (horizontal: CGFloat, bottom: CGFloat)
+    ) -> NSRect {
+        NSRect(
+            x: panelFrame.minX + shadowInsets.horizontal,
+            y: panelFrame.minY + shadowInsets.bottom,
+            width: max(0, panelFrame.width - (shadowInsets.horizontal * 2)),
+            height: max(0, panelFrame.height - shadowInsets.bottom)
+        )
+    }
+
+    private func closedSurfaceRect(for model: AppModel) -> NSRect? {
+        guard let panel else {
+            return nil
+        }
+
+        return Self.closedSurfaceRect(
+            for: panel.frame,
+            shadowInsets: panelShadowInsets(for: model)
         )
     }
 
