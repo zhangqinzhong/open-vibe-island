@@ -1868,8 +1868,8 @@ final class AppModel {
             tool: .claudeCode,
             origin: .live,
             attachmentState: .attached,
-            phase: .running,
-            summary: "Active Claude session detected from \(terminalApp).",
+            phase: .completed,
+            summary: "Claude session detected from \(terminalApp).",
             updatedAt: now,
             jumpTarget: JumpTarget(
                 terminalApp: terminalApp,
