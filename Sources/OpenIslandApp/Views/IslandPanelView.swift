@@ -292,7 +292,7 @@ struct IslandPanelView: View {
             }
 
             headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
-                model.showControlCenter()
+                model.showSettings()
             }
         }
     }
@@ -1472,8 +1472,8 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button("Open Control Center") {
-                model.showControlCenter()
+            Button("Settings…") {
+                model.showSettings()
             }
 
             Text(model.acceptanceStatusTitle)
