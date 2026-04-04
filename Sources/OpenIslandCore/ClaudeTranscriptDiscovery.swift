@@ -178,7 +178,7 @@ public final class ClaudeTranscriptDiscovery: @unchecked Sendable {
             tool: .claudeCode,
             origin: .live,
             attachmentState: .stale,
-            phase: currentTool == nil ? .completed : .running,
+            phase: .completed,
             summary: summary,
             updatedAt: updatedAt,
             jumpTarget: JumpTarget(

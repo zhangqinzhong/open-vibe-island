@@ -880,8 +880,11 @@ struct TerminalSessionAttachmentProbe {
             return false
         }
 
-        return session.attachmentState == .attached
-            || session.phase == .running
+        guard session.attachmentState == .attached else {
+            return false
+        }
+
+        return session.phase == .running
             || session.phase.requiresAttention
             || session.currentToolName?.isEmpty == false
     }

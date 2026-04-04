@@ -147,13 +147,13 @@ struct ActiveAgentProcessDiscovery {
         processesByPID: [String: RunningProcess]
     ) -> ProcessSnapshot? {
         let lsofOutput = lsofOutput(pid: process.pid)
+        let workingDirectory = lsofOutput.flatMap(workingDirectory(from:))
         let transcriptPath = lsofOutput.flatMap {
-            matchingPath(in: $0, containing: "/.claude/projects/", suffix: ".jsonl")
+            bestClaudeTranscriptPath(in: $0, workingDirectory: workingDirectory)
         }
         let sessionID = transcriptPath.flatMap(firstUUID(in:))
             ?? claudeSessionID(from: process.command)
 
-        let workingDirectory = lsofOutput.flatMap(workingDirectory(from:))
         guard workingDirectory != nil || sessionID != nil else {
             return nil
         }
@@ -165,6 +165,44 @@ struct ActiveAgentProcessDiscovery {
             terminalTTY: process.terminalTTY,
             terminalApp: terminalApp(for: process, processesByPID: processesByPID)
         )
+    }
+
+    private func bestClaudeTranscriptPath(in lsofOutput: String, workingDirectory: String?) -> String? {
+        let paths = allMatchingPaths(in: lsofOutput, containing: "/.claude/projects/", suffix: ".jsonl")
+        guard !paths.isEmpty else {
+            return nil
+        }
+
+        if paths.count == 1 {
+            return paths[0]
+        }
+
+        if let cwd = workingDirectory {
+            let encodedCWD = cwd.replacingOccurrences(of: "/", with: "-")
+            if let preferred = paths.first(where: { $0.contains(encodedCWD) }) {
+                return preferred
+            }
+        }
+
+        return paths.first
+    }
+
+    private func allMatchingPaths(in lsofOutput: String, containing fragment: String, suffix: String) -> [String] {
+        var results: [String] = []
+        for line in lsofOutput.split(whereSeparator: \.isNewline) {
+            guard line.first == "n" else {
+                continue
+            }
+
+            let value = String(line.dropFirst()).trimmingCharacters(in: .whitespacesAndNewlines)
+            guard value.contains(fragment), value.hasSuffix(suffix) else {
+                continue
+            }
+
+            results.append(value)
+        }
+
+        return results
     }
 
     private func terminalApp(
