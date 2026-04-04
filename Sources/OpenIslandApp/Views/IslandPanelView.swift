@@ -826,47 +826,44 @@ private struct IslandSessionRow: View {
     private func rowBody(referenceDate: Date) -> some View {
         let presence = session.islandPresence(at: referenceDate)
         let showsExpandedContent = presence != .inactive
-        return Button(action: handlePrimaryTap) {
-            HStack(alignment: .top, spacing: 14) {
-                statusDot(for: presence)
+        return HStack(alignment: .top, spacing: 14) {
+            statusDot(for: presence)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top, spacing: 12) {
-                        Text(session.spotlightHeadlineText)
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(headlineColor(for: presence))
-                            .lineLimit(1)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .top, spacing: 12) {
+                    Text(session.spotlightHeadlineText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(headlineColor(for: presence))
+                        .lineLimit(1)
 
-                        Spacer(minLength: 8)
+                    Spacer(minLength: 8)
 
-                        HStack(spacing: 6) {
-                            compactBadge(session.tool.displayName, presence: presence)
-                            if let terminalBadge = session.spotlightTerminalBadge {
-                                compactBadge(terminalBadge, presence: presence)
-                            }
-                            compactBadge(session.spotlightAgeBadge, presence: presence)
+                    HStack(spacing: 6) {
+                        compactBadge(session.tool.displayName, presence: presence)
+                        if let terminalBadge = session.spotlightTerminalBadge {
+                            compactBadge(terminalBadge, presence: presence)
                         }
+                        compactBadge(session.spotlightAgeBadge, presence: presence)
                     }
+                }
 
-                    if showsExpandedContent,
-                       let promptLine = session.spotlightPromptLineText {
-                        Text(promptLine)
-                            .font(.system(size: 11.5, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.62))
-                            .lineLimit(1)
-                    }
+                if showsExpandedContent,
+                   let promptLine = session.spotlightPromptLineText {
+                    Text(promptLine)
+                        .font(.system(size: 11.5, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.62))
+                        .lineLimit(1)
+                }
 
-                    if showsExpandedContent,
-                       let activityLine = session.spotlightActivityLineText {
-                        Text(activityLine)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(activityColor(for: presence).opacity(0.94))
-                            .lineLimit(1)
-                    }
+                if showsExpandedContent,
+                   let activityLine = session.spotlightActivityLineText {
+                    Text(activityLine)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(activityColor(for: presence).opacity(0.94))
+                        .lineLimit(1)
                 }
             }
         }
-        .buttonStyle(.plain)
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(
@@ -885,6 +882,7 @@ private struct IslandSessionRow: View {
             alignment: .bottom
         )
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onTapGesture(perform: handlePrimaryTap)
         .onHover(perform: onHoverChange)
     }
 
