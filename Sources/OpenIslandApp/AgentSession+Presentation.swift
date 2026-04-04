@@ -158,6 +158,14 @@ extension AgentSession {
         return "You: \(prompt)"
     }
 
+    var notificationHeaderPromptLineText: String? {
+        guard phase != .completed else {
+            return nil
+        }
+
+        return spotlightPromptLineText
+    }
+
     var spotlightActivityLineText: String? {
         guard spotlightShowsDetailLines else {
             return nil

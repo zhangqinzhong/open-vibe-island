@@ -977,7 +977,7 @@ private struct IslandNotificationCard: View {
                         }
                     }
 
-                    if let promptLine = session.spotlightPromptLineText {
+                    if let promptLine = session.notificationHeaderPromptLineText {
                         Text(promptLine)
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.white.opacity(0.66))

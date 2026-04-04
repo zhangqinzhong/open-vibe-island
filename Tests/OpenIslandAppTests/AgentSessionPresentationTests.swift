@@ -126,4 +126,34 @@ struct AgentSessionPresentationTests {
         #expect(session.spotlightHeadlineText == "worktree · Start by fixing the island hover behavior.")
         #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
+
+    @Test
+    func completedNotificationHeaderOmitsDuplicatePromptLine() {
+        let now = Date.now
+        let session = AgentSession(
+            id: "session-1",
+            title: "Codex · worktree",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Done",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "worktree",
+                paneTitle: "codex ~/tmp/worktree",
+                workingDirectory: "/tmp/worktree",
+                terminalSessionID: "ghostty-1"
+            ),
+            codexMetadata: CodexSessionMetadata(
+                initialUserPrompt: "Commit the README change.",
+                lastUserPrompt: "Also confirm the worktree status.",
+                lastAssistantMessage: "Committed and verified."
+            )
+        )
+
+        #expect(session.spotlightPromptLineText == "You: Also confirm the worktree status.")
+        #expect(session.notificationHeaderPromptLineText == nil)
+    }
 }
