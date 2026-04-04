@@ -276,7 +276,7 @@ struct SessionStateTests {
     @Test
     func bridgeQuestionCommandEmitsQuestionEventForExistingSession() async throws {
         let socketURL = BridgeSocketLocation.uniqueTestURL()
-        let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
+        let server = DemoBridgeServer(socketURL: socketURL)
         try server.start()
         defer { server.stop() }
 
@@ -315,7 +315,7 @@ struct SessionStateTests {
     @Test
     func codexPreToolUseWaitsForApprovalAndReturnsDenyDirective() async throws {
         let socketURL = BridgeSocketLocation.uniqueTestURL()
-        let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
+        let server = DemoBridgeServer(socketURL: socketURL)
         try server.start()
         defer { server.stop() }
 
@@ -355,9 +355,9 @@ struct SessionStateTests {
     }
 
     @Test
-    func codexPreToolUseBypassesIslandApprovalWhenCodexDoesNotAsk() async throws {
+    func codexPreToolUseStillRequiresResolutionWhenHookArrivesInDontAskMode() async throws {
         let socketURL = BridgeSocketLocation.uniqueTestURL()
-        let server = DemoBridgeServer(socketURL: socketURL, approvalTimeout: 5)
+        let server = DemoBridgeServer(socketURL: socketURL)
         try server.start()
         defer { server.stop() }
 
@@ -381,14 +381,23 @@ struct SessionStateTests {
             toolInput: CodexHookToolInput(command: "ls")
         )
 
-        let response = try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(payload))
+        let requestTask = Task {
+            try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(payload))
+        }
 
         var iterator = stream.makeAsyncIterator()
         let startedEvent = try await nextEvent(from: &iterator)
-        let activityEvent = try await nextEvent(from: &iterator)
+        let permissionEvent = try await nextEvent(from: &iterator)
 
         #expect(startedEvent.isSessionStarted)
-        #expect(activityEvent.activityUpdate?.summary == "Running Bash without approval: ls")
+        #expect(permissionEvent.isPermissionRequested)
+
+        try await observer.send(.resolvePermission(sessionID: "codex-session-no-ask", resolution: .allowOnce()))
+
+        let activityEvent = try await nextEvent(from: &iterator)
+        let response = try await requestTask.value
+
+        #expect(activityEvent.activityUpdate?.summary == "Permission approved. Codex continued the command.")
         #expect(response == .acknowledged)
     }
 
