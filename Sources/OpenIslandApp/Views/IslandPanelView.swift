@@ -905,9 +905,6 @@ private struct IslandSessionRow: View {
     }
 
     private func handlePrimaryTap() {
-        guard !session.phase.requiresAttention else {
-            return
-        }
         onJump()
     }
 
