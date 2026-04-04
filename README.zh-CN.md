@@ -32,6 +32,13 @@
 
 待补充
 
+## 社区
+
+目前项目还在早期阶段，欢迎 issue 和 pull request。
+如果你想现在就开始做贡献，可以先加入微信群：
+
+<img src="docs/images/wechat-group.jpg" alt="Open Island 微信群二维码" width="360">
+
 ## Agent Parts
 
 这部分内容是给 agents 阅读的。
@@ -155,4 +162,4 @@ swift run OpenIslandSetup uninstall
 
 ## 贡献
 
-欢迎 issue 和 pull request。我们更偏好小而聚焦的改动。
+目前项目还在早期阶段，欢迎 issue 和 pull request。
