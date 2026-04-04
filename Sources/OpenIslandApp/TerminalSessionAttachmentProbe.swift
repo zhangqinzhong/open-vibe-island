@@ -258,6 +258,13 @@ struct TerminalSessionAttachmentProbe {
         now: Date
     ) -> SessionAttachmentState {
         if isMatched {
+            // A completed Claude Code session whose terminal tab is still open
+            // but whose process has exited should not stay attached — the user
+            // has finished that conversation and it would otherwise linger in the
+            // primary session list indefinitely.
+            if session.tool == .claudeCode && session.phase == .completed && !isActiveProcess {
+                return .stale
+            }
             return .attached
         }
 
