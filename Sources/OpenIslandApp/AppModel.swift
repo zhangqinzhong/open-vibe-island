@@ -204,15 +204,15 @@ final class AppModel {
     }
 
     var liveSessionCount: Int {
-        state.liveSessionCount
+        surfacedSessions.count
     }
 
     var liveAttentionCount: Int {
-        state.liveAttentionCount
+        surfacedSessions.filter { $0.phase.requiresAttention }.count
     }
 
     var liveRunningCount: Int {
-        state.liveRunningCount
+        surfacedSessions.filter { $0.phase == .running }.count
     }
 
     var shouldShowSessionBootstrapPlaceholder: Bool {
@@ -1405,7 +1405,19 @@ final class AppModel {
             return lhsScore > rhsScore
         }
 
-        let primary = rankedSessions.filter(\.isAttachedToTerminal)
+        var primary: [AgentSession] = []
+        var claimedLiveAttachmentKeys: Set<String> = []
+
+        for session in rankedSessions where session.isAttachedToTerminal {
+            if let liveAttachmentKey = liveAttachmentKey(for: session) {
+                guard claimedLiveAttachmentKeys.insert(liveAttachmentKey).inserted else {
+                    continue
+                }
+            }
+
+            primary.append(session)
+        }
+
         let primaryIDs = Set(primary.map(\.id))
         let overflow = rankedSessions.filter { !primaryIDs.contains($0.id) }
         return (primary, overflow)
@@ -1787,6 +1799,40 @@ final class AppModel {
 
         if let terminalTTY = normalizedTTYForMatching(session.jumpTarget?.terminalTTY) {
             return "tty:\(terminalTTY)"
+        }
+
+        return nil
+    }
+
+    private func liveAttachmentKey(for session: AgentSession) -> String? {
+        guard let jumpTarget = session.jumpTarget else {
+            return nil
+        }
+
+        let terminalApp = supportedTerminalApp(for: jumpTarget.terminalApp)
+            ?? jumpTarget.terminalApp.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !terminalApp.isEmpty else {
+            return nil
+        }
+
+        if let terminalSessionID = jumpTarget.terminalSessionID?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !terminalSessionID.isEmpty {
+            return "\(terminalApp.lowercased()):session:\(terminalSessionID.lowercased())"
+        }
+
+        if let terminalTTY = normalizedTTYForMatching(jumpTarget.terminalTTY) {
+            return "\(terminalApp.lowercased()):tty:\(terminalTTY.lowercased())"
+        }
+
+        let paneTitle = jumpTarget.paneTitle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if let workingDirectory = normalizedPathForMatching(jumpTarget.workingDirectory),
+           !paneTitle.isEmpty {
+            return "\(terminalApp.lowercased()):cwd:\(workingDirectory):title:\(paneTitle)"
+        }
+
+        if let workingDirectory = normalizedPathForMatching(jumpTarget.workingDirectory) {
+            return "\(terminalApp.lowercased()):cwd:\(workingDirectory)"
         }
 
         return nil

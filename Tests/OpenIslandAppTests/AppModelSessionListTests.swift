@@ -62,6 +62,73 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func islandListDeduplicatesSessionsSharingTheSameLiveGhosttyTerminal() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        model.state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "running-live",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .attached,
+                    phase: .running,
+                    summary: "Current live turn",
+                    updatedAt: now,
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "open-island",
+                        paneTitle: "codex ~/p/open-island",
+                        workingDirectory: "/tmp/open-island",
+                        terminalSessionID: "ghostty-split-1"
+                    )
+                ),
+                AgentSession(
+                    id: "old-turn-same-split",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .attached,
+                    phase: .completed,
+                    summary: "Historical turn on the same split",
+                    updatedAt: now.addingTimeInterval(-90),
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "open-island",
+                        paneTitle: "codex ~/p/open-island",
+                        workingDirectory: "/tmp/open-island",
+                        terminalSessionID: "ghostty-split-1"
+                    )
+                ),
+                AgentSession(
+                    id: "other-live",
+                    title: "Codex · open-island",
+                    tool: .codex,
+                    origin: .live,
+                    attachmentState: .attached,
+                    phase: .completed,
+                    summary: "Another live split",
+                    updatedAt: now.addingTimeInterval(-30),
+                    jumpTarget: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: "open-island",
+                        paneTitle: "codex ~/p/open-island",
+                        workingDirectory: "/tmp/open-island",
+                        terminalSessionID: "ghostty-split-2"
+                    )
+                ),
+            ]
+        )
+
+        #expect(model.surfacedSessions.map(\.id) == ["running-live", "other-live"])
+        #expect(model.recentSessions.map(\.id).contains("old-turn-same-split"))
+        #expect(model.liveSessionCount == 2)
+        #expect(model.liveRunningCount == 1)
+        #expect(model.liveAttentionCount == 0)
+    }
+
+    @Test
     func sessionBootstrapPlaceholderAppearsWhileStartupResolutionIsPending() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
