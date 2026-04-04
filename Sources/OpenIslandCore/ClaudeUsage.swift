@@ -36,8 +36,13 @@ public struct ClaudeUsageSnapshot: Equatable, Codable, Sendable {
 
 public enum ClaudeUsageLoader {
     public static let defaultCacheURL = URL(fileURLWithPath: "/tmp/open-island-rl.json")
+    public static let legacyCacheURL = URL(fileURLWithPath: "/tmp/vibe-island-rl.json")
 
-    public static func load(from url: URL = defaultCacheURL) throws -> ClaudeUsageSnapshot? {
+    public static func load() throws -> ClaudeUsageSnapshot? {
+        try load(from: [defaultCacheURL, legacyCacheURL])
+    }
+
+    public static func load(from url: URL) throws -> ClaudeUsageSnapshot? {
         guard FileManager.default.fileExists(atPath: url.path) else {
             return nil
         }
@@ -59,9 +64,30 @@ public enum ClaudeUsageLoader {
         return snapshot.isEmpty ? nil : snapshot
     }
 
+    public static func load(from urls: [URL]) throws -> ClaudeUsageSnapshot? {
+        let candidates = urls
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+            .map { url in
+                let attributes = try? FileManager.default.attributesOfItem(atPath: url.path)
+                let modificationDate = attributes?[.modificationDate] as? Date ?? .distantPast
+                return (url, modificationDate)
+            }
+            .sorted { lhs, rhs in
+                lhs.1 > rhs.1
+            }
+
+        for (url, _) in candidates {
+            if let snapshot = try load(from: url) {
+                return snapshot
+            }
+        }
+
+        return nil
+    }
+
     private static func usageWindow(for key: String, in payload: [String: Any]) -> ClaudeUsageWindow? {
         guard let window = payload[key] as? [String: Any],
-              let rawPercentage = number(from: window["used_percentage"]) else {
+              let rawPercentage = number(from: window["used_percentage"]) ?? number(from: window["utilization"]) else {
             return nil
         }
 
@@ -89,6 +115,16 @@ public enum ClaudeUsageLoader {
         case let value as String:
             if let seconds = Double(value) {
                 return Date(timeIntervalSince1970: seconds)
+            }
+            let formatterWithFractionalSeconds = ISO8601DateFormatter()
+            formatterWithFractionalSeconds.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = formatterWithFractionalSeconds.date(from: value) {
+                return date
+            }
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            if let date = formatter.date(from: value) {
+                return date
             }
             return nil
         default:

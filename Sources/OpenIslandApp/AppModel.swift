@@ -286,6 +286,10 @@ final class AppModel {
             return "Claude usage bridge installed"
         }
 
+        if status.managedStatusLineNeedsRepair {
+            return "Claude usage bridge needs repair"
+        }
+
         if status.hasConflictingStatusLine {
             return "Custom Claude status line detected"
         }
@@ -303,6 +307,10 @@ final class AppModel {
                 return "Caching rate limits from Claude Code · \(summary)"
             }
             return "Caching rate limits from Claude Code into \(status.cacheURL.path)."
+        }
+
+        if status.managedStatusLineNeedsRepair {
+            return "Open Island detected a missing managed Claude status line script and will repair it automatically."
         }
 
         if status.hasConflictingStatusLine {
@@ -928,8 +936,12 @@ final class AppModel {
             }
 
             do {
-                self.claudeStatusLineStatus = try self.claudeStatusLineInstallationManager.status()
-                self.claudeUsageSnapshot = try ClaudeUsageLoader.load()
+                let usageState = try self.readClaudeUsageState(repairManagedBridgeIfNeeded: true)
+                self.claudeStatusLineStatus = usageState.status
+                self.claudeUsageSnapshot = usageState.snapshot
+                if usageState.repairedManagedBridge {
+                    self.lastActionMessage = "Recovered the Claude usage bridge after repairing a missing managed script."
+                }
             } catch {
                 self.lastActionMessage = "Failed to read Claude usage state: \(error.localizedDescription)"
             }
@@ -1114,6 +1126,25 @@ final class AppModel {
                 self.lastActionMessage = "Claude usage bridge update failed: \(error.localizedDescription)"
             }
         }
+    }
+
+    private func readClaudeUsageState(
+        repairManagedBridgeIfNeeded: Bool
+    ) throws -> (
+        status: ClaudeStatusLineInstallationStatus,
+        snapshot: ClaudeUsageSnapshot?,
+        repairedManagedBridge: Bool
+    ) {
+        var status = try claudeStatusLineInstallationManager.status()
+        var repairedManagedBridge = false
+
+        if repairManagedBridgeIfNeeded && status.managedStatusLineNeedsRepair {
+            status = try claudeStatusLineInstallationManager.install()
+            repairedManagedBridge = true
+        }
+
+        let snapshot = try ClaudeUsageLoader.load()
+        return (status, snapshot, repairedManagedBridge)
     }
 
     func applyTrackedEvent(

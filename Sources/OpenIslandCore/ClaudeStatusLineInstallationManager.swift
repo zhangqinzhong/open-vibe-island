@@ -8,7 +8,9 @@ public struct ClaudeStatusLineInstallationStatus: Equatable, Sendable {
     public var cacheURL: URL
     public var statusLineCommand: String?
     public var hasStatusLine: Bool
+    public var managedStatusLineConfigured: Bool
     public var managedStatusLineInstalled: Bool
+    public var managedStatusLineNeedsRepair: Bool
     public var hasConflictingStatusLine: Bool
 
     public init(
@@ -19,7 +21,9 @@ public struct ClaudeStatusLineInstallationStatus: Equatable, Sendable {
         cacheURL: URL,
         statusLineCommand: String?,
         hasStatusLine: Bool,
+        managedStatusLineConfigured: Bool,
         managedStatusLineInstalled: Bool,
+        managedStatusLineNeedsRepair: Bool,
         hasConflictingStatusLine: Bool
     ) {
         self.claudeDirectory = claudeDirectory
@@ -29,7 +33,9 @@ public struct ClaudeStatusLineInstallationStatus: Equatable, Sendable {
         self.cacheURL = cacheURL
         self.statusLineCommand = statusLineCommand
         self.hasStatusLine = hasStatusLine
+        self.managedStatusLineConfigured = managedStatusLineConfigured
         self.managedStatusLineInstalled = managedStatusLineInstalled
+        self.managedStatusLineNeedsRepair = managedStatusLineNeedsRepair
         self.hasConflictingStatusLine = hasConflictingStatusLine
     }
 }
@@ -86,9 +92,12 @@ public final class ClaudeStatusLineInstallationManager: @unchecked Sendable {
         let statusLine = settings["statusLine"] as? [String: Any]
         let command = statusLine?["command"] as? String
         let managedCommands = [scriptURL.path, legacyScriptURL.path]
-        let managedStatusLineInstalled = managedCommands.contains(command ?? "")
+        let managedStatusLineConfigured = managedCommands.contains(command ?? "")
+        let managedStatusLineInstalled = managedStatusLineConfigured
+            && (command.map { fileManager.fileExists(atPath: $0) } ?? false)
+        let managedStatusLineNeedsRepair = managedStatusLineConfigured && !managedStatusLineInstalled
         let hasStatusLine = statusLine != nil
-        let hasConflictingStatusLine = hasStatusLine && !managedStatusLineInstalled
+        let hasConflictingStatusLine = hasStatusLine && !managedStatusLineConfigured
 
         return ClaudeStatusLineInstallationStatus(
             claudeDirectory: claudeDirectory,
@@ -98,7 +107,9 @@ public final class ClaudeStatusLineInstallationManager: @unchecked Sendable {
             cacheURL: Self.managedCacheURL,
             statusLineCommand: command,
             hasStatusLine: hasStatusLine,
+            managedStatusLineConfigured: managedStatusLineConfigured,
             managedStatusLineInstalled: managedStatusLineInstalled,
+            managedStatusLineNeedsRepair: managedStatusLineNeedsRepair,
             hasConflictingStatusLine: hasConflictingStatusLine
         )
     }
@@ -144,7 +155,7 @@ public final class ClaudeStatusLineInstallationManager: @unchecked Sendable {
         let settingsURL = currentStatus.settingsURL
         let scriptURL = currentStatus.scriptURL
 
-        if currentStatus.managedStatusLineInstalled {
+        if currentStatus.managedStatusLineConfigured {
             var settings = try loadSettings(at: settingsURL)
             settings.removeValue(forKey: "statusLine")
             if fileManager.fileExists(atPath: settingsURL.path) {

@@ -37,6 +37,83 @@ struct ClaudeUsageTests {
     }
 
     @Test
+    func claudeUsageLoaderParsesUtilizationPayloadWithISO8601ResetDates() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("open-island-claude-usage-iso-\(UUID().uuidString)", isDirectory: true)
+        let cacheURL = rootURL.appendingPathComponent("open-island-rl.json")
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        let payload = """
+        {
+          "five_hour": {
+            "utilization": 0,
+            "resets_at": null
+          },
+          "seven_day": {
+            "utilization": 23,
+            "resets_at": "2026-02-09T12:00:00.462679+00:00"
+          }
+        }
+        """
+        try payload.write(to: cacheURL, atomically: true, encoding: .utf8)
+
+        let snapshot = try ClaudeUsageLoader.load(from: cacheURL)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        #expect(snapshot?.fiveHour?.roundedUsedPercentage == 0)
+        #expect(snapshot?.fiveHour?.resetsAt == nil)
+        #expect(snapshot?.sevenDay?.roundedUsedPercentage == 23)
+        #expect(snapshot?.sevenDay?.resetsAt == formatter.date(from: "2026-02-09T12:00:00.462679+00:00"))
+    }
+
+    @Test
+    func claudeUsageLoaderPrefersMostRecentLegacyOrCurrentCache() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("open-island-claude-usage-candidates-\(UUID().uuidString)", isDirectory: true)
+        let currentCacheURL = rootURL.appendingPathComponent("open-island-rl.json")
+        let legacyCacheURL = rootURL.appendingPathComponent("vibe-island-rl.json")
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: rootURL, withIntermediateDirectories: true)
+        try """
+        {
+          "five_hour": {
+            "used_percentage": 11,
+            "resets_at": 1760000000
+          }
+        }
+        """.write(to: legacyCacheURL, atomically: true, encoding: .utf8)
+        try """
+        {
+          "five_hour": {
+            "used_percentage": 77,
+            "resets_at": 1760000100
+          }
+        }
+        """.write(to: currentCacheURL, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1_760_000_100)],
+            ofItemAtPath: legacyCacheURL.path
+        )
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date(timeIntervalSince1970: 1_760_000_200)],
+            ofItemAtPath: currentCacheURL.path
+        )
+
+        let snapshot = try ClaudeUsageLoader.load(from: [legacyCacheURL, currentCacheURL])
+
+        #expect(snapshot?.fiveHour?.roundedUsedPercentage == 77)
+    }
+
+    @Test
     func claudeStatusLineInstallationManagerInstallsManagedScriptWithoutOverwritingCustomCommand() throws {
         let rootURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("open-island-claude-status-\(UUID().uuidString)", isDirectory: true)
@@ -71,6 +148,97 @@ struct ClaudeUsageTests {
         let uninstalled = try manager.uninstall()
         #expect(!uninstalled.managedStatusLineInstalled)
         #expect(!FileManager.default.fileExists(atPath: installed.scriptURL.path))
+    }
+
+    @Test
+    func claudeStatusLineInstallationManagerRepairsMissingLegacyManagedScript() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("open-island-claude-repair-\(UUID().uuidString)", isDirectory: true)
+        let claudeDirectory = rootURL.appendingPathComponent(".claude", isDirectory: true)
+        let scriptDirectory = rootURL
+            .appendingPathComponent(".open-island", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let legacyScriptDirectory = rootURL
+            .appendingPathComponent(".vibe-island", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let manager = ClaudeStatusLineInstallationManager(
+            claudeDirectory: claudeDirectory,
+            scriptDirectoryURL: scriptDirectory,
+            legacyScriptDirectoryURL: legacyScriptDirectory
+        )
+        let settingsURL = claudeDirectory.appendingPathComponent("settings.json")
+        let legacyScriptURL = legacyScriptDirectory.appendingPathComponent(ClaudeStatusLineInstallationManager.legacyManagedScriptName)
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: claudeDirectory, withIntermediateDirectories: true)
+        let settingsData = try JSONSerialization.data(
+            withJSONObject: [
+                "statusLine": [
+                    "type": "command",
+                    "command": legacyScriptURL.path,
+                ],
+            ],
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try settingsData.write(to: settingsURL, options: .atomic)
+
+        let brokenStatus = try manager.status()
+        #expect(brokenStatus.managedStatusLineConfigured)
+        #expect(!brokenStatus.managedStatusLineInstalled)
+        #expect(brokenStatus.managedStatusLineNeedsRepair)
+        #expect(!brokenStatus.hasConflictingStatusLine)
+
+        let repairedStatus = try manager.install()
+        #expect(repairedStatus.managedStatusLineConfigured)
+        #expect(repairedStatus.managedStatusLineInstalled)
+        #expect(!repairedStatus.managedStatusLineNeedsRepair)
+        #expect(repairedStatus.statusLineCommand == repairedStatus.scriptURL.path)
+        #expect(FileManager.default.fileExists(atPath: repairedStatus.scriptURL.path))
+    }
+
+    @Test
+    func claudeStatusLineInstallationManagerUninstallsBrokenManagedConfiguration() throws {
+        let rootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("open-island-claude-uninstall-broken-\(UUID().uuidString)", isDirectory: true)
+        let claudeDirectory = rootURL.appendingPathComponent(".claude", isDirectory: true)
+        let scriptDirectory = rootURL
+            .appendingPathComponent(".open-island", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let legacyScriptDirectory = rootURL
+            .appendingPathComponent(".vibe-island", isDirectory: true)
+            .appendingPathComponent("bin", isDirectory: true)
+        let manager = ClaudeStatusLineInstallationManager(
+            claudeDirectory: claudeDirectory,
+            scriptDirectoryURL: scriptDirectory,
+            legacyScriptDirectoryURL: legacyScriptDirectory
+        )
+        let settingsURL = claudeDirectory.appendingPathComponent("settings.json")
+        let legacyScriptURL = legacyScriptDirectory.appendingPathComponent(ClaudeStatusLineInstallationManager.legacyManagedScriptName)
+
+        defer {
+            try? FileManager.default.removeItem(at: rootURL)
+        }
+
+        try FileManager.default.createDirectory(at: claudeDirectory, withIntermediateDirectories: true)
+        let settingsData = try JSONSerialization.data(
+            withJSONObject: [
+                "statusLine": [
+                    "type": "command",
+                    "command": legacyScriptURL.path,
+                ],
+            ],
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try settingsData.write(to: settingsURL, options: .atomic)
+
+        let uninstalledStatus = try manager.uninstall()
+        #expect(!uninstalledStatus.managedStatusLineConfigured)
+        #expect(!uninstalledStatus.managedStatusLineInstalled)
+        #expect(!uninstalledStatus.managedStatusLineNeedsRepair)
+        #expect(!uninstalledStatus.hasStatusLine)
     }
 
     @Test
