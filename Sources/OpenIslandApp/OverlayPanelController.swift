@@ -541,6 +541,15 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         true
     }
 
+    override func mouseDown(with event: NSEvent) {
+        // Ensure the panel is key before SwiftUI processes the click.
+        // With nonactivatingPanel, hover-opened panels aren't key, so
+        // SwiftUI Button may consume the first click for key acquisition
+        // instead of firing its action.
+        window?.makeKey()
+        super.mouseDown(with: event)
+    }
+
     required init(rootView: Content) {
         super.init(rootView: rootView)
         configureTransparency()
