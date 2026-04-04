@@ -964,8 +964,6 @@ private struct IslandSessionRow: View {
 }
 
 private struct IslandNotificationCard: View {
-    private static let completionReplyMaxHeight: CGFloat = 188
-
     let session: AgentSession
     let onApprove: (Bool) -> Void
     let onAnswer: (QuestionPromptResponse) -> Void
@@ -1118,7 +1116,6 @@ private struct IslandNotificationCard: View {
                     .padding(.vertical, 14)
             }
             .scrollIndicators(.visible)
-            .frame(minHeight: 0, maxHeight: Self.completionReplyMaxHeight, alignment: .top)
         }
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
