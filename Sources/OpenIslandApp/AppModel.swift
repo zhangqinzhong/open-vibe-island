@@ -1706,58 +1706,22 @@ final class AppModel {
         activeProcesses: [ActiveProcessSnapshot],
         now: Date
     ) -> [AgentSession] {
-        let attachedClaudeSessions = existingSessions.filter { session in
-            session.tool == .claudeCode && session.isAttachedToTerminal
-        }
-
-        var exactMatchedProcessKeys: Set<String> = []
         let activeClaudeProcesses = activeProcesses.filter { process in
             process.tool == .claudeCode && supportedTerminalApp(for: process.terminalApp) != nil
         }
-
-        for process in activeClaudeProcesses {
-            if let sessionID = process.sessionID,
-               attachedClaudeSessions.contains(where: { $0.id == sessionID }) {
-                exactMatchedProcessKeys.insert(processIdentityKey(process))
-                continue
-            }
-
-            if let terminalTTY = normalizedTTYForMatching(process.terminalTTY),
-               attachedClaudeSessions.contains(where: {
-                   normalizedTTYForMatching($0.jumpTarget?.terminalTTY) == terminalTTY
-               }) {
-                exactMatchedProcessKeys.insert(processIdentityKey(process))
-            }
+        let trackedClaudeSessions = existingSessions.filter { session in
+            session.tool == .claudeCode && !isSyntheticClaudeSession(session)
         }
 
-        let unmatchedProcesses = activeClaudeProcesses.filter {
-            !exactMatchedProcessKeys.contains(processIdentityKey($0))
-        }
+        let representedProcessKeys = representedClaudeProcessKeys(
+            sessions: trackedClaudeSessions,
+            activeProcesses: activeClaudeProcesses
+        )
 
-        let groupedProcesses = Dictionary(grouping: unmatchedProcesses, by: syntheticClaudeGroupKey(for:))
-
-        return groupedProcesses.values.flatMap { processes -> [AgentSession] in
-            guard let firstProcess = processes.first,
-                  let groupKey = syntheticClaudeGroupKey(for: firstProcess),
-                  let terminalApp = supportedTerminalApp(for: firstProcess.terminalApp) else {
-                return []
-            }
-
-            let representedCount = attachedClaudeSessions.filter { session in
-                supportedTerminalApp(for: session.jumpTarget?.terminalApp) == terminalApp
-                    && syntheticClaudeGroupKey(for: session) == groupKey
-            }.count
-
-            let syntheticCount = max(0, processes.count - representedCount)
-            guard syntheticCount > 0 else {
-                return []
-            }
-
-            return processes
-                .sorted { processIdentityKey($0) < processIdentityKey($1) }
-                .prefix(syntheticCount)
-                .map { syntheticClaudeSession(for: $0, now: now) }
-        }
+        return activeClaudeProcesses
+            .filter { !representedProcessKeys.contains(processIdentityKey($0)) }
+            .sorted { processIdentityKey($0) < processIdentityKey($1) }
+            .map { syntheticClaudeSession(for: $0, now: now) }
     }
 
     private func syntheticClaudeSession(
@@ -1792,6 +1756,118 @@ final class AppModel {
 
     private func isSyntheticClaudeSession(_ session: AgentSession) -> Bool {
         session.tool == .claudeCode && session.id.hasPrefix(Self.syntheticClaudeSessionPrefix)
+    }
+
+    private func representedClaudeProcessKeys(
+        sessions: [AgentSession],
+        activeProcesses: [ActiveProcessSnapshot]
+    ) -> Set<String> {
+        let trackedClaudeSessions = sessions.filter { session in
+            session.tool == .claudeCode && !isSyntheticClaudeSession(session)
+        }
+
+        var representedProcessKeys: Set<String> = []
+        var claimedSessionIDs: Set<String> = []
+
+        for process in activeProcesses {
+            guard let processSessionID = process.sessionID,
+                  let matchedSession = trackedClaudeSessions.first(where: {
+                      !claimedSessionIDs.contains($0.id) && $0.id == processSessionID
+                  }) else {
+                continue
+            }
+
+            representedProcessKeys.insert(processIdentityKey(process))
+            claimedSessionIDs.insert(matchedSession.id)
+        }
+
+        for process in activeProcesses {
+            let processKey = processIdentityKey(process)
+            guard !representedProcessKeys.contains(processKey),
+                  let matchedSession = uniqueTrackedClaudeSession(
+                      for: process,
+                      sessions: trackedClaudeSessions,
+                      claimedSessionIDs: claimedSessionIDs
+                  ) else {
+                continue
+            }
+
+            representedProcessKeys.insert(processKey)
+            claimedSessionIDs.insert(matchedSession.id)
+        }
+
+        return representedProcessKeys
+    }
+
+    private func uniqueTrackedClaudeSession(
+        for process: ActiveProcessSnapshot,
+        sessions: [AgentSession],
+        claimedSessionIDs: Set<String>
+    ) -> AgentSession? {
+        if let terminalTTY = normalizedTTYForMatching(process.terminalTTY),
+           let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            let candidates = claudeTrackedSessions(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: terminalTTY,
+                workingDirectory: workingDirectory
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        if let terminalTTY = normalizedTTYForMatching(process.terminalTTY) {
+            let candidates = claudeTrackedSessions(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: terminalTTY,
+                workingDirectory: nil
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        if let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            let candidates = claudeTrackedSessions(
+                in: sessions,
+                claimedSessionIDs: claimedSessionIDs,
+                terminalTTY: nil,
+                workingDirectory: workingDirectory
+            )
+            if candidates.count == 1 {
+                return candidates[0]
+            }
+        }
+
+        return nil
+    }
+
+    private func claudeTrackedSessions(
+        in sessions: [AgentSession],
+        claimedSessionIDs: Set<String>,
+        terminalTTY: String?,
+        workingDirectory: String?
+    ) -> [AgentSession] {
+        sessions.filter { session in
+            guard session.tool == .claudeCode,
+                  !claimedSessionIDs.contains(session.id) else {
+                return false
+            }
+
+            if let terminalTTY,
+               normalizedTTYForMatching(session.jumpTarget?.terminalTTY) != terminalTTY {
+                return false
+            }
+
+            if let workingDirectory,
+               normalizedPathForMatching(session.jumpTarget?.workingDirectory) != workingDirectory {
+                return false
+            }
+
+            return true
+        }
     }
 
     private func processIdentityKey(_ process: ActiveProcessSnapshot) -> String {

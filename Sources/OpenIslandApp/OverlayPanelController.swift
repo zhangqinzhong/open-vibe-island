@@ -14,7 +14,6 @@ final class OverlayPanelController {
     private static let maxVisibleSessionRows: Int = 6
     private static let openedExpandedRowHeight: CGFloat = 76
     private static let openedCollapsedRowHeight: CGFloat = 44
-    private static let openedHiddenRowHeight: CGFloat = 42
     private static let openedRowSpacing: CGFloat = 4
     private static let openedContentVerticalInsets: CGFloat = 28
     private static let openedEmptyStateHeight: CGFloat = 108
@@ -456,23 +455,18 @@ final class OverlayPanelController {
         }
 
         let now = Date.now
-        let presentation = openedSessionListPresentation(
-            sessions: model.islandListSessions,
-            referenceDate: now
+        let visibleSessions = openedVisibleSessions(
+            sessions: model.islandListSessions
         )
 
-        if presentation.visibleSessions.isEmpty {
+        if visibleSessions.isEmpty {
             return Self.openedEmptyStateHeight
         }
 
-        var rowHeights = presentation.visibleSessions.map { session in
+        let rowHeights = visibleSessions.map { session in
             session.islandPresence(at: now) == .inactive
                 ? Self.openedCollapsedRowHeight
                 : Self.openedExpandedRowHeight
-        }
-
-        if presentation.hiddenSessionCount > 0 {
-            rowHeights.append(Self.openedHiddenRowHeight)
         }
 
         let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
@@ -497,27 +491,8 @@ final class OverlayPanelController {
         )
     }
 
-    private func openedSessionListPresentation(
-        sessions: [AgentSession],
-        referenceDate: Date
-    ) -> (visibleSessions: [AgentSession], hiddenSessionCount: Int) {
-        guard sessions.count > Self.maxVisibleSessionRows else {
-            return (sessions, 0)
-        }
-
-        let activeSessions = sessions.filter { $0.islandPresence(at: referenceDate) != .inactive }
-        let inactiveSessions = sessions.filter { $0.islandPresence(at: referenceDate) == .inactive }
-        let contentSlots = max(0, Self.maxVisibleSessionRows - 1)
-
-        var visibleSessions = Array(activeSessions.prefix(contentSlots))
-
-        if visibleSessions.count < contentSlots {
-            let remainingSlots = contentSlots - visibleSessions.count
-            visibleSessions.append(contentsOf: inactiveSessions.prefix(remainingSlots))
-        }
-
-        let hiddenSessionCount = max(0, sessions.count - visibleSessions.count)
-        return (visibleSessions, hiddenSessionCount)
+    private func openedVisibleSessions(sessions: [AgentSession]) -> [AgentSession] {
+        Array(sessions.prefix(Self.maxVisibleSessionRows))
     }
 
     // MARK: - Event reposting

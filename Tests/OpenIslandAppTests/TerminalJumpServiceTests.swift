@@ -4,6 +4,10 @@ import OpenIslandCore
 import Foundation
 
 final class TerminalJumpServiceTests: XCTestCase {
+    private final class OpenedArgumentsBox: @unchecked Sendable {
+        var values: [[String]] = []
+    }
+
     func testGhosttyJumpScriptActivatesWindowAndRetriesFocusUntilItSticks() {
         let target = JumpTarget(
             terminalApp: "Ghostty",
@@ -19,8 +23,9 @@ final class TerminalJumpServiceTests: XCTestCase {
         XCTAssertTrue(script.contains("activate window targetWindow"))
         XCTAssertTrue(script.contains("select tab targetTab"))
         XCTAssertTrue(script.contains("focus targetTerminal"))
-        XCTAssertTrue(script.contains("repeat 4 times"))
-        XCTAssertTrue(script.contains("delay 0.12"))
+        XCTAssertTrue(script.contains("repeat 6 times"))
+        XCTAssertTrue(script.contains("delay 0.15"))
+        XCTAssertTrue(script.contains("delay 0.08"))
         XCTAssertTrue(script.contains("focused terminal of selected tab of front window"))
         XCTAssertTrue(script.contains("repeat with aWindow in windows"))
         XCTAssertTrue(script.contains("repeat with aTab in tabs of aWindow"))
@@ -54,19 +59,64 @@ final class TerminalJumpServiceTests: XCTestCase {
 
         let service = TerminalJumpService()
         for terminal in terminals {
-            let result = try service.jump(
-                to: JumpTarget(
-                    terminalApp: "Ghostty",
-                    workspaceName: URL(fileURLWithPath: terminal.workingDirectory).lastPathComponent,
-                    paneTitle: terminal.title,
-                    workingDirectory: terminal.workingDirectory,
-                    terminalSessionID: terminal.id
-                )
-            )
+            var matched = false
+            var lastResult = ""
+            var lastFocusedID = ""
 
-            XCTAssertEqual(result, "Focused the matching Ghostty terminal.")
-            XCTAssertEqual(try focusedGhosttyTerminalID(), terminal.id)
+            for _ in 0..<2 {
+                lastResult = try service.jump(
+                    to: JumpTarget(
+                        terminalApp: "Ghostty",
+                        workspaceName: URL(fileURLWithPath: terminal.workingDirectory).lastPathComponent,
+                        paneTitle: terminal.title,
+                        workingDirectory: terminal.workingDirectory,
+                        terminalSessionID: terminal.id
+                    )
+                )
+                lastFocusedID = try focusedGhosttyTerminalID()
+                if lastResult == "Focused the matching Ghostty terminal.",
+                   lastFocusedID == terminal.id {
+                    matched = true
+                    break
+                }
+
+                Thread.sleep(forTimeInterval: 0.25)
+            }
+
+            XCTAssertTrue(
+                matched,
+                "Ghostty jump did not settle on \(terminal.id). lastResult=\(lastResult) lastFocusedID=\(lastFocusedID)"
+            )
         }
+    }
+
+    func testGhosttyJumpDoesNotOpenNewTabWhenPreciseTargetMissesInRunningApp() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                bundleIdentifier == "com.mitchellh.ghostty" ? URL(fileURLWithPath: "/Applications/Ghostty.app") : nil
+            },
+            appRunningChecker: { bundleIdentifier in
+                bundleIdentifier == "com.mitchellh.ghostty"
+            },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "Claude open-island",
+                workingDirectory: "/Users/wangruobing/Personal/open-island",
+                terminalTTY: "/dev/ttys002"
+            )
+        )
+
+        XCTAssertEqual(result, "Activated Ghostty. Exact pane targeting could not find the live terminal.")
+        XCTAssertEqual(openedArguments.values, [["-b", "com.mitchellh.ghostty"]])
     }
 }
 

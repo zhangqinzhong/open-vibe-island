@@ -508,6 +508,48 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func mergedWithSyntheticClaudeSessionsSkipsSyntheticWhenStaleClaudeSessionMatchesActiveProcess() {
+        let now = Date(timeIntervalSince1970: 2_000)
+        let model = AppModel()
+        let existing = AgentSession(
+            id: "e45d5e87-66d0-4f67-8399-6ebc02f3d453",
+            title: "Claude · open-island-readme",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .stale,
+            phase: .completed,
+            summary: "Recovered transcript",
+            updatedAt: now.addingTimeInterval(-120),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island-readme",
+                paneTitle: "Claude e45d5e87",
+                workingDirectory: "/tmp/open-island-readme"
+            ),
+            claudeMetadata: ClaudeSessionMetadata(
+                transcriptPath: "/tmp/claude-session.jsonl",
+                lastUserPrompt: "整理 readme。"
+            )
+        )
+
+        let merged = model.mergedWithSyntheticClaudeSessions(
+            existingSessions: [existing],
+            activeProcesses: [
+                .init(
+                    tool: .claudeCode,
+                    sessionID: existing.id,
+                    workingDirectory: "/tmp/open-island-readme",
+                    terminalTTY: "/dev/ttys008",
+                    terminalApp: "Ghostty"
+                ),
+            ],
+            now: now
+        )
+
+        #expect(merged.map(\.id) == [existing.id])
+    }
+
+    @Test
     func syntheticClaudeSessionWinsOverRecoveredUnknownSessionsForLiveGhosttyProcess() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()

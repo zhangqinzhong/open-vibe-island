@@ -351,25 +351,28 @@ struct IslandPanelView: View {
 
     private var sessionList: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            let presentation = sessionListPresentation(at: context.date)
-
-            VStack(spacing: 4) {
-                ForEach(presentation.visibleSessions) { session in
-                    IslandSessionRow(
-                        session: session,
-                        isHighlighted: session.id == hoveredSessionID,
-                        onHoverChange: { isHovering in
-                            hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
-                        },
-                        onJump: { model.jumpToSession(session) }
-                    )
-                }
-
-                if presentation.hiddenSessionCount > 0 {
-                    HiddenSessionsRow(hiddenSessionCount: presentation.hiddenSessionCount)
+            ScrollView(.vertical, showsIndicators: false) {
+                VStack(spacing: 4) {
+                    ForEach(displayedSessions) { session in
+                        IslandSessionRow(
+                            session: session,
+                            isHighlighted: session.id == hoveredSessionID,
+                            onHoverChange: { isHovering in
+                                hoveredSessionID = isHovering ? session.id : (hoveredSessionID == session.id ? nil : hoveredSessionID)
+                            },
+                            onJump: { model.jumpToSession(session) }
+                        )
+                    }
                 }
             }
             .padding(.vertical, 2)
+            .frame(
+                maxHeight: sessionListViewportHeight(
+                    referenceDate: context.date,
+                    sessions: sessionListViewportSessions(at: context.date)
+                ),
+                alignment: .top
+            )
         }
     }
 
@@ -385,28 +388,21 @@ struct IslandPanelView: View {
         model.islandListSessions
     }
 
-    private func sessionListPresentation(at referenceDate: Date) -> SessionListPresentation {
-        let sessions = displayedSessions
-        guard sessions.count > Self.maxVisibleSessionRows else {
-            return SessionListPresentation(visibleSessions: sessions, hiddenSessionCount: 0)
+    private func sessionListViewportSessions(at referenceDate: Date) -> [AgentSession] {
+        Array(displayedSessions.prefix(Self.maxVisibleSessionRows))
+    }
+
+    private func sessionListViewportHeight(
+        referenceDate: Date,
+        sessions: [AgentSession]
+    ) -> CGFloat {
+        let rowHeights = sessions.map { session in
+            session.islandPresence(at: referenceDate) == .inactive ? 44.0 : 76.0
         }
 
-        let activeSessions = sessions.filter { $0.islandPresence(at: referenceDate) != .inactive }
-        let inactiveSessions = sessions.filter { $0.islandPresence(at: referenceDate) == .inactive }
-        let contentSlots = max(0, Self.maxVisibleSessionRows - 1)
-
-        var visibleSessions = Array(activeSessions.prefix(contentSlots))
-
-        if visibleSessions.count < contentSlots {
-            let remainingSlots = contentSlots - visibleSessions.count
-            visibleSessions.append(contentsOf: inactiveSessions.prefix(remainingSlots))
-        }
-
-        let hiddenSessionCount = max(0, sessions.count - visibleSessions.count)
-        return SessionListPresentation(
-            visibleSessions: visibleSessions,
-            hiddenSessionCount: hiddenSessionCount
-        )
+        let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
+        let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * 4
+        return rowsHeight + spacingHeight + 4
     }
 
     // MARK: - Helpers
@@ -708,11 +704,6 @@ struct IslandPanelView: View {
 
         return formatter.string(from: interval)
     }
-}
-
-private struct SessionListPresentation {
-    let visibleSessions: [AgentSession]
-    let hiddenSessionCount: Int
 }
 
 private struct UsageProviderPresentation: Identifiable {
@@ -1218,35 +1209,6 @@ private struct IslandNotificationCard: View {
             .padding(.horizontal, 7)
             .padding(.vertical, 3.5)
             .background(Color(red: 0.14, green: 0.14, blue: 0.15), in: Capsule())
-    }
-}
-
-private struct HiddenSessionsRow: View {
-    let hiddenSessionCount: Int
-
-    var body: some View {
-        HStack(spacing: 14) {
-            Circle()
-                .fill(.white.opacity(0.28))
-                .frame(width: 9, height: 9)
-                .padding(.top, 2)
-
-            Text("\(hiddenSessionCount) session\(hiddenSessionCount == 1 ? "" : "s") hidden")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.white.opacity(0.42))
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.black)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.04))
-        )
     }
 }
 

@@ -3,6 +3,11 @@ import Foundation
 import OpenIslandCore
 
 struct TerminalJumpService {
+    typealias ApplicationResolver = @Sendable (String) -> URL?
+    typealias AppRunningChecker = @Sendable (String) -> Bool
+    typealias OpenAction = @Sendable ([String]) throws -> Void
+    typealias AppleScriptRunner = @Sendable (String) throws -> String
+
     private struct TerminalAppDescriptor {
         let displayName: String
         let bundleIdentifier: String
@@ -37,13 +42,41 @@ struct TerminalJumpService {
         ),
     ]
 
-    private static let ghosttyFocusSettleDelay = 0.12
-    private static let ghosttyWindowActivationDelay = 0.05
-    private static let ghosttyFocusAttempts = 4
+    private static let ghosttyFocusSettleDelay = 0.15
+    private static let ghosttyWindowActivationDelay = 0.08
+    private static let ghosttyFocusAttempts = 6
+
+    private let applicationResolver: ApplicationResolver
+    private let appRunningChecker: AppRunningChecker
+    private let openAction: OpenAction
+    private let appleScriptRunner: AppleScriptRunner
+
+    init(
+        applicationResolver: @escaping ApplicationResolver = { bundleIdentifier in
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        },
+        appRunningChecker: @escaping AppRunningChecker = { bundleIdentifier in
+            NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty == false
+        },
+        openAction: @escaping OpenAction = Self.defaultOpenAction(arguments:),
+        appleScriptRunner: @escaping AppleScriptRunner = Self.defaultAppleScriptRunner(script:)
+    ) {
+        self.applicationResolver = applicationResolver
+        self.appRunningChecker = appRunningChecker
+        self.openAction = openAction
+        self.appleScriptRunner = appleScriptRunner
+    }
 
     func jump(to target: JumpTarget) throws -> String {
         let descriptor = resolveTerminalApp(preferredName: target.terminalApp)
         let hasWorkingDirectory = target.workingDirectory.map { FileManager.default.fileExists(atPath: $0) } ?? false
+        let hasPreciseLocator = [target.terminalSessionID, target.terminalTTY].contains {
+            guard let value = $0?.trimmingCharacters(in: .whitespacesAndNewlines) else {
+                return false
+            }
+            return !value.isEmpty
+        }
+        let appIsRunning = descriptor.map { appRunningChecker($0.bundleIdentifier) } ?? false
 
         if let descriptor {
             switch descriptor.bundleIdentifier {
@@ -64,18 +97,23 @@ struct TerminalJumpService {
             }
         }
 
+        if let descriptor, hasPreciseLocator, appIsRunning {
+            try openAction(["-b", descriptor.bundleIdentifier])
+            return "Activated \(descriptor.displayName). Exact pane targeting could not find the live terminal."
+        }
+
         if let descriptor, hasWorkingDirectory, let workingDirectory = target.workingDirectory {
-            try runOpen(arguments: ["-b", descriptor.bundleIdentifier, workingDirectory])
+            try openAction(["-b", descriptor.bundleIdentifier, workingDirectory])
             return "Opened \(target.workspaceName) in \(descriptor.displayName). Exact pane targeting is still best-effort."
         }
 
         if let descriptor {
-            try runOpen(arguments: ["-b", descriptor.bundleIdentifier])
+            try openAction(["-b", descriptor.bundleIdentifier])
             return "Activated \(descriptor.displayName). Exact pane targeting is still best-effort."
         }
 
         if hasWorkingDirectory, let workingDirectory = target.workingDirectory {
-            try runOpen(arguments: [workingDirectory])
+            try openAction([workingDirectory])
             return "Opened \(target.workspaceName) in Finder because no supported terminal app could be resolved."
         }
 
@@ -135,18 +173,6 @@ struct TerminalJumpService {
                             set targetTerminal to aTerminal
                             exit repeat
                         end if
-
-                        if targetTerminal is missing value and "\(workingDirectory)" is not "" and (working directory of aTerminal as text) is "\(workingDirectory)" then
-                            set targetWindow to aWindow
-                            set targetTab to aTab
-                            set targetTerminal to aTerminal
-                        end if
-
-                        if targetTerminal is missing value and "\(paneTitle)" is not "" and (name of aTerminal as text) contains "\(paneTitle)" then
-                            set targetWindow to aWindow
-                            set targetTab to aTab
-                            set targetTerminal to aTerminal
-                        end if
                     end repeat
 
                     if targetTerminal is not missing value then
@@ -159,25 +185,81 @@ struct TerminalJumpService {
                 end if
             end repeat
 
+            if targetTerminal is missing value and "\(workingDirectory)" is not "" then
+                repeat with aWindow in windows
+                    repeat with aTab in tabs of aWindow
+                        repeat with aTerminal in terminals of aTab
+                            if (working directory of aTerminal as text) is "\(workingDirectory)" then
+                                set targetWindow to aWindow
+                                set targetTab to aTab
+                                set targetTerminal to aTerminal
+                                exit repeat
+                            end if
+                        end repeat
+
+                        if targetTerminal is not missing value then
+                            exit repeat
+                        end if
+                    end repeat
+
+                    if targetTerminal is not missing value then
+                        exit repeat
+                    end if
+                end repeat
+            end if
+
+            if targetTerminal is missing value and "\(paneTitle)" is not "" then
+                repeat with aWindow in windows
+                    repeat with aTab in tabs of aWindow
+                        repeat with aTerminal in terminals of aTab
+                            if (name of aTerminal as text) contains "\(paneTitle)" then
+                                set targetWindow to aWindow
+                                set targetTab to aTab
+                                set targetTerminal to aTerminal
+                                exit repeat
+                            end if
+                        end repeat
+
+                        if targetTerminal is not missing value then
+                            exit repeat
+                        end if
+                    end repeat
+
+                    if targetTerminal is not missing value then
+                        exit repeat
+                    end if
+                end repeat
+            end if
+
             if targetTerminal is missing value then return ""
 
-            if targetWindow is not missing value then
-                activate window targetWindow
-                delay \(Self.ghosttyWindowActivationDelay)
-            end if
-
-            if targetTab is not missing value then
-                select tab targetTab
-                delay \(Self.ghosttyWindowActivationDelay)
-            end if
-
             if "\(terminalSessionID)" is "" then
+                if targetWindow is not missing value then
+                    activate window targetWindow
+                    delay \(Self.ghosttyWindowActivationDelay)
+                end if
+
+                if targetTab is not missing value then
+                    select tab targetTab
+                    delay \(Self.ghosttyWindowActivationDelay)
+                end if
+
                 focus targetTerminal
                 delay \(Self.ghosttyFocusSettleDelay)
                 return "matched"
             end if
 
             repeat \(Self.ghosttyFocusAttempts) times
+                if targetWindow is not missing value then
+                    activate window targetWindow
+                    delay \(Self.ghosttyWindowActivationDelay)
+                end if
+
+                if targetTab is not missing value then
+                    select tab targetTab
+                    delay \(Self.ghosttyWindowActivationDelay)
+                end if
+
                 focus targetTerminal
                 -- Ghostty updates the focused split asynchronously after focus returns.
                 delay \(Self.ghosttyFocusSettleDelay)
@@ -234,10 +316,14 @@ struct TerminalJumpService {
     }
 
     private func isInstalled(bundleIdentifier: String) -> Bool {
-        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) != nil
+        applicationResolver(bundleIdentifier) != nil
     }
 
-    private func runOpen(arguments: [String]) throws {
+    private func runAppleScript(_ script: String) throws -> String {
+        try appleScriptRunner(script)
+    }
+
+    private static func defaultOpenAction(arguments: [String]) throws {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/open")
         task.arguments = arguments
@@ -250,7 +336,7 @@ struct TerminalJumpService {
         }
     }
 
-    private func runAppleScript(_ script: String) throws -> String {
+    private static func defaultAppleScriptRunner(script: String) throws -> String {
         let task = Process()
         task.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
         task.arguments = ["-e", script]
