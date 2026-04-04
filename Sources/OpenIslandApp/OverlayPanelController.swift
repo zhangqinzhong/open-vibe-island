@@ -22,10 +22,14 @@ final class OverlayPanelController {
     private static let structuredQuestionCardBaseHeight: CGFloat = 312
     private static let structuredQuestionCardPerQuestionHeight: CGFloat = 82
     private static let structuredQuestionCardMaximumHeight: CGFloat = 448
-    private static let completionCardHeight: CGFloat = 288
-    private static let completionCardBaseHeight: CGFloat = 78
-    private static let completionCardMinHeight: CGFloat = 160
-    private static let completionCardMaxHeight: CGFloat = 380
+    // Completion card chrome breakdown (everything except the scrollable text):
+    // openedContent vertical padding: 24, card container padding: 28,
+    // card VStack spacing: 14, card header (title+prompt): ~50,
+    // completionBody header ("You:"/Done row): ~42, divider: 1,
+    // text area vertical padding: 28  →  total ≈ 187
+    private static let completionCardChromeHeight: CGFloat = 187
+    private static let completionCardMinHeight: CGFloat = 210
+    private static let completionCardMaxHeight: CGFloat = 400
 
     private var panel: NotchPanel?
     private var eventMonitors = NotchEventMonitors()
@@ -513,7 +517,7 @@ final class OverlayPanelController {
             attributes: [.font: font]
         )
 
-        let estimatedHeight = Self.completionCardBaseHeight + ceil(textSize.height) + 28 // 28 = text vertical padding (14*2)
+        let estimatedHeight = Self.completionCardChromeHeight + ceil(textSize.height)
         return min(Self.completionCardMaxHeight, max(Self.completionCardMinHeight, estimatedHeight))
     }
 

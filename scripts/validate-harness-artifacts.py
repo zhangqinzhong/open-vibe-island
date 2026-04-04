@@ -253,7 +253,7 @@ def main() -> None:
         require_frame_between(
             overlay_frame,
             width=(660, 760),
-            height=(240, 320),
+            height=(240, 460),
             context="completionCard overlay frame",
         )
         if "Done" not in text_values:
@@ -267,7 +267,7 @@ def main() -> None:
         require_frame_between(
             overlay_frame,
             width=(660, 760),
-            height=(240, 320),
+            height=(240, 460),
             context="longCompletionCard overlay frame",
         )
         if "Done" not in text_values:
