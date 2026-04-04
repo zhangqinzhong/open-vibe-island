@@ -2077,12 +2077,21 @@ final class AppModel {
         }
 
         if let workingDirectory = normalizedPathForMatching(process.workingDirectory) {
+            let processTTY = normalizedTTYForMatching(process.terminalTTY)
+            // When matching by cwd alone, skip sessions whose TTY is known but
+            // differs from the process — they belong to a different terminal and
+            // should not consume this process's slot.
             let candidates = claudeTrackedSessions(
                 in: sessions,
                 claimedSessionIDs: claimedSessionIDs,
                 terminalTTY: nil,
                 workingDirectory: workingDirectory
-            )
+            ).filter { session in
+                guard let sessionTTY = normalizedTTYForMatching(session.jumpTarget?.terminalTTY) else {
+                    return true
+                }
+                return processTTY == nil || sessionTTY == processTTY
+            }
             if candidates.count == 1 {
                 return candidates[0]
             }
