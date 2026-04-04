@@ -128,7 +128,7 @@ struct AgentSessionPresentationTests {
     }
 
     @Test
-    func detachedSessionHeadlineStaysOnInitialPromptWhilePromptLineUsesLatestPrompt() {
+    func detachedSessionHeadlineShowsLatestPrompt() {
         let session = AgentSession(
             id: "session-1",
             title: "Codex · worktree",
@@ -145,8 +145,8 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightHeadlineText == "worktree · Start by fixing the island hover behavior.")
-        #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
+        #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
+        #expect(session.spotlightPromptLineText == nil)
     }
 
     @Test

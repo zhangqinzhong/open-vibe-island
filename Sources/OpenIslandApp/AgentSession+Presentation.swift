@@ -142,8 +142,7 @@ extension AgentSession {
     }
 
     var spotlightHeadlinePromptText: String? {
-        if prefersLivePromptHeadline,
-           let prompt = spotlightPromptText {
+        if let prompt = spotlightPromptText {
             return prompt
         }
 
