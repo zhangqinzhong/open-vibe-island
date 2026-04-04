@@ -62,7 +62,7 @@ public struct SessionState: Equatable, Sendable {
                 tool: payload.tool,
                 origin: payload.origin,
                 attachmentState: .attached,
-                phase: .running,
+                phase: payload.initialPhase,
                 summary: payload.summary,
                 updatedAt: payload.timestamp,
                 jumpTarget: payload.jumpTarget,

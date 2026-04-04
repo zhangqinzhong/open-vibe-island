@@ -447,6 +447,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
                         title: payload.sessionTitle,
                         tool: .claudeCode,
                         origin: .live,
+                        initialPhase: .completed,
                         summary: payload.implicitStartSummary,
                         timestamp: .now,
                         jumpTarget: payload.defaultJumpTarget,
@@ -615,14 +616,13 @@ public final class DemoBridgeServer: @unchecked Sendable {
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
 
-            let currentPhase = state.session(id: payload.sessionID)?.phase
+            let currentPhase = state.session(id: payload.sessionID)?.phase ?? .completed
             let notificationPhase: SessionPhase
             if payload.notificationType == "idle_prompt" {
                 notificationPhase = .completed
-            } else if currentPhase == .completed {
-                notificationPhase = .completed
             } else {
-                notificationPhase = .running
+                // Notifications are informational — never escalate phase to running.
+                notificationPhase = currentPhase
             }
 
             emit(
@@ -836,6 +836,7 @@ public final class DemoBridgeServer: @unchecked Sendable {
                     title: payload.sessionTitle,
                     tool: .claudeCode,
                     origin: .live,
+                    initialPhase: .completed,
                     summary: payload.implicitStartSummary,
                     timestamp: .now,
                     jumpTarget: payload.defaultJumpTarget,
