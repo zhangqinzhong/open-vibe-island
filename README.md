@@ -1,20 +1,40 @@
 # Open Island
 
+[中文](README.zh-CN.md) | **English**
+
 ## Human Parts
 
-This section is reserved for human-written context, narrative, screenshots, and project voice.
+This section is written for humans.
 
-> 我不想在自己的电脑上运行一个闭源、付费的软件来监视我所有的生产过程。<br>
-> 所以我 build 了这个开源的版本。<br>
->
-> you don’t need to pay for a product you can vibe since you are a vibe coder
+### What This Is
 
-- personal motivation
-- story behind the project
-- screenshots or demo framing
-- anything you want humans to feel before they parse the product details
+An open-source Vibe Island alternative for heavy code-agent users on macOS, currently focused on Claude Code, Codex, Terminal.app, and Ghostty.
+
+### Motivation
+
+I do not want to run a closed-source paid app on my own computer just to monitor my entire production flow, so I built an open-source version instead.
+
+> you don't need to pay for a product you can vibe since you are a vibe coder
+
+### How To Use It
+
+- Download a build from GitHub Releases.
+- Fork this repository and vibe your own version. This project is trying to apply harness engineering, so customization should stay straightforward.
+- If you hit a bug or a usage problem, open an issue. Those should get the highest priority.
+- If you want support for another terminal app or coding agent, open an issue first. We will expand where practical.
+- If you have a product idea or feature request, open an issue first. A follow-up PR with a demo is welcome.
+
+### Notes
+
+This app may install hooks for Claude Code or Codex, so you may see hook-related output inside those sessions.
+
+### Demo
+
+TBD
 
 ## Agent Parts
+
+This section is written for agents.
 
 The open-source macOS companion for terminal-native AI coding.
 
