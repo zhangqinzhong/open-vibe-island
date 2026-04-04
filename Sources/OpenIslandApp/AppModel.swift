@@ -1731,7 +1731,11 @@ final class AppModel {
             }
 
             while !Task.isCancelled {
-                self.reconcileSessionAttachments()
+                let discovery = self.activeAgentProcessDiscovery
+                let snapshots = await Task.detached(priority: .utility) {
+                    discovery.discover()
+                }.value
+                self.reconcileSessionAttachments(activeProcesses: snapshots)
                 try? await Task.sleep(for: .seconds(3))
             }
         }
@@ -1771,8 +1775,8 @@ final class AppModel {
         }
     }
 
-    private func reconcileSessionAttachments() {
-        let activeProcesses = activeAgentProcessDiscovery.discover()
+    private func reconcileSessionAttachments(activeProcesses: [ActiveAgentProcessDiscovery.ProcessSnapshot]? = nil) {
+        let activeProcesses = activeProcesses ?? activeAgentProcessDiscovery.discover()
         let sanitizedSessions = sanitizeCrossToolGhosttyJumpTargets(in: state.sessions)
         let sanitizedSessionsChanged = sanitizedSessions != state.sessions
         if sanitizedSessionsChanged {

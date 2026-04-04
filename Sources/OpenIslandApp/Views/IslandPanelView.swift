@@ -891,6 +891,7 @@ private struct IslandSessionRow: View {
                 .frame(height: 1),
             alignment: .bottom
         )
+        .drawingGroup()
         .contentShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
         .onTapGesture(perform: handlePrimaryTap)
         .onHover { hovering in
