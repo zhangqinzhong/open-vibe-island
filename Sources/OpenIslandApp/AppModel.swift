@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import OpenIslandCore
+import SwiftUI
 
 enum NotchStatus: Equatable {
     case closed
@@ -798,6 +799,15 @@ final class AppModel {
         }
 
         refreshOverlayPlacement()
+    }
+
+    func showSettings() {
+        if let window = NSApp.windows.first(where: { $0.title == "Open Island Settings" }) {
+            window.orderFrontRegardless()
+            window.makeKey()
+        }
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     func showControlCenter() {
@@ -1788,7 +1798,7 @@ final class AppModel {
 
             while !Task.isCancelled {
                 self.refreshCodexUsageState()
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(120))
             }
         }
     }
