@@ -2173,6 +2173,8 @@ final class AppModel {
                 guard !sessionOwnedByOtherProcess else { continue }
 
                 sessions[index].jumpTarget?.terminalTTY = processTTY
+                sessions[index].attachmentState = .attached
+                sessions[index].updatedAt = .now
                 changed = true
                 break
             }
