@@ -75,11 +75,14 @@ public enum HooksBinaryLocator {
 
         let currentDirectory = currentDirectory
             ?? URL(fileURLWithPath: fileManager.currentDirectoryPath, isDirectory: true)
-        let candidates = ManagedHooksBinary.candidateURLs(fileManager: fileManager) + [
+        let candidates = [
             executableDirectory?.appendingPathComponent("OpenIslandHooks"),
             executableDirectory?.deletingLastPathComponent().appendingPathComponent("OpenIslandHooks"),
+            executableDirectory?.deletingLastPathComponent().appendingPathComponent("Helpers/OpenIslandHooks"),
             executableDirectory?.appendingPathComponent("VibeIslandHooks"),
             executableDirectory?.deletingLastPathComponent().appendingPathComponent("VibeIslandHooks"),
+            executableDirectory?.deletingLastPathComponent().appendingPathComponent("Helpers/VibeIslandHooks"),
+        ].compactMap { $0 } + ManagedHooksBinary.candidateURLs(fileManager: fileManager) + [
             currentDirectory.appendingPathComponent(".build/arm64-apple-macosx/release/OpenIslandHooks"),
             currentDirectory.appendingPathComponent(".build/release/OpenIslandHooks"),
             currentDirectory.appendingPathComponent(".build/arm64-apple-macosx/release/VibeIslandHooks"),
@@ -88,7 +91,7 @@ public enum HooksBinaryLocator {
             currentDirectory.appendingPathComponent(".build/debug/OpenIslandHooks"),
             currentDirectory.appendingPathComponent(".build/arm64-apple-macosx/debug/VibeIslandHooks"),
             currentDirectory.appendingPathComponent(".build/debug/VibeIslandHooks"),
-        ].compactMap { $0 }
+        ]
 
         for candidate in candidates where fileManager.isExecutableFile(atPath: candidate.path) {
             return candidate.standardizedFileURL

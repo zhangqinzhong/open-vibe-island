@@ -73,6 +73,14 @@ open Package.swift
 
 The harness entrypoint lives at `scripts/harness.sh`. With no arguments it runs the current repository baseline: docs checks, `swift test`, and `swift build`.
 
+Build a local `.app` bundle:
+
+```bash
+zsh scripts/package-app.sh
+```
+
+That script creates `output/package/Open Island.app` and `output/package/Open Island.zip`. If this Mac already has a `Developer ID Application` certificate, you can pass `OPEN_ISLAND_SIGN_IDENTITY` to sign the bundle. See [docs/packaging.md](docs/packaging.md) for the full path, including notarization.
+
 Connect Codex:
 
 Open the package in Xcode to run the macOS app target. On launch, the app restores its local cache, scans recent `~/.codex/sessions/**/rollout-*.jsonl` files for existing Codex sessions, and then starts the live bridge for new hook events.
