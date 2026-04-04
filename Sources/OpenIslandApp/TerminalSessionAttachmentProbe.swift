@@ -208,10 +208,41 @@ struct TerminalSessionAttachmentProbe {
             )
         }
 
+        // When a new session starts on the same TTY as an old session (e.g.
+        // user closed Claude and reopened in the same terminal tab), both may
+        // resolve as attached — the new one via process match, the old one via
+        // grace period.  Keep only the most recently updated session per TTY.
+        deduplicateAttachedSessionsByTTY(sessions: sessions, resolutions: &resolutions)
+
         return ResolutionReport(
             resolutions: resolutions,
             isAuthoritative: ghosttyAvailability.isAuthoritative && terminalAvailability.isAuthoritative
         )
+    }
+
+    private func deduplicateAttachedSessionsByTTY(
+        sessions: [AgentSession],
+        resolutions: inout [String: SessionResolution]
+    ) {
+        var ttyOwners: [String: (sessionID: String, updatedAt: Date)] = [:]
+
+        for session in sessions {
+            guard let tty = normalizedTTYForMatching(session.jumpTarget?.terminalTTY),
+                  resolutions[session.id]?.attachmentState == .attached else {
+                continue
+            }
+
+            if let existing = ttyOwners[tty] {
+                if session.updatedAt > existing.updatedAt {
+                    resolutions[existing.sessionID]?.attachmentState = .stale
+                    ttyOwners[tty] = (sessionID: session.id, updatedAt: session.updatedAt)
+                } else {
+                    resolutions[session.id]?.attachmentState = .stale
+                }
+            } else {
+                ttyOwners[tty] = (sessionID: session.id, updatedAt: session.updatedAt)
+            }
+        }
     }
 
     func sessionResolutions(
