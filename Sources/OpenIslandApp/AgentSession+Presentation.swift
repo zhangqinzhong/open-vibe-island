@@ -132,26 +132,29 @@ extension AgentSession {
     }
 
     var spotlightHeadlinePromptText: String? {
-        let prompt = initialUserPromptText?.trimmedForSurface
-        guard let prompt, !prompt.isEmpty else {
-            return spotlightPromptText
+        if prefersLivePromptHeadline,
+           let prompt = spotlightPromptText {
+            return prompt
         }
 
-        return prompt
+        if let prompt = initialPromptText {
+            return prompt
+        }
+
+        return spotlightPromptText
     }
 
     var spotlightPromptText: String? {
-        let prompt = latestUserPromptText?.trimmedForSurface
-        guard let prompt, !prompt.isEmpty else {
-            return nil
-        }
-
-        return prompt
+        latestPromptText
     }
 
     var spotlightPromptLineText: String? {
         guard spotlightShowsDetailLines,
               let prompt = spotlightPromptText else {
+            return nil
+        }
+
+        guard prompt != spotlightHeadlinePromptText else {
             return nil
         }
 
@@ -301,6 +304,28 @@ extension AgentSession {
         default:
             return toolName
         }
+    }
+
+    private var initialPromptText: String? {
+        let prompt = initialUserPromptText?.trimmedForSurface
+        guard let prompt, !prompt.isEmpty else {
+            return nil
+        }
+
+        return prompt
+    }
+
+    private var latestPromptText: String? {
+        let prompt = latestUserPromptText?.trimmedForSurface
+        guard let prompt, !prompt.isEmpty else {
+            return nil
+        }
+
+        return prompt
+    }
+
+    private var prefersLivePromptHeadline: Bool {
+        isAttachedToTerminal || phase == .running || phase.requiresAttention
     }
 }
 

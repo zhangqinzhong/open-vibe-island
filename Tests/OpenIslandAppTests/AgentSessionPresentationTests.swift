@@ -99,7 +99,7 @@ struct AgentSessionPresentationTests {
     }
 
     @Test
-    func headlineUsesInitialPromptWhilePromptLineUsesLatestPrompt() {
+    func liveHeadlineUsesLatestPromptForAttachedSession() {
         let session = AgentSession(
             id: "session-1",
             title: "Codex · worktree",
@@ -116,6 +116,28 @@ struct AgentSessionPresentationTests {
                 workingDirectory: "/tmp/worktree",
                 terminalSessionID: "ghostty-1"
             ),
+            codexMetadata: CodexSessionMetadata(
+                initialUserPrompt: "Start by fixing the island hover behavior.",
+                lastUserPrompt: "Now make the overlay height fit the content.",
+                lastAssistantMessage: "Updating the layout logic."
+            )
+        )
+
+        #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
+        #expect(session.spotlightPromptLineText == nil)
+    }
+
+    @Test
+    func detachedSessionHeadlineStaysOnInitialPromptWhilePromptLineUsesLatestPrompt() {
+        let session = AgentSession(
+            id: "session-1",
+            title: "Codex · worktree",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .detached,
+            phase: .completed,
+            summary: "Done",
+            updatedAt: Date.now.addingTimeInterval(-30),
             codexMetadata: CodexSessionMetadata(
                 initialUserPrompt: "Start by fixing the island hover behavior.",
                 lastUserPrompt: "Now make the overlay height fit the content.",
@@ -153,7 +175,8 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightPromptLineText == "You: Also confirm the worktree status.")
+        #expect(session.spotlightHeadlineText == "worktree · Also confirm the worktree status.")
+        #expect(session.spotlightPromptLineText == nil)
         #expect(session.notificationHeaderPromptLineText == nil)
     }
 }
