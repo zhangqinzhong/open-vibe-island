@@ -2,65 +2,55 @@ import Foundation
 import OpenIslandCore
 
 enum IslandSurface: Equatable {
-    case sessionList
-    case approvalCard(sessionID: String)
-    case questionCard(sessionID: String)
-    case completionCard(sessionID: String)
+    case sessionList(actionableSessionID: String? = nil)
 
     var sessionID: String? {
         switch self {
-        case .sessionList:
-            nil
-        case let .approvalCard(sessionID), let .questionCard(sessionID), let .completionCard(sessionID):
-            sessionID
+        case let .sessionList(actionableSessionID):
+            actionableSessionID
         }
     }
 
     var isNotificationCard: Bool {
-        switch self {
-        case .sessionList:
-            false
-        case .approvalCard, .questionCard, .completionCard:
-            true
-        }
+        sessionID != nil
     }
 
-    var autoDismissesWhenPresentedAsNotification: Bool {
-        switch self {
-        case .completionCard:
-            true
-        case .sessionList, .approvalCard, .questionCard:
-            false
-        }
+    func autoDismissesWhenPresentedAsNotification(session: AgentSession?) -> Bool {
+        guard sessionID != nil else { return false }
+        return session?.phase == .completed
     }
 
     static func notificationSurface(for event: AgentEvent) -> IslandSurface? {
         switch event {
         case let .permissionRequested(payload):
-            .approvalCard(sessionID: payload.sessionID)
+            .sessionList(actionableSessionID: payload.sessionID)
         case let .questionAsked(payload):
-            .questionCard(sessionID: payload.sessionID)
+            .sessionList(actionableSessionID: payload.sessionID)
         case let .sessionCompleted(payload):
-            payload.isInterrupt == true ? nil : .completionCard(sessionID: payload.sessionID)
+            payload.isInterrupt == true ? nil : .sessionList(actionableSessionID: payload.sessionID)
         default:
             nil
         }
     }
 
     func matchesCurrentState(of session: AgentSession?) -> Bool {
+        guard sessionID != nil else {
+            return true
+        }
+
         guard let session else {
             return false
         }
 
-        switch self {
-        case .sessionList:
+        switch session.phase {
+        case .waitingForApproval:
+            return session.permissionRequest != nil
+        case .waitingForAnswer:
+            return session.questionPrompt != nil
+        case .completed:
             return true
-        case .approvalCard:
-            return session.phase == .waitingForApproval && session.permissionRequest != nil
-        case .questionCard:
-            return session.phase == .waitingForAnswer && session.questionPrompt != nil
-        case .completionCard:
-            return session.phase == .completed
+        case .running:
+            return false
         }
     }
 }

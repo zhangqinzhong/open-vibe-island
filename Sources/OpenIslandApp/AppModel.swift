@@ -48,7 +48,7 @@ final class AppModel {
     var selectedSessionID: String?
     var notchStatus: NotchStatus = .closed
     var notchOpenReason: NotchOpenReason?
-    var islandSurface: IslandSurface = .sessionList
+    var islandSurface: IslandSurface = .sessionList()
     var isOverlayVisible: Bool { notchStatus != .closed }
     let hooks = HookInstallationCoordinator()
     var isCodexSetupBusy: Bool { hooks.isCodexSetupBusy }
@@ -279,17 +279,17 @@ final class AppModel {
             return false
         }
 
-        if notchOpenReason == .hover && islandSurface == .sessionList {
+        if notchOpenReason == .hover && !islandSurface.isNotificationCard {
             return true
         }
 
         return notchOpenReason == .notification
-            && islandSurface.autoDismissesWhenPresentedAsNotification
+            && islandSurface.autoDismissesWhenPresentedAsNotification(session: activeIslandCardSession)
     }
 
     private var autoCollapseOnMouseLeaveRequiresPriorSurfaceEntry: Bool {
         notchOpenReason == .notification
-            && islandSurface.autoDismissesWhenPresentedAsNotification
+            && islandSurface.autoDismissesWhenPresentedAsNotification(session: activeIslandCardSession)
     }
 
     var hasAnySession: Bool {
@@ -514,7 +514,7 @@ final class AppModel {
         }
     }
 
-    func notchOpen(reason: NotchOpenReason, surface: IslandSurface = .sessionList) {
+    func notchOpen(reason: NotchOpenReason, surface: IslandSurface = .sessionList()) {
         transitionOverlay(
             to: .opened,
             reason: reason,
@@ -537,7 +537,7 @@ final class AppModel {
         transitionOverlay(
             to: .closed,
             reason: nil,
-            surface: .sessionList,
+            surface: .sessionList(),
             interactive: false,
             beforeTransition: { [weak self] in
                 self?.notificationAutoCollapseTask?.cancel()
@@ -592,7 +592,7 @@ final class AppModel {
 
     func notchPop() {
         guard notchStatus == .closed else { return }
-        islandSurface = .sessionList
+        islandSurface = .sessionList()
         notchStatus = .popping
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
             guard self?.notchStatus == .popping else { return }
@@ -603,7 +603,7 @@ final class AppModel {
     func performBootAnimation() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self else { return }
-            self.notchOpen(reason: .boot, surface: .sessionList)
+            self.notchOpen(reason: .boot, surface: .sessionList())
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
                 guard self?.notchOpenReason == .boot else { return }
                 self?.notchClose()
@@ -616,7 +616,7 @@ final class AppModel {
     }
 
     // Legacy compatibility
-    func showOverlay() { notchOpen(reason: .click, surface: .sessionList) }
+    func showOverlay() { notchOpen(reason: .click, surface: .sessionList()) }
     func hideOverlay() { notchClose() }
 
     func refreshOverlayDisplayConfiguration() {
@@ -933,7 +933,7 @@ final class AppModel {
             if notchOpenReason == .notification {
                 notchClose()
             } else {
-                islandSurface = .sessionList
+                islandSurface = .sessionList()
             }
             return
         }
@@ -956,7 +956,7 @@ final class AppModel {
 
         guard notchStatus == .opened,
               notchOpenReason == .notification,
-              islandSurface.autoDismissesWhenPresentedAsNotification else {
+              islandSurface.autoDismissesWhenPresentedAsNotification(session: activeIslandCardSession) else {
             return
         }
 
@@ -966,7 +966,7 @@ final class AppModel {
             guard let self,
                   self.notchStatus == .opened,
                   self.notchOpenReason == .notification,
-                  self.islandSurface.autoDismissesWhenPresentedAsNotification else {
+                  self.islandSurface.autoDismissesWhenPresentedAsNotification(session: self.activeIslandCardSession) else {
                 return
             }
 

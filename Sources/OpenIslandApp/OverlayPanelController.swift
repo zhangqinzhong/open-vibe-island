@@ -444,19 +444,6 @@ final class OverlayPanelController {
     }
 
     private func openedContentHeight(for model: AppModel) -> CGFloat {
-        if model.showsNotificationCard {
-            switch model.islandSurface {
-            case .approvalCard:
-                return Self.approvalCardHeight
-            case .questionCard:
-                return questionCardHeight(for: model.activeIslandCardSession?.questionPrompt)
-            case .completionCard:
-                return completionCardHeight(for: model)
-            case .sessionList:
-                break
-            }
-        }
-
         let now = Date.now
         let visibleSessions = openedVisibleSessions(
             sessions: model.islandListSessions
@@ -466,11 +453,32 @@ final class OverlayPanelController {
             return Self.openedEmptyStateHeight
         }
 
-        let rowHeights = visibleSessions.map { $0.estimatedIslandRowHeight(at: now) }
+        let actionableID = model.islandSurface.sessionID
+        let rowHeights = visibleSessions.map { session -> CGFloat in
+            if session.id == actionableID {
+                return session.estimatedIslandRowHeight(at: now)
+                    + actionableBodyHeight(for: session, model: model)
+            }
+            return session.estimatedIslandRowHeight(at: now)
+        }
 
         let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
         let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * Self.openedRowSpacing
         return rowsHeight + spacingHeight + Self.openedContentVerticalInsets
+    }
+
+    /// Additional height for the actionable session's inline action area.
+    private func actionableBodyHeight(for session: AgentSession, model: AppModel) -> CGFloat {
+        switch session.phase {
+        case .waitingForApproval:
+            return Self.approvalCardHeight - 44 // subtract base row height
+        case .waitingForAnswer:
+            return questionCardHeight(for: session.questionPrompt) - 44
+        case .completed:
+            return completionCardHeight(for: model) - 44
+        case .running:
+            return 0
+        }
     }
 
     private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {

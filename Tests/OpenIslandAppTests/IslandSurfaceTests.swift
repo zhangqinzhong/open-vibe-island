@@ -5,7 +5,7 @@ import OpenIslandCore
 
 struct IslandSurfaceTests {
     @Test
-    func permissionEventsRouteToApprovalCard() {
+    func permissionEventsRouteToActionableSurface() {
         let event = AgentEvent.permissionRequested(
             PermissionRequested(
                 sessionID: "session-1",
@@ -18,11 +18,11 @@ struct IslandSurfaceTests {
             )
         )
 
-        #expect(IslandSurface.notificationSurface(for: event) == .approvalCard(sessionID: "session-1"))
+        #expect(IslandSurface.notificationSurface(for: event) == .sessionList(actionableSessionID: "session-1"))
     }
 
     @Test
-    func questionEventsRouteToQuestionCard() {
+    func questionEventsRouteToActionableSurface() {
         let event = AgentEvent.questionAsked(
             QuestionAsked(
                 sessionID: "session-2",
@@ -34,11 +34,11 @@ struct IslandSurfaceTests {
             )
         )
 
-        #expect(IslandSurface.notificationSurface(for: event) == .questionCard(sessionID: "session-2"))
+        #expect(IslandSurface.notificationSurface(for: event) == .sessionList(actionableSessionID: "session-2"))
     }
 
     @Test
-    func approvalCardOnlyMatchesActiveApprovalState() {
+    func actionableSurfaceMatchesApprovalState() {
         let session = AgentSession(
             id: "session-1",
             title: "Codex · repo",
@@ -54,12 +54,28 @@ struct IslandSurfaceTests {
             )
         )
 
-        #expect(IslandSurface.approvalCard(sessionID: "session-1").matchesCurrentState(of: session))
-        #expect(!IslandSurface.questionCard(sessionID: "session-1").matchesCurrentState(of: session))
+        let surface = IslandSurface.sessionList(actionableSessionID: "session-1")
+        #expect(surface.matchesCurrentState(of: session))
     }
 
     @Test
-    func completionEventsRouteToCompletionCard() {
+    func actionableSurfaceDoesNotMatchRunningState() {
+        let session = AgentSession(
+            id: "session-1",
+            title: "Codex · repo",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working...",
+            updatedAt: .now
+        )
+
+        let surface = IslandSurface.sessionList(actionableSessionID: "session-1")
+        #expect(!surface.matchesCurrentState(of: session))
+    }
+
+    @Test
+    func completionEventsRouteToActionableSurface() {
         let event = AgentEvent.sessionCompleted(
             SessionCompleted(
                 sessionID: "session-3",
@@ -68,11 +84,11 @@ struct IslandSurfaceTests {
             )
         )
 
-        #expect(IslandSurface.notificationSurface(for: event) == .completionCard(sessionID: "session-3"))
+        #expect(IslandSurface.notificationSurface(for: event) == .sessionList(actionableSessionID: "session-3"))
     }
 
     @Test
-    func interruptedCompletionEventsDoNotRouteToCompletionCard() {
+    func interruptedCompletionEventsDoNotRouteToSurface() {
         let event = AgentEvent.sessionCompleted(
             SessionCompleted(
                 sessionID: "session-3",
@@ -86,9 +102,29 @@ struct IslandSurfaceTests {
     }
 
     @Test
-    func onlyCompletionCardsAutoDismissAsNotifications() {
-        #expect(!IslandSurface.approvalCard(sessionID: "session-1").autoDismissesWhenPresentedAsNotification)
-        #expect(!IslandSurface.questionCard(sessionID: "session-2").autoDismissesWhenPresentedAsNotification)
-        #expect(IslandSurface.completionCard(sessionID: "session-3").autoDismissesWhenPresentedAsNotification)
+    func autoDismissOnlyForCompletedSessions() {
+        let approvalSession = AgentSession(
+            id: "session-1",
+            title: "Test",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .waitingForApproval,
+            summary: "Approve",
+            updatedAt: .now,
+            permissionRequest: PermissionRequest(title: "T", summary: "S", affectedPath: "/tmp")
+        )
+        let completedSession = AgentSession(
+            id: "session-3",
+            title: "Test",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Done",
+            updatedAt: .now
+        )
+
+        let surface = IslandSurface.sessionList(actionableSessionID: "session-1")
+        #expect(!surface.autoDismissesWhenPresentedAsNotification(session: approvalSession))
+        #expect(surface.autoDismissesWhenPresentedAsNotification(session: completedSession))
     }
 }
