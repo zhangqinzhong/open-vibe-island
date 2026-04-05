@@ -149,9 +149,17 @@ final class OverlayPanelController {
 
         let windowFrame = panelFrame(for: model, on: screen)
         if animated {
+            let status = model?.notchStatus
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = panelAnimationDuration(for: model?.notchStatus)
-                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                switch status {
+                case .opened:
+                    context.duration = 0.50
+                case .closed, .popping:
+                    context.duration = 0.42
+                case nil:
+                    context.duration = 0
+                }
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.22, 1.0, 0.36, 1.0)
                 context.allowsImplicitAnimation = true
                 panel.animator().setFrame(windowFrame, display: true)
             }
@@ -164,17 +172,6 @@ final class OverlayPanelController {
             preferredScreenID: preferredScreenID,
             panelSize: panel.frame.size
         )
-    }
-
-    private func panelAnimationDuration(for status: NotchStatus?) -> TimeInterval {
-        switch status {
-        case .opened:
-            0.36
-        case .closed, .popping:
-            0.30
-        case nil:
-            0
-        }
     }
 
     private func presentPanel(_ panel: NSPanel, activates: Bool) {
