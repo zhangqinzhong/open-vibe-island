@@ -123,13 +123,13 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
-        // Prompt line always shows when detail lines are visible, even if duplicated in headline
+        // Headline uses initial prompt (session topic), prompt line uses latest
+        #expect(session.spotlightHeadlineText == "worktree · Start by fixing the island hover behavior.")
         #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
 
     @Test
-    func detachedSessionHeadlineShowsLatestPrompt() {
+    func detachedSessionHeadlineShowsInitialPrompt() {
         let session = AgentSession(
             id: "session-1",
             title: "Codex · worktree",
@@ -146,12 +146,12 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
+        #expect(session.spotlightHeadlineText == "worktree · Start by fixing the island hover behavior.")
         #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
 
     @Test
-    func completedSessionAlwaysShowsPromptLine() {
+    func completedSessionShowsDifferentHeadlineAndPrompt() {
         let now = Date.now
         let session = AgentSession(
             id: "session-1",
@@ -176,9 +176,8 @@ struct AgentSessionPresentationTests {
             )
         )
 
-        #expect(session.spotlightHeadlineText == "worktree · Also confirm the worktree status.")
+        #expect(session.spotlightHeadlineText == "worktree · Commit the README change.")
         #expect(session.spotlightPromptLineText == "You: Also confirm the worktree status.")
-        // Completed sessions don't show prompt in notification header
         #expect(session.notificationHeaderPromptLineText == nil)
     }
 }
