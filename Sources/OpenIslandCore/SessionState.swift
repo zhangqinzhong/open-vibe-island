@@ -30,15 +30,15 @@ public struct SessionState: Equatable, Sendable {
     }
 
     public var liveSessionCount: Int {
-        sessionsByID.values.filter(\.isAttachedToTerminal).count
+        sessionsByID.values.filter(\.isVisibleInIsland).count
     }
 
     public var liveAttentionCount: Int {
-        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase.requiresAttention }.count
+        sessionsByID.values.filter { $0.isVisibleInIsland && $0.phase.requiresAttention }.count
     }
 
     public var liveRunningCount: Int {
-        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase == .running }.count
+        sessionsByID.values.filter { $0.isVisibleInIsland && $0.phase == .running }.count
     }
 
     public var completedCount: Int {

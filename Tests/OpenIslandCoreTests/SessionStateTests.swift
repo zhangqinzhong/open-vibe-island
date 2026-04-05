@@ -212,27 +212,33 @@ struct SessionStateTests {
     }
 
     @Test
-    func liveCountsOnlyIncludeAttachedSessions() {
+    func liveCountsOnlyIncludeVisibleSessions() {
+        var liveRunning = AgentSession(
+            id: "live-running",
+            title: "Live running",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working",
+            updatedAt: .now
+        )
+        liveRunning.isProcessAlive = true
+
+        var liveAttention = AgentSession(
+            id: "live-attention",
+            title: "Live attention",
+            tool: .codex,
+            attachmentState: .attached,
+            phase: .waitingForApproval,
+            summary: "Needs approval",
+            updatedAt: .now
+        )
+        liveAttention.isProcessAlive = true
+
         let state = SessionState(
             sessions: [
-                AgentSession(
-                    id: "live-running",
-                    title: "Live running",
-                    tool: .codex,
-                    attachmentState: .attached,
-                    phase: .running,
-                    summary: "Working",
-                    updatedAt: .now
-                ),
-                AgentSession(
-                    id: "live-attention",
-                    title: "Live attention",
-                    tool: .codex,
-                    attachmentState: .attached,
-                    phase: .waitingForApproval,
-                    summary: "Needs approval",
-                    updatedAt: .now
-                ),
+                liveRunning,
+                liveAttention,
                 AgentSession(
                     id: "detached-running",
                     title: "Detached running",
