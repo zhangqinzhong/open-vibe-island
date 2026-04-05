@@ -1118,35 +1118,21 @@ private struct IslandNotificationCard: View {
     }
 
     private var questionBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(session.questionPrompt?.title ?? "Question")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.yellow.opacity(0.96))
-                .fixedSize(horizontal: false, vertical: true)
-
-            Button {
-                onJump()
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("Go to Terminal")
-                        .font(.system(size: 13, weight: .semibold))
-                }
-            }
-            .buttonStyle(IslandWideButtonStyle(kind: .primary))
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(Color.white.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(.white.opacity(0.06))
-        )
+        Text(session.questionPrompt?.title ?? "Question")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.yellow.opacity(0.96))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(.white.opacity(0.06))
+            )
     }
 
     private var completionBody: some View {
