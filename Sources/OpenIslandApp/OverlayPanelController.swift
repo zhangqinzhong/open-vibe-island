@@ -481,14 +481,39 @@ final class OverlayPanelController {
     private func actionableBodyHeight(for session: AgentSession, model: AppModel) -> CGFloat {
         switch session.phase {
         case .waitingForApproval:
-            return Self.approvalCardHeight - 44 // subtract base row height
+            return Self.approvalCardHeight - 44
         case .waitingForAnswer:
             return questionCardHeight(for: session.questionPrompt) - 44
         case .completed:
-            return completionCardHeight(for: model) - 44
+            return completionBodyHeight(for: session)
         case .running:
             return 0
         }
+    }
+
+    /// Height of the inline completion expansion area (not the old full-card height).
+    private func completionBodyHeight(for session: AgentSession) -> CGFloat {
+        // Header: "You: ..." + "Done" badge with padding
+        let headerHeight: CGFloat = 48  // padding (12*2) + text (~24)
+
+        let text = (session.lastAssistantMessageText ?? session.summary)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard !text.isEmpty else {
+            // No markdown content — just the header
+            return headerHeight + 16  // + container padding
+        }
+
+        // Divider + markdown content
+        let availableWidth = Self.preferredNotificationPanelWidth - 96
+        let font = NSFont.systemFont(ofSize: 13.5, weight: .medium)
+        let textSize = (text as NSString).boundingRect(
+            with: NSSize(width: availableWidth, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        let markdownHeight = min(260, ceil(textSize.height) + 28) // padding (14*2)
+        return headerHeight + 1 + markdownHeight + 16
     }
 
     private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {

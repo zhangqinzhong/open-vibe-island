@@ -440,7 +440,8 @@ struct IslandPanelView: View {
                         // Footer to expand to full list
                         if totalSessionCount > 1 {
                             Button {
-                                model.expandNotificationToSessionList()
+                                let isCompletion = model.activeIslandCardSession?.phase == .completed
+                                model.expandNotificationToSessionList(clearExpansion: isCompletion)
                             } label: {
                                 Text("显示全部 \(totalSessionCount) 个会话")
                                     .font(.system(size: 11, weight: .medium))

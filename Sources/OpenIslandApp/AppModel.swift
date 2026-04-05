@@ -459,7 +459,9 @@ final class AppModel {
     func ensureOverlayPanel() { overlay.ensureOverlayPanel() }
     func showOverlay() { overlay.showOverlay() }
     func hideOverlay() { overlay.hideOverlay() }
-    func expandNotificationToSessionList() { overlay.expandNotificationToSessionList() }
+    func expandNotificationToSessionList(clearExpansion: Bool = false) {
+        overlay.expandNotificationToSessionList(clearExpansion: clearExpansion)
+    }
     func refreshOverlayDisplayConfiguration() { overlay.refreshOverlayDisplayConfiguration() }
     func refreshOverlayPlacement() { overlay.refreshOverlayPlacement() }
     private func refreshOverlayPlacementIfVisible() { overlay.refreshOverlayPlacementIfVisible() }
