@@ -159,6 +159,22 @@ public struct ClaudeSubagentInfo: Equatable, Codable, Sendable {
     }
 }
 
+public struct ClaudeTaskInfo: Equatable, Codable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var status: Status
+
+    public enum Status: String, Codable, Sendable {
+        case pending, inProgress = "in_progress", completed
+    }
+
+    public init(id: String, title: String, status: Status = .pending) {
+        self.id = id
+        self.title = title
+        self.status = status
+    }
+}
+
 public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
     public var transcriptPath: String?
     public var initialUserPrompt: String?
@@ -173,6 +189,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
     public var agentType: String?
     public var worktreeBranch: String?
     public var activeSubagents: [ClaudeSubagentInfo]
+    public var activeTasks: [ClaudeTaskInfo]
 
     public init(
         transcriptPath: String? = nil,
@@ -187,7 +204,8 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         agentID: String? = nil,
         agentType: String? = nil,
         worktreeBranch: String? = nil,
-        activeSubagents: [ClaudeSubagentInfo] = []
+        activeSubagents: [ClaudeSubagentInfo] = [],
+        activeTasks: [ClaudeTaskInfo] = []
     ) {
         self.transcriptPath = transcriptPath
         self.initialUserPrompt = initialUserPrompt
@@ -202,6 +220,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         self.agentType = agentType
         self.worktreeBranch = worktreeBranch
         self.activeSubagents = activeSubagents
+        self.activeTasks = activeTasks
     }
 
     public var isEmpty: Bool {
@@ -218,6 +237,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
             && agentType == nil
             && worktreeBranch == nil
             && activeSubagents.isEmpty
+            && activeTasks.isEmpty
     }
 }
 
