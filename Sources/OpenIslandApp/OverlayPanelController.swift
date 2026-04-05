@@ -461,7 +461,8 @@ final class OverlayPanelController {
             let rowHeight = session.estimatedIslandRowHeight(at: now)
                 + actionableBodyHeight(for: session, model: model)
             let footerHeight: CGFloat = model.allSessions.count > 1 ? 28 : 0
-            return rowHeight + footerHeight + Self.openedContentVerticalInsets
+            // Notification mode has no header controls, so use tighter insets
+            return rowHeight + footerHeight + 12
         }
 
         let rowHeights = visibleSessions.map { session -> CGFloat in
@@ -493,18 +494,17 @@ final class OverlayPanelController {
 
     /// Height of the inline completion expansion area (not the old full-card height).
     private func completionBodyHeight(for session: AgentSession) -> CGFloat {
-        // Header: "You: ..." + "Done" badge with padding
-        let headerHeight: CGFloat = 48  // padding (12*2) + text (~24)
+        // Header: "You: ..." + "完成" badge with padding (12 top + 12 bottom + ~20 text)
+        let headerHeight: CGFloat = 44
 
         let text = (session.lastAssistantMessageText ?? session.summary)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !text.isEmpty else {
-            // No markdown content — just the header
-            return headerHeight + 16  // + container padding
+            return headerHeight
         }
 
-        // Divider + markdown content
+        // Divider (1) + markdown text + padding (10 top + 10 bottom)
         let availableWidth = Self.preferredNotificationPanelWidth - 96
         let font = NSFont.systemFont(ofSize: 13.5, weight: .medium)
         let textSize = (text as NSString).boundingRect(
@@ -512,8 +512,8 @@ final class OverlayPanelController {
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font]
         )
-        let markdownHeight = min(260, ceil(textSize.height) + 28) // padding (14*2)
-        return headerHeight + 1 + markdownHeight + 16
+        let markdownHeight = min(260, ceil(textSize.height) + 20)
+        return headerHeight + 1 + markdownHeight
     }
 
     private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {
