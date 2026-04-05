@@ -81,6 +81,7 @@ Open `Package.swift` in Xcode for the app target. Requires macOS 14+, Swift 6.2.
 - Each agent or workstream should work on its own branch, named to match the topic (e.g. `feat/<topic>`, `fix/<topic>`).
 - Standard flow: **EnterWorktree → develop → commit → push → ExitWorktree → create PR → merge**.
 - For parallel Agent sub-tasks, use `Agent(isolation: "worktree")` to give each agent its own isolated copy.
+- **All PRs MUST target `main` as base branch.** Never target another feature branch. Chain PRs (A → B → main) are prohibited — they cause silent change loss when merge order is wrong. If work depends on an unmerged branch, wait for it to merge to main first, then rebase.
 
 ## App Targets And Naming
 
