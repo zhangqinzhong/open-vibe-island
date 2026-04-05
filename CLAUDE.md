@@ -75,11 +75,12 @@ Default finish order: **implement → verify → summarize → commit**.
 
 ## Branching Rules
 
-- `main` is the shared integration branch. **Never commit directly to `main`.**
+- `main` is受保护分支（GitHub branch protection 已启用）。**严禁直接 commit 或 push 到 `main`。**
+- 所有变更必须通过 Pull Request 合入 `main`，不接受直接推送。
 - All feature branches must be created from the latest local `main` (`git checkout -b <branch> main`).
-- Use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) for parallel work. Do not manually manage worktrees.
+- **必须使用 Claude Code 的 worktree 隔离**（`isolation: "worktree"` on Agent tool）进行所有开发工作。禁止在主工作区直接编辑。
 - Each agent or workstream should work on its own branch, named to match the topic (e.g. `feat/<topic>`, `fix/<topic>`).
-- Integrate completed work back to `main` after verification.
+- 标准流程：**创建分支 → worktree 开发 → push → 创建 PR → review/merge**。
 
 ## App Targets And Naming
 
