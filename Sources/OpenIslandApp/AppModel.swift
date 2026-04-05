@@ -741,14 +741,15 @@ final class AppModel {
         notchClose()
     }
 
-    func approveFocusedPermission(_ approved: Bool) {
+    func approveFocusedPermission(_ mode: ClaudePermissionMode?) {
         guard let session = focusedSession else {
             return
         }
 
+        let resolution = permissionResolution(for: mode)
         send(
-            .resolvePermission(sessionID: session.id, resolution: permissionResolution(for: approved)),
-            userMessage: approved
+            .resolvePermission(sessionID: session.id, resolution: resolution),
+            userMessage: mode != nil
                 ? "Approving permission for \(session.title)."
                 : "Denying permission for \(session.title)."
         )
@@ -816,22 +817,36 @@ final class AppModel {
         }
     }
 
-    func approvePermission(for sessionID: String, approved: Bool) {
+    func approvePermission(for sessionID: String, mode: ClaudePermissionMode?) {
         guard let session = state.session(id: sessionID) else {
             return
         }
 
-        let resolution = permissionResolution(for: approved)
+        let resolution = permissionResolution(for: mode)
         dismissNotificationSurfaceIfPresent(for: sessionID)
         state.resolvePermission(sessionID: session.id, resolution: resolution)
         synchronizeSelection()
         refreshOverlayPlacementIfVisible()
 
+        let message: String
+        if let mode {
+            switch mode {
+            case .default:
+                message = "Approving permission for \(session.title)."
+            case .acceptEdits:
+                message = "Auto-accepting edits for \(session.title)."
+            case .bypassPermissions, .dontAsk:
+                message = "Auto-approving all permissions for \(session.title)."
+            case .plan:
+                message = "Switching to plan mode for \(session.title)."
+            }
+        } else {
+            message = "Denying permission for \(session.title)."
+        }
+
         send(
             .resolvePermission(sessionID: session.id, resolution: resolution),
-            userMessage: approved
-                ? "Approving permission for \(session.title)."
-                : "Denying permission for \(session.title)."
+            userMessage: message
         )
     }
 
@@ -878,12 +893,17 @@ final class AppModel {
         }
     }
 
-    private func permissionResolution(for approved: Bool) -> PermissionResolution {
-        if approved {
-            return .allowOnce()
+    private func permissionResolution(for mode: ClaudePermissionMode?) -> PermissionResolution {
+        guard let mode else {
+            return .deny(message: "Permission denied in Open Island.", interrupt: false)
         }
 
-        return .deny(message: "Permission denied in Open Island.", interrupt: false)
+        switch mode {
+        case .default:
+            return .allowOnce()
+        case .acceptEdits, .plan, .dontAsk, .bypassPermissions:
+            return .allowOnce(updatedPermissions: [.setMode(destination: .session, mode: mode)])
+        }
     }
 
     func applyTrackedEvent(

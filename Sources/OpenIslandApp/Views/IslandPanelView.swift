@@ -403,7 +403,7 @@ struct IslandPanelView: View {
                             session: session,
                             referenceDate: context.date,
                             isActionable: session.id == actionableSessionID,
-                            onApprove: { model.approvePermission(for: session.id, approved: $0) },
+                            onApprove: { model.approvePermission(for: session.id, mode: $0) },
                             onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                             onJump: { model.jumpToSession(session) }
                         )
@@ -850,7 +850,7 @@ private struct IslandSessionRow: View {
     let session: AgentSession
     let referenceDate: Date
     var isActionable: Bool = false
-    var onApprove: ((Bool) -> Void)?
+    var onApprove: ((ClaudePermissionMode?) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
     let onJump: () -> Void
 
@@ -1026,11 +1026,13 @@ private struct IslandSessionRow: View {
                     .strokeBorder(.orange.opacity(0.18))
             )
 
-            HStack(spacing: 10) {
-                Button(denyTitle) { onApprove?(false) }
+            HStack(spacing: 8) {
+                Button("手动审批") { onApprove?(.default) }
                     .buttonStyle(IslandWideButtonStyle(kind: .secondary))
-                Button(allowTitle) { onApprove?(true) }
-                    .buttonStyle(IslandWideButtonStyle(kind: .primary))
+                Button("自动接受编辑") { onApprove?(.acceptEdits) }
+                    .buttonStyle(IslandWideButtonStyle(kind: .warning))
+                Button("自动批准权限") { onApprove?(.bypassPermissions) }
+                    .buttonStyle(IslandWideButtonStyle(kind: .danger))
             }
         }
     }
@@ -1361,6 +1363,8 @@ private struct IslandWideButtonStyle: ButtonStyle {
     enum Kind {
         case primary
         case secondary
+        case warning
+        case danger
     }
 
     let kind: Kind
@@ -1368,18 +1372,32 @@ private struct IslandWideButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 11.5, weight: .semibold))
-            .foregroundStyle(kind == .primary ? Color.white : Color.white.opacity(0.88))
+            .foregroundStyle(foregroundColor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
             .background(backgroundColor(configuration.isPressed), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
+    private var foregroundColor: Color {
+        switch kind {
+        case .primary, .warning, .danger:
+            return .white
+        case .secondary:
+            return .white.opacity(0.88)
+        }
+    }
+
     private func backgroundColor(_ isPressed: Bool) -> Color {
+        let pressedFactor: Double = isPressed ? 0.78 : 1.0
         switch kind {
         case .primary:
-            return Color(red: 0.26, green: 0.45, blue: 0.86).opacity(isPressed ? 0.78 : 1.0)
+            return Color(red: 0.26, green: 0.45, blue: 0.86).opacity(pressedFactor)
         case .secondary:
             return Color.white.opacity(isPressed ? 0.12 : 0.16)
+        case .warning:
+            return Color(red: 0.85, green: 0.55, blue: 0.15).opacity(pressedFactor)
+        case .danger:
+            return Color(red: 0.82, green: 0.22, blue: 0.22).opacity(pressedFactor)
         }
     }
 }
