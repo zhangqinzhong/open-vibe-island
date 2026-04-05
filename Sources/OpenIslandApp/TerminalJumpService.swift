@@ -22,7 +22,7 @@ struct TerminalJumpService {
         ),
         TerminalAppDescriptor(
             displayName: "cmux",
-            bundleIdentifier: "dev.cmux.cmux",
+            bundleIdentifier: "com.cmuxterm.app",
             aliases: ["cmux"]
         ),
         TerminalAppDescriptor(
@@ -89,7 +89,7 @@ struct TerminalJumpService {
                 if try jumpToITermSession(target) {
                     return "Focused the matching iTerm session."
                 }
-            case "dev.cmux.cmux":
+            case "com.cmuxterm.app":
                 if jumpToCmuxTerminal(target) {
                     return "Focused the matching cmux terminal."
                 }
@@ -163,8 +163,7 @@ struct TerminalJumpService {
             return false
         }
 
-        let socketPath = "/tmp/cmux.sock"
-        guard FileManager.default.fileExists(atPath: socketPath) else {
+        guard let socketPath = Self.resolveCmuxSocketPath() else {
             return false
         }
 
@@ -197,9 +196,35 @@ struct TerminalJumpService {
         guard sent > 0 else { return false }
 
         // Best-effort: activate the cmux app window.
-        try? openAction(["-b", "dev.cmux.cmux"])
+        try? openAction(["-b", "com.cmuxterm.app"])
 
         return true
+    }
+
+    private static func resolveCmuxSocketPath() -> String? {
+        let fm = FileManager.default
+
+        // 1. cmux writes the active socket path here on startup.
+        if let redirected = try? String(contentsOfFile: "/tmp/cmux-last-socket-path", encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !redirected.isEmpty,
+           fm.fileExists(atPath: redirected) {
+            return redirected
+        }
+
+        // 2. Standard Application Support location.
+        let appSupportPath = NSHomeDirectory() + "/Library/Application Support/cmux/cmux.sock"
+        if fm.fileExists(atPath: appSupportPath) {
+            return appSupportPath
+        }
+
+        // 3. Legacy fallback.
+        let legacyPath = "/tmp/cmux.sock"
+        if fm.fileExists(atPath: legacyPath) {
+            return legacyPath
+        }
+
+        return nil
     }
 
     private func jumpToGhosttyTerminal(_ target: JumpTarget) throws -> Bool {
