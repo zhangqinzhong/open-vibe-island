@@ -797,10 +797,6 @@ final class AppModel {
     }
 
     private func refreshOverlayPlacementIfVisible() {
-        guard notchStatus == .opened else {
-            return
-        }
-
         refreshOverlayPlacement()
     }
 
