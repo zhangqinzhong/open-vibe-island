@@ -84,6 +84,12 @@ final class AppModel {
                 : "Island sound notifications enabled."
         }
     }
+    var selectedSoundName: String = NotificationSoundService.defaultSoundName {
+        didSet {
+            guard selectedSoundName != oldValue else { return }
+            NotificationSoundService.selectedSoundName = selectedSoundName
+        }
+    }
     var overlayDisplaySelectionID = OverlayDisplayOption.automaticID {
         didSet {
             guard overlayDisplaySelectionID != oldValue else {
@@ -188,6 +194,7 @@ final class AppModel {
             forKey: Self.overlayDisplayPreferenceDefaultsKey
         ) ?? OverlayDisplayOption.automaticID
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
+        selectedSoundName = NotificationSoundService.selectedSoundName
 
         codexRolloutWatcher.eventHandler = { [weak self] event in
             Task { @MainActor [weak self] in
@@ -1300,6 +1307,7 @@ final class AppModel {
             return
         }
 
+        NotificationSoundService.playNotification(isMuted: isSoundMuted)
         notchOpen(reason: .notification, surface: surface)
     }
 

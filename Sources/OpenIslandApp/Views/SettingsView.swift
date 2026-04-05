@@ -242,6 +242,10 @@ struct DisplaySettingsPane: View {
 struct SoundSettingsPane: View {
     var model: AppModel
 
+    private var availableSounds: [String] {
+        NotificationSoundService.availableSounds()
+    }
+
     var body: some View {
         Form {
             Section("通知音效") {
@@ -249,6 +253,28 @@ struct SoundSettingsPane: View {
                     get: { model.isSoundMuted },
                     set: { _ in model.toggleSoundMuted() }
                 ))
+            }
+
+            Section("选择音效") {
+                List(availableSounds, id: \.self) { name in
+                    Button {
+                        model.selectedSoundName = name
+                        NotificationSoundService.play(name)
+                    } label: {
+                        HStack {
+                            Text(name)
+                                .foregroundStyle(.primary)
+                            Spacer()
+                            if name == model.selectedSoundName {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.blue)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .formStyle(.grouped)
