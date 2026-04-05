@@ -1535,6 +1535,8 @@ final class AppModel {
             payload.sessionID
         case let .claudeSessionMetadataUpdated(payload):
             payload.sessionID
+        case let .actionableStateResolved(payload):
+            payload.sessionID
         }
     }
 
@@ -2072,6 +2074,8 @@ final class AppModel {
             }
 
             return payload.claudeMetadata.lastAssistantMessage ?? "Claude session metadata updated."
+        case let .actionableStateResolved(payload):
+            return payload.summary
         }
     }
 
