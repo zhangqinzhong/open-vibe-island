@@ -929,7 +929,12 @@ final class AppModel {
     }
 
     func jumpToSession(_ session: AgentSession) {
-        jump(to: session.jumpTarget)
+        guard let jumpTarget = session.jumpTarget,
+              jumpTarget.terminalApp.lowercased() != "unknown" else {
+            lastActionMessage = "Cannot jump: terminal app is unknown."
+            return
+        }
+        jump(to: jumpTarget)
     }
 
     private func jump(to jumpTarget: JumpTarget?) {
