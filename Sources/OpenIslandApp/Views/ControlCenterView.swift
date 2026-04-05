@@ -357,14 +357,10 @@ struct ControlCenterView: View {
 
     private var liveSurfaceTitle: String {
         switch model.islandSurface {
-        case .sessionList:
+        case .sessionList(actionableSessionID: nil):
             "Session List"
-        case .approvalCard:
-            "Approval Card"
-        case .questionCard:
-            "Question Card"
-        case .completionCard:
-            "Completion Card"
+        case .sessionList(actionableSessionID: .some):
+            "Session List (Actionable)"
         }
     }
 
