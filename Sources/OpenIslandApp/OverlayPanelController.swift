@@ -459,8 +459,7 @@ final class OverlayPanelController {
                 return model.measuredNotificationContentHeight + 8
             }
             // First render: use generous height so content isn't clipped.
-            // SwiftUI will measure actual height and trigger a resize via
-            // measuredNotificationContentHeight didSet.
+            // SwiftUI will measure actual height and trigger a resize.
             return 500
         }
 
@@ -493,8 +492,7 @@ final class OverlayPanelController {
 
     /// Height of the inline completion expansion area (not the old full-card height).
     private func completionBodyHeight(for session: AgentSession) -> CGFloat {
-        // Header: "You: ..." + "完成" badge with padding
-        let headerHeight: CGFloat = 48
+        let headerHeight: CGFloat = 44
 
         let text = (session.lastAssistantMessageText ?? session.summary)
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -510,7 +508,6 @@ final class OverlayPanelController {
             options: [.usesLineFragmentOrigin, .usesFontLeading],
             attributes: [.font: font]
         )
-        // 1 (divider) + text + padding (10*2)
         let markdownHeight = min(260, ceil(textSize.height) + 20)
         return headerHeight + 1 + markdownHeight
     }
