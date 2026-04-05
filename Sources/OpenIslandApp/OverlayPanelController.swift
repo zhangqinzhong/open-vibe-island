@@ -12,7 +12,7 @@ final class OverlayPanelController {
     private static let openedContentWidthPadding: CGFloat = 28
     private static let openedContentBottomPadding: CGFloat = 0
     private static let maxVisibleSessionRows: Int = 6
-    private static let openedRowSpacing: CGFloat = 4
+    private static let openedRowSpacing: CGFloat = 6
     // Content padding (8) + scroll padding (4) + view chrome: outerBottomPadding (14) + header-content gap (12)
     private static let openedContentVerticalInsets: CGFloat = 38
     private static let openedEmptyStateHeight: CGFloat = 108
