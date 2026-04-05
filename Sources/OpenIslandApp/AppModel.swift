@@ -1876,6 +1876,23 @@ final class AppModel {
 
         let attachmentsChanged = state.reconcileAttachmentStates(attachmentUpdates)
         let jumpTargetsChanged = state.reconcileJumpTargets(jumpTargetUpdates)
+
+        // Phase 1: populate isProcessAlive in parallel with existing system.
+        let aliveIDs = sessionIDsWithAliveProcesses(activeProcesses: activeProcesses)
+        let livenessChanges = state.markProcessLiveness(aliveSessionIDs: aliveIDs)
+
+        // Phase 1 diagnostic: log discrepancies between old and new visibility models.
+        if !livenessChanges.isEmpty {
+            for sessionID in livenessChanges {
+                guard let session = state.sessions.first(where: { $0.id == sessionID }) else { continue }
+                let oldVisible = session.isAttachedToTerminal
+                let newVisible = session.isVisibleInIsland
+                if oldVisible != newVisible {
+                    print("[Phase1 Δ] session=\(session.id.prefix(12)) old=\(oldVisible) new=\(newVisible) phase=\(session.phase) processAlive=\(session.isProcessAlive) notSeenCount=\(session.processNotSeenCount)")
+                }
+            }
+        }
+
         guard sanitizedSessionsChanged || syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged else {
             if resolutionReport.isAuthoritative {
                 isResolvingInitialLiveSessions = false
@@ -1937,6 +1954,73 @@ final class AppModel {
         case let .claudeSessionMetadataUpdated(payload):
             payload.sessionID
         }
+    }
+
+    /// Determine which session IDs have a corresponding alive process.
+    /// This mirrors the matching logic used by `representedClaudeProcessKeys`
+    /// but returns matched session IDs instead of process keys.
+    private func sessionIDsWithAliveProcesses(
+        activeProcesses: [ActiveProcessSnapshot]
+    ) -> Set<String> {
+        var aliveIDs: Set<String> = []
+        let sessions = state.sessions
+
+        // Codex sessions: match by session ID directly.
+        let codexProcessIDs = Set(
+            activeProcesses
+                .filter { $0.tool == .codex }
+                .compactMap(\.sessionID)
+        )
+        for session in sessions where session.tool == .codex && !session.isDemoSession {
+            if codexProcessIDs.contains(session.id) {
+                aliveIDs.insert(session.id)
+            }
+        }
+
+        // Claude sessions: reuse the multi-pass matching from representedClaudeProcessKeys.
+        let claudeProcesses = activeProcesses.filter { $0.tool == .claudeCode }
+        let trackedClaudeSessions = sessions.filter { $0.tool == .claudeCode && !isSyntheticClaudeSession($0) }
+        var claimedSessionIDs: Set<String> = []
+
+        // Pass 1: exact session ID match.
+        for process in claudeProcesses {
+            guard let processSessionID = process.sessionID,
+                  let matched = trackedClaudeSessions.first(where: {
+                      !claimedSessionIDs.contains($0.id) && $0.id == processSessionID
+                  }) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Pass 2: transcript path match.
+        for process in claudeProcesses {
+            guard let transcriptPath = process.transcriptPath,
+                  let matched = trackedClaudeSessions.first(where: {
+                      !claimedSessionIDs.contains($0.id)
+                          && $0.claudeMetadata?.transcriptPath == transcriptPath
+                  }) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Pass 3: TTY + CWD fallback match.
+        for process in claudeProcesses {
+            guard let matched = uniqueTrackedClaudeSession(
+                for: process,
+                sessions: trackedClaudeSessions,
+                claimedSessionIDs: claimedSessionIDs
+            ) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Synthetic sessions: always alive if the process exists.
+        let syntheticSessions = sessions.filter { isSyntheticClaudeSession($0) }
+        for session in syntheticSessions {
+            aliveIDs.insert(session.id)
+        }
+
+        return aliveIDs
     }
 
     private func mergeAttachmentState(

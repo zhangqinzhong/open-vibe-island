@@ -243,6 +243,45 @@ public struct SessionState: Equatable, Sendable {
         return changed
     }
 
+    /// Update process liveness for all tracked sessions based on process discovery.
+    /// Returns the set of session IDs whose `isProcessAlive` changed.
+    @discardableResult
+    public mutating func markProcessLiveness(aliveSessionIDs: Set<String>) -> Set<String> {
+        var changed: Set<String> = []
+
+        for (id, var session) in sessionsByID {
+            let wasAlive = session.isProcessAlive
+
+            if aliveSessionIDs.contains(id) {
+                session.isProcessAlive = true
+                session.processNotSeenCount = 0
+            } else {
+                session.processNotSeenCount += 1
+                session.isProcessAlive = session.processNotSeenCount < 2
+            }
+
+            if session.isProcessAlive != wasAlive {
+                changed.insert(id)
+                upsert(session)
+            } else if !aliveSessionIDs.contains(id), session.processNotSeenCount >= 1 {
+                upsert(session)
+            }
+        }
+
+        return changed
+    }
+
+    /// Remove sessions that are no longer visible in the island.
+    /// Returns `true` if any sessions were removed.
+    @discardableResult
+    public mutating func removeInvisibleSessions() -> Bool {
+        let before = sessionsByID.count
+        sessionsByID = sessionsByID.filter { _, session in
+            session.isVisibleInIsland
+        }
+        return sessionsByID.count != before
+    }
+
     private mutating func upsert(_ session: AgentSession) {
         sessionsByID[session.id] = session
     }
