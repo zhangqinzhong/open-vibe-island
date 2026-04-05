@@ -46,17 +46,43 @@ swift build -c release --product OpenIslandHooks   # build hook binary
 
 Open `Package.swift` in Xcode for the app target. Requires macOS 14+, Swift 6.2.
 
-## Required Workflow
+## Required Workflow — MANDATORY
 
-1. Start each round by checking the current repository state with `git status -sb`.
-2. Verify you are on the correct feature branch. If on `main`, create or switch to a feature branch before making any edits.
-3. Read the relevant files before editing. Do not guess repository structure or behavior.
-4. Keep each round focused on a single coherent change.
-5. After making changes, run the most relevant verification available for that round.
-6. Summarize what changed, including any verification gaps.
-7. Commit the round before stopping.
+> **⚠️ CRITICAL: NEVER edit files directly in the main worktree. ALL code changes MUST be made inside a worktree-isolated Agent.**
 
-Default finish order: **implement → verify → summarize → commit**.
+When the user requests any task that involves file modifications, **the very first step** MUST be spawning an isolated Agent:
+
+```
+Agent(
+  subagent_type: "general-purpose",
+  isolation: "worktree",
+  prompt: "task description...",
+  description: "short summary"
+)
+```
+
+### Allowed in main conversation (main worktree):
+- Read files (Read, Grep, Glob)
+- Run read-only git commands (git status, git log, git diff)
+- Research and planning (no file mutations)
+- Spawn Agent sub-tasks
+
+### FORBIDDEN in main conversation:
+- Using Edit / Write tools to modify any source file
+- Running `git commit`, `git checkout -b`, or any write operations
+- Creating branches or commits directly in the main worktree
+
+### Workflow inside the worktree Agent:
+1. Check repository state with `git status -sb`
+2. Confirm you are on the correct feature branch (worktree Agent auto-creates a branch)
+3. Read relevant files before editing — do not guess
+4. Keep each round focused on a single coherent change
+5. Run the most relevant verification after changes (`swift build`, `swift test`, etc.)
+6. Summarize what changed
+7. Commit and push to remote
+
+### After Agent completes:
+Create a PR from the main conversation to merge the branch into main.
 
 ## Commit Policy
 
@@ -75,11 +101,12 @@ Default finish order: **implement → verify → summarize → commit**.
 
 ## Branching Rules
 
-- `main` is the shared integration branch. **Never commit directly to `main`.**
-- All feature branches must be created from the latest local `main` (`git checkout -b <branch> main`).
-- Use Claude Code's built-in worktree isolation (`isolation: "worktree"` on Agent tool) for parallel work. Do not manually manage worktrees.
+- `main` is a protected branch (GitHub branch protection enabled). **NEVER commit or push directly to `main`.**
+- All changes MUST go through a Pull Request to merge into `main`. Direct pushes are rejected.
+- All feature branches must be created from the latest local `main`.
+- **You MUST use the Agent tool with `isolation: "worktree"`** for all development work. This is NOT optional — it is a hard requirement.
 - Each agent or workstream should work on its own branch, named to match the topic (e.g. `feat/<topic>`, `fix/<topic>`).
-- Integrate completed work back to `main` after verification.
+- Standard flow: **Agent(worktree) develop → push → create PR → review/merge**.
 
 ## App Targets And Naming
 
