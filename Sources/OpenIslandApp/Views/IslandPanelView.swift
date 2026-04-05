@@ -933,6 +933,7 @@ private struct IslandSessionRow: View {
     let onJump: () -> Void
 
     @State private var isHighlighted = false
+    @State private var isManuallyExpanded = false
 
     var body: some View {
         rowBody(referenceDate: referenceDate)
@@ -940,7 +941,7 @@ private struct IslandSessionRow: View {
 
     private func rowBody(referenceDate: Date) -> some View {
         let presence = session.islandPresence(at: referenceDate)
-        let showsExpandedContent = presence != .inactive
+        let showsExpandedContent = presence != .inactive || isManuallyExpanded
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top, spacing: 14) {
                 statusDot(for: presence)
@@ -1194,26 +1195,28 @@ private struct IslandSessionRow: View {
 
                 Spacer(minLength: 8)
 
-                Text("Done")
+                Text("完成")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color(red: 0.29, green: 0.86, blue: 0.46).opacity(0.96))
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
 
-            Rectangle()
-                .fill(.white.opacity(0.04))
-                .frame(height: 1)
+            if !completionMessageText.isEmpty {
+                Rectangle()
+                    .fill(.white.opacity(0.04))
+                    .frame(height: 1)
 
-            ScrollView(.vertical) {
-                Markdown(completionMessageText)
-                    .markdownTheme(.completionCard)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 14)
+                ScrollView(.vertical) {
+                    Markdown(completionMessageText)
+                        .markdownTheme(.completionCard)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 14)
+                }
+                .scrollIndicators(.visible)
+                .frame(maxHeight: 260)
             }
-            .scrollIndicators(.visible)
-            .frame(maxHeight: 260)
         }
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1311,7 +1314,14 @@ private struct IslandSessionRow: View {
     }
 
     private func handlePrimaryTap() {
-        onJump()
+        let presence = session.islandPresence(at: referenceDate)
+        if presence == .inactive && !isManuallyExpanded {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isManuallyExpanded = true
+            }
+        } else {
+            onJump()
+        }
     }
 
     private func compactBadge(
