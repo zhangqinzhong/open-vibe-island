@@ -56,7 +56,7 @@ public struct SessionState: Equatable, Sendable {
     public mutating func apply(_ event: AgentEvent) {
         switch event {
         case let .sessionStarted(payload):
-            let session = AgentSession(
+            var session = AgentSession(
                 id: payload.sessionID,
                 title: payload.title,
                 tool: payload.tool,
@@ -69,6 +69,8 @@ public struct SessionState: Equatable, Sendable {
                 codexMetadata: payload.codexMetadata?.isEmpty == true ? nil : payload.codexMetadata,
                 claudeMetadata: payload.claudeMetadata?.isEmpty == true ? nil : payload.claudeMetadata
             )
+            session.isProcessAlive = true
+            session.processNotSeenCount = 0
             upsert(session)
 
         case let .activityUpdated(payload):
@@ -241,6 +243,16 @@ public struct SessionState: Equatable, Sendable {
         }
 
         return changed
+    }
+
+    /// Mark a single session as alive (e.g. when a hook event is received).
+    /// Does not affect other sessions' processNotSeenCount.
+    public mutating func markSingleSessionAlive(sessionID: String) {
+        guard var session = sessionsByID[sessionID] else { return }
+        guard !session.isProcessAlive || session.processNotSeenCount != 0 else { return }
+        session.isProcessAlive = true
+        session.processNotSeenCount = 0
+        upsert(session)
     }
 
     /// Update process liveness for all tracked sessions based on process discovery.

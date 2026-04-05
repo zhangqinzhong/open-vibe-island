@@ -1287,6 +1287,7 @@ final class AppModel {
         reconcileIslandSurfaceAfterStateChange()
         if ingress == .bridge {
             markSessionAttached(for: event)
+            markSessionProcessAlive(for: event)
         }
         synchronizeSelection()
         refreshCodexRolloutTracking()
@@ -1679,7 +1680,7 @@ final class AppModel {
         var primary: [AgentSession] = []
         var claimedLiveAttachmentKeys: Set<String> = []
 
-        for session in rankedSessions where session.isAttachedToTerminal {
+        for session in rankedSessions where session.isVisibleInIsland {
             guard !session.isSubagentSession else { continue }
 
             if let liveAttachmentKey = liveAttachmentKey(for: session) {
@@ -1701,14 +1702,10 @@ final class AppModel {
 
         let presence = session.islandPresence(at: now)
 
-        switch session.attachmentState {
-        case .attached:
-            // Inactive attached sessions rank below active ones.
+        if session.isProcessAlive {
             score += presence == .inactive ? 3_000 : 12_000
-        case .stale:
-            score += 1_000
-        case .detached:
-            break
+        } else if session.isDemoSession || session.phase.requiresAttention {
+            score += 6_000
         }
 
         if session.phase.requiresAttention {
@@ -1953,6 +1950,14 @@ final class AppModel {
         _ = state.reconcileAttachmentStates([sessionID: .attached])
     }
 
+    private func markSessionProcessAlive(for event: AgentEvent) {
+        guard let sessionID = sessionID(for: event) else {
+            return
+        }
+
+        state.markSingleSessionAlive(sessionID: sessionID)
+    }
+
     private func sessionID(for event: AgentEvent) -> String? {
         switch event {
         case let .sessionStarted(payload):
@@ -2136,7 +2141,7 @@ final class AppModel {
         let terminalApp = supportedTerminalApp(for: process.terminalApp) ?? "Unknown"
         let identity = processIdentityKey(process)
 
-        return AgentSession(
+        var session = AgentSession(
             id: "\(Self.syntheticClaudeSessionPrefix)\(identity)",
             title: "Claude · \(workspaceName)",
             tool: .claudeCode,
@@ -2153,6 +2158,8 @@ final class AppModel {
                 terminalTTY: process.terminalTTY
             )
         )
+        session.isProcessAlive = true
+        return session
     }
 
     private func isSyntheticClaudeSession(_ session: AgentSession) -> Bool {
