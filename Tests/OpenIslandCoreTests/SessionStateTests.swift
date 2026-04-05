@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import Testing
 @testable import OpenIslandCore
@@ -337,9 +338,7 @@ struct SessionStateTests {
             toolInput: CodexHookToolInput(command: "rm -rf build")
         )
 
-        let requestTask = Task {
-            try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(payload))
-        }
+        async let responseTask = sendOnGCDThread(.processCodexHook(payload), socketURL: socketURL)
 
         var iterator = stream.makeAsyncIterator()
         let startedEvent = try await nextEvent(from: &iterator)
@@ -350,7 +349,7 @@ struct SessionStateTests {
 
         try await observer.send(.resolvePermission(sessionID: "codex-session-1", resolution: .deny()))
 
-        let response = try await requestTask.value
+        let response = try await responseTask
         #expect(response == .codexHookDirective(.deny(reason: "Permission denied in Open Island.")))
     }
 
@@ -381,9 +380,7 @@ struct SessionStateTests {
             toolInput: CodexHookToolInput(command: "ls")
         )
 
-        let requestTask = Task {
-            try BridgeCommandClient(socketURL: socketURL).send(.processCodexHook(payload))
-        }
+        async let responseTask = sendOnGCDThread(.processCodexHook(payload), socketURL: socketURL)
 
         var iterator = stream.makeAsyncIterator()
         let startedEvent = try await nextEvent(from: &iterator)
@@ -395,7 +392,7 @@ struct SessionStateTests {
         try await observer.send(.resolvePermission(sessionID: "codex-session-no-ask", resolution: .allowOnce()))
 
         let activityEvent = try await nextEvent(from: &iterator)
-        let response = try await requestTask.value
+        let response = try await responseTask
 
         #expect(activityEvent.activityUpdate?.summary == "Permission approved. Codex continued the command.")
         #expect(response == .acknowledged)
@@ -845,4 +842,20 @@ private func jsonObject(from data: Data?) throws -> [String: Any] {
 
     let object = try JSONSerialization.jsonObject(with: data)
     return object as? [String: Any] ?? [:]
+}
+
+private func sendOnGCDThread(
+    _ command: BridgeCommand,
+    socketURL: URL
+) async throws -> BridgeResponse? {
+    try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.global().async {
+            do {
+                let response = try BridgeCommandClient(socketURL: socketURL).send(command)
+                continuation.resume(returning: response)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
 }
