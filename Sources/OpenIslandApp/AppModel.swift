@@ -155,6 +155,9 @@ final class AppModel {
     private let terminalSessionAttachmentProbe = TerminalSessionAttachmentProbe()
 
     @ObservationIgnored
+    private let terminalJumpTargetResolver = TerminalJumpTargetResolver()
+
+    @ObservationIgnored
     var harnessRuntimeMonitor: HarnessRuntimeMonitor?
 
     @ObservationIgnored
@@ -1284,6 +1287,7 @@ final class AppModel {
         reconcileIslandSurfaceAfterStateChange()
         if ingress == .bridge {
             markSessionAttached(for: event)
+            markSessionProcessAlive(for: event)
         }
         synchronizeSelection()
         refreshCodexRolloutTracking()
@@ -1676,7 +1680,7 @@ final class AppModel {
         var primary: [AgentSession] = []
         var claimedLiveAttachmentKeys: Set<String> = []
 
-        for session in rankedSessions where session.isAttachedToTerminal {
+        for session in rankedSessions where session.isVisibleInIsland {
             guard !session.isSubagentSession else { continue }
 
             if let liveAttachmentKey = liveAttachmentKey(for: session) {
@@ -1698,14 +1702,10 @@ final class AppModel {
 
         let presence = session.islandPresence(at: now)
 
-        switch session.attachmentState {
-        case .attached:
-            // Inactive attached sessions rank below active ones.
+        if session.isProcessAlive {
             score += presence == .inactive ? 3_000 : 12_000
-        case .stale:
-            score += 1_000
-        case .detached:
-            break
+        } else if session.isDemoSession || session.phase.requiresAttention {
+            score += 6_000
         }
 
         if session.phase.requiresAttention {
@@ -1782,7 +1782,7 @@ final class AppModel {
                     ghosttyAvailability: ghosttyAvail,
                     terminalAvailability: terminalAvail
                 )
-                try? await Task.sleep(for: .seconds(3))
+                try? await Task.sleep(for: .seconds(2))
             }
         }
     }
@@ -1876,7 +1876,24 @@ final class AppModel {
 
         let attachmentsChanged = state.reconcileAttachmentStates(attachmentUpdates)
         let jumpTargetsChanged = state.reconcileJumpTargets(jumpTargetUpdates)
-        guard sanitizedSessionsChanged || syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged else {
+
+        // Phase 1: populate isProcessAlive in parallel with existing system.
+        let aliveIDs = sessionIDsWithAliveProcesses(activeProcesses: activeProcesses)
+        let livenessChanges = state.markProcessLiveness(aliveSessionIDs: aliveIDs)
+
+        // Resolve jump targets via the new focused resolver.
+        let resolverJumpTargets = terminalJumpTargetResolver.resolveJumpTargets(
+            for: state.sessions.filter(\.isTrackedLiveSession),
+            activeProcesses: activeProcesses
+        )
+        if !resolverJumpTargets.isEmpty {
+            _ = state.reconcileJumpTargets(resolverJumpTargets)
+        }
+
+        // Phase 4: remove sessions that are no longer visible.
+        let removedInvisible = state.removeInvisibleSessions()
+
+        guard sanitizedSessionsChanged || syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged || removedInvisible else {
             if resolutionReport.isAuthoritative {
                 isResolvingInitialLiveSessions = false
             }
@@ -1918,6 +1935,14 @@ final class AppModel {
         _ = state.reconcileAttachmentStates([sessionID: .attached])
     }
 
+    private func markSessionProcessAlive(for event: AgentEvent) {
+        guard let sessionID = sessionID(for: event) else {
+            return
+        }
+
+        state.markSingleSessionAlive(sessionID: sessionID)
+    }
+
     private func sessionID(for event: AgentEvent) -> String? {
         switch event {
         case let .sessionStarted(payload):
@@ -1937,6 +1962,73 @@ final class AppModel {
         case let .claudeSessionMetadataUpdated(payload):
             payload.sessionID
         }
+    }
+
+    /// Determine which session IDs have a corresponding alive process.
+    /// This mirrors the matching logic used by `representedClaudeProcessKeys`
+    /// but returns matched session IDs instead of process keys.
+    private func sessionIDsWithAliveProcesses(
+        activeProcesses: [ActiveProcessSnapshot]
+    ) -> Set<String> {
+        var aliveIDs: Set<String> = []
+        let sessions = state.sessions
+
+        // Codex sessions: match by session ID directly.
+        let codexProcessIDs = Set(
+            activeProcesses
+                .filter { $0.tool == .codex }
+                .compactMap(\.sessionID)
+        )
+        for session in sessions where session.tool == .codex && !session.isDemoSession {
+            if codexProcessIDs.contains(session.id) {
+                aliveIDs.insert(session.id)
+            }
+        }
+
+        // Claude sessions: reuse the multi-pass matching from representedClaudeProcessKeys.
+        let claudeProcesses = activeProcesses.filter { $0.tool == .claudeCode }
+        let trackedClaudeSessions = sessions.filter { $0.tool == .claudeCode && !isSyntheticClaudeSession($0) }
+        var claimedSessionIDs: Set<String> = []
+
+        // Pass 1: exact session ID match.
+        for process in claudeProcesses {
+            guard let processSessionID = process.sessionID,
+                  let matched = trackedClaudeSessions.first(where: {
+                      !claimedSessionIDs.contains($0.id) && $0.id == processSessionID
+                  }) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Pass 2: transcript path match.
+        for process in claudeProcesses {
+            guard let transcriptPath = process.transcriptPath,
+                  let matched = trackedClaudeSessions.first(where: {
+                      !claimedSessionIDs.contains($0.id)
+                          && $0.claudeMetadata?.transcriptPath == transcriptPath
+                  }) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Pass 3: TTY + CWD fallback match.
+        for process in claudeProcesses {
+            guard let matched = uniqueTrackedClaudeSession(
+                for: process,
+                sessions: trackedClaudeSessions,
+                claimedSessionIDs: claimedSessionIDs
+            ) else { continue }
+            aliveIDs.insert(matched.id)
+            claimedSessionIDs.insert(matched.id)
+        }
+
+        // Synthetic sessions: always alive if the process exists.
+        let syntheticSessions = sessions.filter { isSyntheticClaudeSession($0) }
+        for session in syntheticSessions {
+            aliveIDs.insert(session.id)
+        }
+
+        return aliveIDs
     }
 
     private func mergeAttachmentState(
@@ -2034,7 +2126,7 @@ final class AppModel {
         let terminalApp = supportedTerminalApp(for: process.terminalApp) ?? "Unknown"
         let identity = processIdentityKey(process)
 
-        return AgentSession(
+        var session = AgentSession(
             id: "\(Self.syntheticClaudeSessionPrefix)\(identity)",
             title: "Claude · \(workspaceName)",
             tool: .claudeCode,
@@ -2051,6 +2143,8 @@ final class AppModel {
                 terminalTTY: process.terminalTTY
             )
         )
+        session.isProcessAlive = true
+        return session
     }
 
     private func isSyntheticClaudeSession(_ session: AgentSession) -> Bool {

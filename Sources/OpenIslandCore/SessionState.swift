@@ -30,15 +30,15 @@ public struct SessionState: Equatable, Sendable {
     }
 
     public var liveSessionCount: Int {
-        sessionsByID.values.filter(\.isAttachedToTerminal).count
+        sessionsByID.values.filter(\.isVisibleInIsland).count
     }
 
     public var liveAttentionCount: Int {
-        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase.requiresAttention }.count
+        sessionsByID.values.filter { $0.isVisibleInIsland && $0.phase.requiresAttention }.count
     }
 
     public var liveRunningCount: Int {
-        sessionsByID.values.filter { $0.isAttachedToTerminal && $0.phase == .running }.count
+        sessionsByID.values.filter { $0.isVisibleInIsland && $0.phase == .running }.count
     }
 
     public var completedCount: Int {
@@ -56,7 +56,7 @@ public struct SessionState: Equatable, Sendable {
     public mutating func apply(_ event: AgentEvent) {
         switch event {
         case let .sessionStarted(payload):
-            let session = AgentSession(
+            var session = AgentSession(
                 id: payload.sessionID,
                 title: payload.title,
                 tool: payload.tool,
@@ -69,6 +69,8 @@ public struct SessionState: Equatable, Sendable {
                 codexMetadata: payload.codexMetadata?.isEmpty == true ? nil : payload.codexMetadata,
                 claudeMetadata: payload.claudeMetadata?.isEmpty == true ? nil : payload.claudeMetadata
             )
+            session.isProcessAlive = true
+            session.processNotSeenCount = 0
             upsert(session)
 
         case let .activityUpdated(payload):
@@ -241,6 +243,55 @@ public struct SessionState: Equatable, Sendable {
         }
 
         return changed
+    }
+
+    /// Mark a single session as alive (e.g. when a hook event is received).
+    /// Does not affect other sessions' processNotSeenCount.
+    public mutating func markSingleSessionAlive(sessionID: String) {
+        guard var session = sessionsByID[sessionID] else { return }
+        guard !session.isProcessAlive || session.processNotSeenCount != 0 else { return }
+        session.isProcessAlive = true
+        session.processNotSeenCount = 0
+        upsert(session)
+    }
+
+    /// Update process liveness for all tracked sessions based on process discovery.
+    /// Returns the set of session IDs whose `isProcessAlive` changed.
+    @discardableResult
+    public mutating func markProcessLiveness(aliveSessionIDs: Set<String>) -> Set<String> {
+        var changed: Set<String> = []
+
+        for (id, var session) in sessionsByID {
+            let wasAlive = session.isProcessAlive
+
+            if aliveSessionIDs.contains(id) {
+                session.isProcessAlive = true
+                session.processNotSeenCount = 0
+            } else {
+                session.processNotSeenCount += 1
+                session.isProcessAlive = session.processNotSeenCount < 1
+            }
+
+            if session.isProcessAlive != wasAlive {
+                changed.insert(id)
+                upsert(session)
+            } else if !aliveSessionIDs.contains(id), session.processNotSeenCount >= 1 {
+                upsert(session)
+            }
+        }
+
+        return changed
+    }
+
+    /// Remove sessions that are no longer visible in the island.
+    /// Returns `true` if any sessions were removed.
+    @discardableResult
+    public mutating func removeInvisibleSessions() -> Bool {
+        let before = sessionsByID.count
+        sessionsByID = sessionsByID.filter { _, session in
+            session.isVisibleInIsland
+        }
+        return sessionsByID.count != before
     }
 
     private mutating func upsert(_ session: AgentSession) {

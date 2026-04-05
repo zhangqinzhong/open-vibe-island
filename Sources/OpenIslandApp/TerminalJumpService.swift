@@ -188,8 +188,8 @@ struct TerminalJumpService {
         }
         guard connectResult == 0 else { return false }
 
-        // Send JSON-RPC focus_surface request.
-        let request = #"{"jsonrpc":"2.0","method":"focus_surface","params":{"surface_id":"\#(surfaceID)"},"id":1}"# + "\n"
+        // Send JSON-RPC surface.focus request.
+        let request = #"{"jsonrpc":"2.0","method":"surface.focus","params":{"surface_id":"\#(surfaceID)"},"id":1}"# + "\n"
         let sent = request.withCString { ptr in
             Darwin.send(fd, ptr, strlen(ptr), 0)
         }

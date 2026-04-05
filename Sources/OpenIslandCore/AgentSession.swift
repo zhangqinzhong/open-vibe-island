@@ -268,6 +268,15 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
     public var codexMetadata: CodexSessionMetadata?
     public var claudeMetadata: ClaudeSessionMetadata?
 
+    /// Whether the agent process is currently alive according to process discovery.
+    /// Populated in parallel with the existing attachment system during Phase 1.
+    public var isProcessAlive: Bool = false
+
+    /// Number of consecutive reconciliation polls where the process was not found.
+    /// Reset to 0 when the process is found. When >= 2 (~6 seconds), the session
+    /// is considered gone. This prevents flicker from momentary `ps` gaps.
+    public var processNotSeenCount: Int = 0
+
     public init(
         id: String,
         title: String,
@@ -364,6 +373,15 @@ public extension AgentSession {
 
     var isAttachedToTerminal: Bool {
         attachmentState.isLive
+    }
+
+    /// New visibility rule based on process liveness (Phase 1: parallel, not yet driving UI).
+    /// Will replace `isAttachedToTerminal` in Phase 3.
+    var isVisibleInIsland: Bool {
+        if isDemoSession { return true }
+        if phase.requiresAttention { return true }
+        if isProcessAlive { return true }
+        return false
     }
 
     var currentToolName: String? {

@@ -9,29 +9,33 @@ struct AppModelSessionListTests {
     func islandListSessionsOnlyIncludeLiveAttachedSessions() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
+
+        var liveSession = AgentSession(
+            id: "live-session",
+            title: "Claude · active",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "active",
+                paneTitle: "claude ~/active",
+                workingDirectory: "/tmp/active",
+                terminalSessionID: "ghostty-1"
+            ),
+            claudeMetadata: ClaudeSessionMetadata(
+                transcriptPath: "/tmp/live.jsonl",
+                currentTool: "Task"
+            )
+        )
+        liveSession.isProcessAlive = true
+
         model.state = SessionState(
             sessions: [
-                AgentSession(
-                    id: "live-session",
-                    title: "Claude · active",
-                    tool: .claudeCode,
-                    origin: .live,
-                    attachmentState: .attached,
-                    phase: .running,
-                    summary: "Running",
-                    updatedAt: now,
-                    jumpTarget: JumpTarget(
-                        terminalApp: "Ghostty",
-                        workspaceName: "active",
-                        paneTitle: "claude ~/active",
-                        workingDirectory: "/tmp/active",
-                        terminalSessionID: "ghostty-1"
-                    ),
-                    claudeMetadata: ClaudeSessionMetadata(
-                        transcriptPath: "/tmp/live.jsonl",
-                        currentTool: "Task"
-                    )
-                ),
+                liveSession,
                 AgentSession(
                     id: "recent-session",
                     title: "Claude · recent",
@@ -65,60 +69,66 @@ struct AppModelSessionListTests {
     func islandListDeduplicatesSessionsSharingTheSameLiveGhosttyTerminal() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
+
+        var runningLive = AgentSession(
+            id: "running-live",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Current live turn",
+            updatedAt: now,
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "codex ~/p/open-island",
+                workingDirectory: "/tmp/open-island",
+                terminalSessionID: "ghostty-split-1"
+            )
+        )
+        runningLive.isProcessAlive = true
+
+        var oldTurnSameSplit = AgentSession(
+            id: "old-turn-same-split",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Historical turn on the same split",
+            updatedAt: now.addingTimeInterval(-90),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "codex ~/p/open-island",
+                workingDirectory: "/tmp/open-island",
+                terminalSessionID: "ghostty-split-1"
+            )
+        )
+        oldTurnSameSplit.isProcessAlive = true
+
+        var otherLive = AgentSession(
+            id: "other-live",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .completed,
+            summary: "Another live split",
+            updatedAt: now.addingTimeInterval(-30),
+            jumpTarget: JumpTarget(
+                terminalApp: "Ghostty",
+                workspaceName: "open-island",
+                paneTitle: "codex ~/p/open-island",
+                workingDirectory: "/tmp/open-island",
+                terminalSessionID: "ghostty-split-2"
+            )
+        )
+        otherLive.isProcessAlive = true
+
         model.state = SessionState(
-            sessions: [
-                AgentSession(
-                    id: "running-live",
-                    title: "Codex · open-island",
-                    tool: .codex,
-                    origin: .live,
-                    attachmentState: .attached,
-                    phase: .running,
-                    summary: "Current live turn",
-                    updatedAt: now,
-                    jumpTarget: JumpTarget(
-                        terminalApp: "Ghostty",
-                        workspaceName: "open-island",
-                        paneTitle: "codex ~/p/open-island",
-                        workingDirectory: "/tmp/open-island",
-                        terminalSessionID: "ghostty-split-1"
-                    )
-                ),
-                AgentSession(
-                    id: "old-turn-same-split",
-                    title: "Codex · open-island",
-                    tool: .codex,
-                    origin: .live,
-                    attachmentState: .attached,
-                    phase: .completed,
-                    summary: "Historical turn on the same split",
-                    updatedAt: now.addingTimeInterval(-90),
-                    jumpTarget: JumpTarget(
-                        terminalApp: "Ghostty",
-                        workspaceName: "open-island",
-                        paneTitle: "codex ~/p/open-island",
-                        workingDirectory: "/tmp/open-island",
-                        terminalSessionID: "ghostty-split-1"
-                    )
-                ),
-                AgentSession(
-                    id: "other-live",
-                    title: "Codex · open-island",
-                    tool: .codex,
-                    origin: .live,
-                    attachmentState: .attached,
-                    phase: .completed,
-                    summary: "Another live split",
-                    updatedAt: now.addingTimeInterval(-30),
-                    jumpTarget: JumpTarget(
-                        terminalApp: "Ghostty",
-                        workspaceName: "open-island",
-                        paneTitle: "codex ~/p/open-island",
-                        workingDirectory: "/tmp/open-island",
-                        terminalSessionID: "ghostty-split-2"
-                    )
-                ),
-            ]
+            sessions: [runningLive, oldTurnSameSplit, otherLive]
         )
 
         #expect(model.surfacedSessions.map(\.id) == ["running-live", "other-live"])
@@ -157,20 +167,20 @@ struct AppModelSessionListTests {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()
         model.isResolvingInitialLiveSessions = true
-        model.state = SessionState(
-            sessions: [
-                AgentSession(
-                    id: "live-session",
-                    title: "Codex · open-island",
-                    tool: .codex,
-                    origin: .live,
-                    attachmentState: .attached,
-                    phase: .running,
-                    summary: "Working",
-                    updatedAt: now
-                ),
-            ]
+
+        var liveSession = AgentSession(
+            id: "live-session",
+            title: "Codex · open-island",
+            tool: .codex,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Working",
+            updatedAt: now
         )
+        liveSession.isProcessAlive = true
+
+        model.state = SessionState(sessions: [liveSession])
 
         #expect(model.liveSessionCount == 1)
         #expect(!model.shouldShowSessionBootstrapPlaceholder)
