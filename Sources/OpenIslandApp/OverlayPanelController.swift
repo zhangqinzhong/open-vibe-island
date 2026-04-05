@@ -12,10 +12,9 @@ final class OverlayPanelController {
     private static let openedContentWidthPadding: CGFloat = 28
     private static let openedContentBottomPadding: CGFloat = 0
     private static let maxVisibleSessionRows: Int = 6
-    private static let openedExpandedRowHeight: CGFloat = 76
-    private static let openedCollapsedRowHeight: CGFloat = 44
     private static let openedRowSpacing: CGFloat = 4
-    private static let openedContentVerticalInsets: CGFloat = 8
+    // Content padding (8) + scroll padding (4) + view chrome: outerBottomPadding (14) + header-content gap (12)
+    private static let openedContentVerticalInsets: CGFloat = 38
     private static let openedEmptyStateHeight: CGFloat = 108
     private static let approvalCardHeight: CGFloat = 288
     private static let questionCardHeight: CGFloat = 110
@@ -467,11 +466,7 @@ final class OverlayPanelController {
             return Self.openedEmptyStateHeight
         }
 
-        let rowHeights = visibleSessions.map { session in
-            session.islandPresence(at: now) == .inactive
-                ? Self.openedCollapsedRowHeight
-                : Self.openedExpandedRowHeight
-        }
+        let rowHeights = visibleSessions.map { $0.estimatedIslandRowHeight(at: now) }
 
         let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
         let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * Self.openedRowSpacing

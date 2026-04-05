@@ -2,6 +2,22 @@ import SwiftUI
 @preconcurrency import MarkdownUI
 import OpenIslandCore
 
+// MARK: - Row Height Estimation
+
+extension AgentSession {
+    /// Estimated row height matching `IslandSessionRow` layout for viewport sizing.
+    func estimatedIslandRowHeight(at date: Date) -> CGFloat {
+        let presence = islandPresence(at: date)
+        // Base: vertical padding (24) + headline (~18) + rounding (2)
+        var height: CGFloat = 44
+        guard presence != .inactive else { return height }
+        if spotlightPromptLineText != nil { height += 22 }   // spacing (6) + text (16)
+        if spotlightActivityLineText != nil { height += 20 }  // spacing (6) + text (14)
+        if spotlightSubagentLabel != nil { height += 20 }     // spacing (6) + text (14)
+        return height
+    }
+}
+
 // MARK: - Animations
 
 private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
@@ -422,9 +438,7 @@ struct IslandPanelView: View {
         referenceDate: Date,
         sessions: [AgentSession]
     ) -> CGFloat {
-        let rowHeights = sessions.map { session in
-            session.islandPresence(at: referenceDate) == .inactive ? 44.0 : 76.0
-        }
+        let rowHeights = sessions.map { $0.estimatedIslandRowHeight(at: referenceDate) }
 
         let rowsHeight = rowHeights.reduce(CGFloat.zero, +)
         let spacingHeight = CGFloat(max(0, rowHeights.count - 1)) * 4
