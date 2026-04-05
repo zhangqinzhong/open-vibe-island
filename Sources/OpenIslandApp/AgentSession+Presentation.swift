@@ -183,10 +183,6 @@ extension AgentSession {
             return nil
         }
 
-        guard prompt != spotlightHeadlinePromptText else {
-            return nil
-        }
-
         return "You: \(prompt)"
     }
 

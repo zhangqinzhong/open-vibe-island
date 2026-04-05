@@ -124,7 +124,8 @@ struct AgentSessionPresentationTests {
         )
 
         #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
-        #expect(session.spotlightPromptLineText == nil)
+        // Prompt line always shows when detail lines are visible, even if duplicated in headline
+        #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
 
     @Test
@@ -146,11 +147,11 @@ struct AgentSessionPresentationTests {
         )
 
         #expect(session.spotlightHeadlineText == "worktree · Now make the overlay height fit the content.")
-        #expect(session.spotlightPromptLineText == nil)
+        #expect(session.spotlightPromptLineText == "You: Now make the overlay height fit the content.")
     }
 
     @Test
-    func completedNotificationHeaderOmitsDuplicatePromptLine() {
+    func completedSessionAlwaysShowsPromptLine() {
         let now = Date.now
         let session = AgentSession(
             id: "session-1",
@@ -176,7 +177,8 @@ struct AgentSessionPresentationTests {
         )
 
         #expect(session.spotlightHeadlineText == "worktree · Also confirm the worktree status.")
-        #expect(session.spotlightPromptLineText == nil)
+        #expect(session.spotlightPromptLineText == "You: Also confirm the worktree status.")
+        // Completed sessions don't show prompt in notification header
         #expect(session.notificationHeaderPromptLineText == nil)
     }
 }

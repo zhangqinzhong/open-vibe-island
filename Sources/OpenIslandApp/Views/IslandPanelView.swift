@@ -17,6 +17,10 @@ extension AgentSession {
             height += 20  // spacing (6) + header (14)
             height += CGFloat(subagents.count) * 18  // each subagent row (spacing 4 + text 14)
         }
+        if let tasks = claudeMetadata?.activeTasks, !tasks.isEmpty {
+            height += 18  // spacing (6) + summary (12)
+            height += CGFloat(tasks.count) * 16  // each task row (spacing 3 + text 13)
+        }
         return height
     }
 }
@@ -964,12 +968,46 @@ private struct IslandSessionRow: View {
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(.white.opacity(0.8))
                                         .lineLimit(1)
-                                    if let summary = sub.summary {
-                                        Text(summary)
+                                    if let desc = sub.taskDescription {
+                                        Text("(\(desc))")
                                             .font(.system(size: 10.5))
-                                            .foregroundStyle(.white.opacity(0.45))
+                                            .foregroundStyle(.white.opacity(0.5))
                                             .lineLimit(1)
                                     }
+                                    Spacer(minLength: 0)
+                                    if sub.summary != nil {
+                                        Text("完成")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                    } else if let started = sub.startedAt {
+                                        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                                            Text(subagentElapsed(since: started, at: timeline.date))
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(.white.opacity(0.4))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if showsExpandedContent,
+                       let tasks = session.claudeMetadata?.activeTasks,
+                       !tasks.isEmpty {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(taskSummary(tasks))
+                                .font(.system(size: 10.5, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.45))
+                            ForEach(tasks) { task in
+                                HStack(spacing: 5) {
+                                    taskStatusIcon(task.status)
+                                    Text(task.title)
+                                        .font(.system(size: 10.5, weight: .medium))
+                                        .foregroundStyle(task.status == .completed
+                                            ? .white.opacity(0.4)
+                                            : .white.opacity(0.7))
+                                        .strikethrough(task.status == .completed)
+                                        .lineLimit(1)
                                 }
                             }
                         }
@@ -1194,6 +1232,39 @@ private struct IslandSessionRow: View {
 
     private var denyTitle: String {
         session.permissionRequest?.secondaryActionTitle.trimmedForNotificationCard ?? "Deny"
+    }
+
+    private func subagentElapsed(since start: Date, at now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(start))
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return "\(minutes)m \(secs)s"
+    }
+
+    private func taskSummary(_ tasks: [ClaudeTaskInfo]) -> String {
+        let done = tasks.filter { $0.status == .completed }.count
+        let prog = tasks.filter { $0.status == .inProgress }.count
+        let pend = tasks.filter { $0.status == .pending }.count
+        return "任务 (\(done) 已完成, \(prog) 进行中, \(pend) 待处理)"
+    }
+
+    @ViewBuilder
+    private func taskStatusIcon(_ status: ClaudeTaskInfo.Status) -> some View {
+        switch status {
+        case .completed:
+            Image(systemName: "checkmark.square.fill")
+                .font(.system(size: 9))
+                .foregroundStyle(.white.opacity(0.35))
+        case .inProgress:
+            Circle()
+                .fill(Color(red: 0.34, green: 0.61, blue: 0.99))
+                .frame(width: 6, height: 6)
+        case .pending:
+            Circle()
+                .strokeBorder(.white.opacity(0.3), lineWidth: 1)
+                .frame(width: 6, height: 6)
+        }
     }
 
     private func statusDot(for presence: IslandSessionPresence) -> some View {

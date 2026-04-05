@@ -141,11 +141,37 @@ public struct ClaudeSubagentInfo: Equatable, Codable, Sendable {
     public var agentID: String
     public var agentType: String?
     public var summary: String?
+    public var taskDescription: String?
+    public var startedAt: Date?
 
-    public init(agentID: String, agentType: String? = nil, summary: String? = nil) {
+    public init(
+        agentID: String,
+        agentType: String? = nil,
+        summary: String? = nil,
+        taskDescription: String? = nil,
+        startedAt: Date? = nil
+    ) {
         self.agentID = agentID
         self.agentType = agentType
         self.summary = summary
+        self.taskDescription = taskDescription
+        self.startedAt = startedAt
+    }
+}
+
+public struct ClaudeTaskInfo: Equatable, Codable, Sendable, Identifiable {
+    public var id: String
+    public var title: String
+    public var status: Status
+
+    public enum Status: String, Codable, Sendable {
+        case pending, inProgress = "in_progress", completed
+    }
+
+    public init(id: String, title: String, status: Status = .pending) {
+        self.id = id
+        self.title = title
+        self.status = status
     }
 }
 
@@ -163,6 +189,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
     public var agentType: String?
     public var worktreeBranch: String?
     public var activeSubagents: [ClaudeSubagentInfo]
+    public var activeTasks: [ClaudeTaskInfo]
 
     public init(
         transcriptPath: String? = nil,
@@ -177,7 +204,8 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         agentID: String? = nil,
         agentType: String? = nil,
         worktreeBranch: String? = nil,
-        activeSubagents: [ClaudeSubagentInfo] = []
+        activeSubagents: [ClaudeSubagentInfo] = [],
+        activeTasks: [ClaudeTaskInfo] = []
     ) {
         self.transcriptPath = transcriptPath
         self.initialUserPrompt = initialUserPrompt
@@ -192,6 +220,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
         self.agentType = agentType
         self.worktreeBranch = worktreeBranch
         self.activeSubagents = activeSubagents
+        self.activeTasks = activeTasks
     }
 
     public var isEmpty: Bool {
@@ -208,6 +237,7 @@ public struct ClaudeSessionMetadata: Equatable, Codable, Sendable {
             && agentType == nil
             && worktreeBranch == nil
             && activeSubagents.isEmpty
+            && activeTasks.isEmpty
     }
 }
 
@@ -642,7 +672,17 @@ public extension ClaudeHookPayload {
     }
 
     var toolInputPreview: String? {
-        clipped(stringValue(for: toolInput))
+        // For object-type tool inputs, extract the most relevant field
+        // instead of serializing the entire JSON structure.
+        if case let .object(obj) = toolInput {
+            let keyPriority = ["command", "file_path", "pattern", "query", "prompt", "description", "skill", "url"]
+            for key in keyPriority {
+                if let val = obj[key]?.stringValue, !val.isEmpty {
+                    return clipped(val)
+                }
+            }
+        }
+        return clipped(stringValue(for: toolInput))
     }
 
     var toolResponsePreview: String? {

@@ -41,6 +41,8 @@ public final class BridgeServer: @unchecked Sendable {
     private var pendingApprovals: [String: PendingApproval] = [:]
     private var pendingClaudeToolContexts: [String: PendingClaudeToolContext] = [:]
     private var pendingClaudeInteractions: [String: PendingClaudeInteraction] = [:]
+    /// Caches Agent tool description from preToolUse for use by the next subagentStart.
+    private var pendingAgentDescriptions: [String: String] = [:]
     private var state = SessionState()
 
     public init(
@@ -500,6 +502,21 @@ public final class BridgeServer: @unchecked Sendable {
                 toolInput: payload.toolInput
             )
 
+            // Cache Agent tool description for upcoming subagentStart
+            if payload.toolName == "Agent",
+               case let .object(obj) = payload.toolInput,
+               case let .string(desc) = obj["description"],
+               !desc.isEmpty {
+                pendingAgentDescriptions[payload.sessionID] = desc
+            }
+
+            // Capture task creation/updates from TaskCreate, TaskUpdate, TaskOutput tools
+            if let toolName = payload.toolName,
+               (toolName == "TaskCreate" || toolName == "TaskUpdate"),
+               case let .object(obj) = payload.toolInput {
+                updateTask(from: obj, toolName: toolName, sessionID: payload.sessionID)
+            }
+
             let summary = payload.toolName.map { "Running \($0)" } ?? "Running Claude tool"
             emit(
                 .activityUpdated(
@@ -701,8 +718,14 @@ public final class BridgeServer: @unchecked Sendable {
             synchronizeClaudeMetadata(for: payload)
 
             if let agentID = payload.agentID {
+                let desc = pendingAgentDescriptions.removeValue(forKey: payload.sessionID)
                 addSubagent(
-                    ClaudeSubagentInfo(agentID: agentID, agentType: payload.agentType),
+                    ClaudeSubagentInfo(
+                        agentID: agentID,
+                        agentType: payload.agentType,
+                        taskDescription: desc,
+                        startedAt: .now
+                    ),
                     toSession: payload.sessionID
                 )
             }
@@ -1028,7 +1051,8 @@ public final class BridgeServer: @unchecked Sendable {
             agentID: update.agentID ?? existing?.agentID,
             agentType: update.agentType ?? existing?.agentType,
             worktreeBranch: update.worktreeBranch ?? existing?.worktreeBranch,
-            activeSubagents: existing?.activeSubagents ?? []
+            activeSubagents: existing?.activeSubagents ?? [],
+            activeTasks: existing?.activeTasks ?? []
         )
     }
 
@@ -1057,6 +1081,43 @@ public final class BridgeServer: @unchecked Sendable {
         }
 
         metadata.activeSubagents.removeAll { $0.agentID == agentID }
+
+        emit(
+            .claudeSessionMetadataUpdated(
+                ClaudeSessionMetadataUpdated(
+                    sessionID: sessionID,
+                    claudeMetadata: metadata,
+                    timestamp: .now
+                )
+            )
+        )
+    }
+
+    private func updateTask(
+        from input: [String: ClaudeHookJSONValue],
+        toolName: String,
+        sessionID: String
+    ) {
+        guard var metadata = state.session(id: sessionID)?.claudeMetadata else {
+            return
+        }
+
+        if toolName == "TaskCreate" {
+            guard case let .string(title) = input["subject"] ?? input["description"] else { return }
+            let id = (input["id"]).flatMap { if case let .string(s) = $0 { s } else { nil } }
+                ?? UUID().uuidString
+            let statusStr = (input["status"]).flatMap { if case let .string(s) = $0 { s } else { nil } }
+            let status = statusStr.flatMap { ClaudeTaskInfo.Status(rawValue: $0) } ?? .pending
+            metadata.activeTasks.append(ClaudeTaskInfo(id: id, title: title, status: status))
+        } else if toolName == "TaskUpdate" {
+            guard case let .string(taskId) = input["id"] else { return }
+            if let idx = metadata.activeTasks.firstIndex(where: { $0.id == taskId }) {
+                if let statusStr = (input["status"]).flatMap({ if case let .string(s) = $0 { s } else { nil } }),
+                   let status = ClaudeTaskInfo.Status(rawValue: statusStr) {
+                    metadata.activeTasks[idx].status = status
+                }
+            }
+        }
 
         emit(
             .claudeSessionMetadataUpdated(
