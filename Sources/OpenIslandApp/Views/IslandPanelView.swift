@@ -57,6 +57,18 @@ struct IslandPanelView: View {
         return session.phase == .running || session.phase.requiresAttention
     }
 
+    /// Scout icon tint: blue if any running, green if any live, else gray.
+    private var scoutTint: Color {
+        let sessions = model.surfacedSessions
+        if sessions.contains(where: { $0.phase == .running }) {
+            return Color(red: 0.43, green: 0.62, blue: 1.0) // #6E9FFF working blue
+        }
+        if !sessions.isEmpty {
+            return Color(red: 0.26, green: 0.91, blue: 0.42) // #42E86B idle green
+        }
+        return Color.white.opacity(0.4) // gray
+    }
+
     private var countBadgeWidth: CGFloat {
         let digits = max(1, "\(model.liveSessionCount)".count)
         return CGFloat(18 + max(0, digits - 1) * 7)
@@ -210,7 +222,7 @@ struct IslandPanelView: View {
             HStack(spacing: 0) {
                 if hasClosedPresence {
                     HStack(spacing: 4) {
-                        OpenIslandIcon(size: 14, isAnimating: hasClosedActivity)
+                        OpenIslandIcon(size: 14, isAnimating: hasClosedActivity, tint: scoutTint)
                             .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
 
                         if closedSpotlightSession?.phase.requiresAttention == true {
@@ -236,7 +248,7 @@ struct IslandPanelView: View {
                 if hasClosedPresence {
                     ClosedCountBadge(
                         liveCount: model.liveSessionCount,
-                        tint: closedSpotlightSession?.phase.requiresAttention == true ? .orange : (hasClosedActivity ? .mint : .white.opacity(0.7))
+                        tint: closedSpotlightSession?.phase.requiresAttention == true ? .orange : scoutTint
                     )
                     .matchedGeometryEffect(id: "right-indicator", in: notchNamespace, isSource: true)
                     .frame(width: max(sideWidth, countBadgeWidth))
@@ -393,7 +405,8 @@ struct IslandPanelView: View {
         IslandNotificationCard(
             session: session,
             onApprove: { model.approvePermission(for: session.id, approved: $0) },
-            onAnswer: { model.answerQuestion(for: session.id, answer: $0) }
+            onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
+            onJump: { model.jumpToSession(session) }
         )
     }
 
@@ -982,6 +995,7 @@ private struct IslandNotificationCard: View {
     let session: AgentSession
     let onApprove: (Bool) -> Void
     let onAnswer: (QuestionPromptResponse) -> Void
+    let onJump: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -1094,9 +1108,34 @@ private struct IslandNotificationCard: View {
     }
 
     private var questionBody: some View {
-        StructuredQuestionPromptView(
-            prompt: session.questionPrompt,
-            onAnswer: onAnswer
+        VStack(alignment: .leading, spacing: 12) {
+            Text(session.questionPrompt?.title ?? "Question")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.yellow.opacity(0.96))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Button {
+                onJump()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("Go to Terminal")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+            }
+            .buttonStyle(IslandWideButtonStyle(kind: .primary))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(.white.opacity(0.06))
         )
     }
 

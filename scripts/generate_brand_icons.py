@@ -127,18 +127,6 @@ def draw_app_shell(size: int) -> tuple[Image.Image, tuple[int, int, int, int]]:
     icon_y = (size - icon_size) // 2 - max(2, size // 64)
     outer_radius = max(12, int(icon_size * 0.24))
 
-    draw_glow_ellipse(
-        image,
-        (
-            int(size * 0.16),
-            int(size * 0.70),
-            int(size * 0.84),
-            int(size * 0.95),
-        ),
-        "#00000088",
-        max(6, size / 28),
-    )
-
     draw_shadow(
         image,
         (
@@ -253,23 +241,22 @@ def render_app_icon(size: int) -> Image.Image:
     draw = ImageDraw.Draw(image)
 
     face_x, face_y, face_size, face_height = face
-    mark_width_units = 12
+    mark_width_units = 8
     mark_height_units = 8
     cell = max(1, min(face_size // (mark_width_units + 3), face_height // (mark_height_units + 3)))
     mark_width = mark_width_units * cell
     mark_height = mark_height_units * cell
-    origin_x = face_x + (face_size - mark_width) // 2 - max(1, cell // 3)
+    origin_x = face_x + (face_size - mark_width) // 2
     origin_y = face_y + (face_height - mark_height) // 2
 
     palette = {
         "B": rgba("#F2F1EE"),
         "H": rgba("#FFFFFF"),
         "E": rgba("#1A1C20"),
-        "P": rgba("#F7F7F3"),
     }
 
     draw_mark_shadow(draw, (origin_x, origin_y), cell, SCOUT_PATTERN, 82)
-    draw_mark(draw, (origin_x, origin_y), cell, palette, include_punctuation=True)
+    draw_mark(draw, (origin_x, origin_y), cell, palette, include_punctuation=False)
     return image
 
 
@@ -390,8 +377,10 @@ def write_svg_master(path: Path) -> None:
     }
 
     cell = 58
-    origin_x = 248
-    origin_y = 286
+    mark_width = 8 * cell
+    mark_height = 8 * cell
+    origin_x = (1024 - mark_width) // 2 - 24  # centered within face area
+    origin_y = (1024 - mark_height) // 2 - 12
     for row_index, row in enumerate(SCOUT_PATTERN):
         for column_index, char in enumerate(row):
             if char == ".":
@@ -399,12 +388,6 @@ def write_svg_master(path: Path) -> None:
             pixel_rects.append(
                 f'<rect x="{origin_x + column_index * cell}" y="{origin_y + row_index * cell}" width="{cell}" height="{cell}" fill="{palette[char]}"/>'
             )
-
-    punctuation = []
-    for row_index in (1, 3, 5):
-        punctuation.append(
-            f'<rect x="{origin_x + 11 * cell}" y="{origin_y + row_index * cell}" width="{cell}" height="{cell}" fill="#F7F7F3"/>'
-        )
 
     svg = f"""<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -427,7 +410,6 @@ def write_svg_master(path: Path) -> None:
       <feDropShadow dx="12" dy="12" stdDeviation="0" flood-color="black" flood-opacity="0.32"/>
     </filter>
   </defs>
-  <ellipse cx="512" cy="830" rx="274" ry="94" fill="black" fill-opacity="0.26"/>
   <g filter="url(#shadow)">
     <rect x="140" y="128" width="744" height="744" rx="178" fill="url(#bezel)"/>
     <rect x="166" y="154" width="692" height="692" rx="154" fill="url(#face)"/>
@@ -437,7 +419,6 @@ def write_svg_master(path: Path) -> None:
   </g>
   <g filter="url(#markShadow)">
     {"".join(pixel_rects)}
-    {"".join(punctuation)}
   </g>
 </svg>
 """
