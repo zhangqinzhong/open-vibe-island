@@ -1,6 +1,22 @@
-# Open Island
+<p align="center">
+  <img src="Assets/Brand/app-icon-cat.png" alt="Open Island" width="128" height="128">
+</p>
 
-[中文](README.zh-CN.md) | **English**
+<h1 align="center">Open Island</h1>
+
+<p align="center">
+  The open-source macOS companion for AI coding agents.
+  <br>
+  <a href="README.zh-CN.md">中文</a> | <strong>English</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Octane0411/open-vibe-island/releases">Releases</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#contributing">Contributing</a>
+</p>
+
+---
 
 ## Human Parts
 
@@ -18,7 +34,7 @@ I do not want to run a closed-source paid app on my own computer just to monitor
 
 ### How To Use It
 
-- Download a build from GitHub Releases (coming soon), or build from source.
+- Download an early build from [GitHub Releases](https://github.com/Octane0411/open-vibe-island/releases), or build from source.
 - Fork this repository and vibe your own version.
 - If you hit a bug or a usage problem, open an issue. Those get the highest priority.
 - If you want support for another terminal app or coding agent, open an issue first. We will expand where practical.
@@ -34,8 +50,8 @@ TBD
 
 ## Community
 
-The project is still at an early stage. Issues and pull requests are welcome.
-If you want to start contributing right away, you can join the WeChat group first:
+The project is still at an early stage — you may encounter issues along the way. Join the WeChat group or Discord for faster feedback and higher resolution priority.
+Issues and pull requests are always welcome. We are also looking for additional maintainers — Open Island is just the beginning. Come join us:
 
 <img src="docs/images/wechat-group.jpg" alt="Open Island WeChat group QR code" width="360">
 

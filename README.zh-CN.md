@@ -1,6 +1,22 @@
-# Open Island
+<p align="center">
+  <img src="Assets/Brand/app-icon-cat.png" alt="Open Island" width="128" height="128">
+</p>
 
-**中文** | [English](README.md)
+<h1 align="center">Open Island</h1>
+
+<p align="center">
+  面向 AI coding agents 的开源 macOS companion app。
+  <br>
+  <strong>中文</strong> | <a href="README.md">English</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/Octane0411/open-vibe-island/releases">下载</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#贡献">参与贡献</a>
+</p>
+
+---
 
 ## Human Parts
 
@@ -18,7 +34,7 @@
 
 ### 使用方式
 
-- 从 GitHub Releases 下载构建并安装（即将上线），或从源码构建。
+- 从 [GitHub Releases](https://github.com/Octane0411/open-vibe-island/releases) 下载早期版本并安装，或从源码构建。
 - Fork 这个仓库，然后 vibe 你自己的版本。
 - 如果你遇到 bug 或使用问题，请先发 issue，我们会优先处理。
 - 如果你希望支持其他 terminal app 或 code agent，请先发 issue，我们会尽可能扩展。
@@ -34,8 +50,8 @@
 
 ## 社区
 
-目前项目还在早期阶段，欢迎 issue 和 pull request。
-如果你想现在就开始做贡献，可以先加入微信群：
+目前项目还在早期阶段，在体验中可能会出现任何问题，加入微信群/discord以获得更快的反馈和更高的解决优先级
+同时欢迎任意 issue 和 pull request，我们也在寻找其他maintainer，open island只是个开始，欢迎加入微信群：
 
 <img src="docs/images/wechat-group.jpg" alt="Open Island 微信群二维码" width="360">
   
