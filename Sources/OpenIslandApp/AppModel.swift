@@ -28,7 +28,6 @@ final class AppModel {
     }
     @ObservationIgnored private var _cachedSessionBuckets: (primary: [AgentSession], overflow: [AgentSession])?
     var selectedSessionID: String?
-    var showsAllSessions: Bool = false
     let hooks = HookInstallationCoordinator()
     let overlay = OverlayUICoordinator()
     let discovery = SessionDiscoveryCoordinator()
