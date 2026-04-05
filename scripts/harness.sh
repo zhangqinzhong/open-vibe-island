@@ -21,21 +21,7 @@ run_step() {
             ;;
         test)
             echo "==> test"
-            swift test &
-            local test_pid=$!
-            local timeout=300
-            ( sleep "$timeout" && kill -9 "$test_pid" 2>/dev/null && echo "TIMEOUT: swift test killed after ${timeout}s" >&2 ) &
-            local watchdog_pid=$!
-            wait "$test_pid"
-            local test_exit=$?
-            kill "$watchdog_pid" 2>/dev/null
-            wait "$watchdog_pid" 2>/dev/null
-            if (( test_exit == 137 )); then
-                echo "swift test timed out after ${timeout}s (known issue: one test hangs intermittently)" >&2
-                echo "All other tests passed before the hang."
-            elif (( test_exit != 0 )); then
-                exit "$test_exit"
-            fi
+            swift test
             ;;
         build)
             echo "==> build"
