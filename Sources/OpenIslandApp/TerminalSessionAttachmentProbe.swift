@@ -195,7 +195,7 @@ struct TerminalSessionAttachmentProbe {
                 continue
             }
 
-            // For sessions from unsupported terminals (e.g. cmux), keep them
+            // For sessions from unsupported terminals, keep them
             // attached if they have an active process OR were recently active
             // via hooks (origin == .live and updated recently).
             let isActiveProcess = activeProcessesBySessionID[session.id] != nil
