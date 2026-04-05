@@ -327,8 +327,8 @@ struct IslandPanelView: View {
             }
         }
         .padding(.horizontal, 18)
-        .padding(.top, 12)
-        .padding(.bottom, 4)
+        .padding(.top, 8)
+        .padding(.bottom, 0)
     }
 
     private var sessionBootstrapPlaceholder: some View {

@@ -10,12 +10,12 @@ final class OverlayPanelController {
     private static let openedPanelWidthFactor: CGFloat = 0.46
     private static let preferredNotificationPanelWidth: CGFloat = 620
     private static let openedContentWidthPadding: CGFloat = 28
-    private static let openedContentBottomPadding: CGFloat = 6
+    private static let openedContentBottomPadding: CGFloat = 0
     private static let maxVisibleSessionRows: Int = 6
     private static let openedExpandedRowHeight: CGFloat = 76
     private static let openedCollapsedRowHeight: CGFloat = 44
     private static let openedRowSpacing: CGFloat = 4
-    private static let openedContentVerticalInsets: CGFloat = 18
+    private static let openedContentVerticalInsets: CGFloat = 8
     private static let openedEmptyStateHeight: CGFloat = 108
     private static let approvalCardHeight: CGFloat = 288
     private static let simpleQuestionCardHeight: CGFloat = 248
