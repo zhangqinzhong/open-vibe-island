@@ -41,6 +41,8 @@ public final class BridgeServer: @unchecked Sendable {
     private var pendingApprovals: [String: PendingApproval] = [:]
     private var pendingClaudeToolContexts: [String: PendingClaudeToolContext] = [:]
     private var pendingClaudeInteractions: [String: PendingClaudeInteraction] = [:]
+    /// Caches Agent tool description from preToolUse for use by the next subagentStart.
+    private var pendingAgentDescriptions: [String: String] = [:]
     private var state = SessionState()
 
     public init(
@@ -500,6 +502,14 @@ public final class BridgeServer: @unchecked Sendable {
                 toolInput: payload.toolInput
             )
 
+            // Cache Agent tool description for upcoming subagentStart
+            if payload.toolName == "Agent",
+               case let .object(obj) = payload.toolInput,
+               case let .string(desc) = obj["description"],
+               !desc.isEmpty {
+                pendingAgentDescriptions[payload.sessionID] = desc
+            }
+
             let summary = payload.toolName.map { "Running \($0)" } ?? "Running Claude tool"
             emit(
                 .activityUpdated(
@@ -701,8 +711,14 @@ public final class BridgeServer: @unchecked Sendable {
             synchronizeClaudeMetadata(for: payload)
 
             if let agentID = payload.agentID {
+                let desc = pendingAgentDescriptions.removeValue(forKey: payload.sessionID)
                 addSubagent(
-                    ClaudeSubagentInfo(agentID: agentID, agentType: payload.agentType),
+                    ClaudeSubagentInfo(
+                        agentID: agentID,
+                        agentType: payload.agentType,
+                        taskDescription: desc,
+                        startedAt: .now
+                    ),
                     toSession: payload.sessionID
                 )
             }

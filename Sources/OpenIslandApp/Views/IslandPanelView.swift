@@ -948,11 +948,23 @@ private struct IslandSessionRow: View {
                                         .font(.system(size: 11, weight: .medium))
                                         .foregroundStyle(.white.opacity(0.8))
                                         .lineLimit(1)
-                                    if let summary = sub.summary {
-                                        Text(summary)
+                                    if let desc = sub.taskDescription {
+                                        Text("(\(desc))")
                                             .font(.system(size: 10.5))
-                                            .foregroundStyle(.white.opacity(0.45))
+                                            .foregroundStyle(.white.opacity(0.5))
                                             .lineLimit(1)
+                                    }
+                                    Spacer(minLength: 0)
+                                    if sub.summary != nil {
+                                        Text("完成")
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(.white.opacity(0.4))
+                                    } else if let started = sub.startedAt {
+                                        TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                                            Text(subagentElapsed(since: started, at: timeline.date))
+                                                .font(.system(size: 10, weight: .medium))
+                                                .foregroundStyle(.white.opacity(0.4))
+                                        }
                                     }
                                 }
                             }
@@ -1177,6 +1189,14 @@ private struct IslandSessionRow: View {
 
     private var denyTitle: String {
         session.permissionRequest?.secondaryActionTitle.trimmedForNotificationCard ?? "Deny"
+    }
+
+    private func subagentElapsed(since start: Date, at now: Date) -> String {
+        let seconds = Int(now.timeIntervalSince(start))
+        if seconds < 60 { return "\(seconds)s" }
+        let minutes = seconds / 60
+        let secs = seconds % 60
+        return "\(minutes)m \(secs)s"
     }
 
     private func statusDot(for presence: IslandSessionPresence) -> some View {
