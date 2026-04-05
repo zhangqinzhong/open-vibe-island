@@ -195,8 +195,14 @@ struct TerminalSessionAttachmentProbe {
                 continue
             }
 
+            // For sessions from unsupported terminals (e.g. cmux), keep them
+            // attached if they have an active process OR were recently active
+            // via hooks (origin == .live and updated recently).
+            let isActiveProcess = activeProcessesBySessionID[session.id] != nil
+            let isRecentHookSession = session.origin == .live
+                && now.timeIntervalSince(session.updatedAt) < Self.staleGraceWindow
             resolutions[session.id] = SessionResolution(
-                attachmentState: activeProcessesBySessionID[session.id] != nil
+                attachmentState: (isActiveProcess || isRecentHookSession)
                     ? .attached
                     : fallbackAttachmentState(
                         for: session,
