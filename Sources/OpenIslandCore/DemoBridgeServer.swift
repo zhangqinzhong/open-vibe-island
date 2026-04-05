@@ -144,7 +144,11 @@ public final class DemoBridgeServer: @unchecked Sendable {
             listeningFileDescriptor = -1
         }
 
-        try? FileManager.default.removeItem(at: socketURL)
+        // Do NOT delete the socket file here.  start() already cleans up
+        // stale sockets before binding.  Deleting in stop() causes a race
+        // when the old process is being terminated while a new process has
+        // already created its socket at the same path — the old process's
+        // deferred cleanup removes the new socket file, breaking the bridge.
     }
 
     private func acceptPendingClients() {
