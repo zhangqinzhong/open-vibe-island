@@ -1,3 +1,4 @@
+import Dispatch
 import Foundation
 import Testing
 @testable import OpenIslandCore
@@ -185,9 +186,7 @@ struct ClaudeHooksTests {
         let preToolResponse = try BridgeCommandClient(socketURL: socketURL).send(.processClaudeHook(preToolPayload))
         #expect(preToolResponse == .acknowledged)
 
-        let requestTask = Task {
-            try BridgeCommandClient(socketURL: socketURL).send(.processClaudeHook(permissionPayload))
-        }
+        async let responseTask = sendOnGCDThread(.processClaudeHook(permissionPayload), socketURL: socketURL)
 
         var iterator = stream.makeAsyncIterator()
         let permissionEvent = try await nextMatchingEvent(from: &iterator, maxEvents: 8) { event in
@@ -207,7 +206,7 @@ struct ClaudeHooksTests {
 
         try await observer.send(.resolvePermission(sessionID: "claude-session-1", resolution: .allowOnce()))
 
-        let response = try await requestTask.value
+        let response = try await responseTask
         guard case let .some(.claudeHookDirective(.permissionRequest(.allow(updatedInput, updatedPermissions)))) = response else {
             Issue.record("Expected an allow directive for Claude permission request")
             return
@@ -270,9 +269,7 @@ struct ClaudeHooksTests {
 
         _ = try BridgeCommandClient(socketURL: socketURL).send(.processClaudeHook(preToolPayload))
 
-        let requestTask = Task {
-            try BridgeCommandClient(socketURL: socketURL).send(.processClaudeHook(permissionPayload))
-        }
+        async let responseTask = sendOnGCDThread(.processClaudeHook(permissionPayload), socketURL: socketURL)
 
         var iterator = stream.makeAsyncIterator()
         let questionEvent = try await nextMatchingEvent(from: &iterator, maxEvents: 8) { event in
@@ -301,7 +298,7 @@ struct ClaudeHooksTests {
             )
         )
 
-        let response = try await requestTask.value
+        let response = try await responseTask
         guard case let .some(.claudeHookDirective(.permissionRequest(.allow(updatedInput, _)))) = response,
               case let .object(root)? = updatedInput,
               case let .object(answers)? = root["answers"] else {
@@ -354,4 +351,20 @@ private func option(label: String, description: String) -> ClaudeHookJSONValue {
         "label": .string(label),
         "description": .string(description),
     ])
+}
+
+private func sendOnGCDThread(
+    _ command: BridgeCommand,
+    socketURL: URL
+) async throws -> BridgeResponse? {
+    try await withCheckedThrowingContinuation { continuation in
+        DispatchQueue.global().async {
+            do {
+                let response = try BridgeCommandClient(socketURL: socketURL).send(command)
+                continuation.resume(returning: response)
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
 }

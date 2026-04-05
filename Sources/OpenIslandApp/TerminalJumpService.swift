@@ -21,6 +21,11 @@ struct TerminalJumpService {
             aliases: ["iterm", "iterm2", "iterm.app"]
         ),
         TerminalAppDescriptor(
+            displayName: "cmux",
+            bundleIdentifier: "dev.cmux.cmux",
+            aliases: ["cmux"]
+        ),
+        TerminalAppDescriptor(
             displayName: "Ghostty",
             bundleIdentifier: "com.mitchellh.ghostty",
             aliases: ["ghostty"]
@@ -84,6 +89,10 @@ struct TerminalJumpService {
                 if try jumpToITermSession(target) {
                     return "Focused the matching iTerm session."
                 }
+            case "dev.cmux.cmux":
+                if jumpToCmuxTerminal(target) {
+                    return "Focused the matching cmux terminal."
+                }
             case "com.mitchellh.ghostty":
                 if try jumpToGhosttyTerminal(target) {
                     return "Focused the matching Ghostty terminal."
@@ -144,6 +153,53 @@ struct TerminalJumpService {
         """
 
         return try runAppleScript(script) == "matched"
+    }
+
+    private func jumpToCmuxTerminal(_ target: JumpTarget) -> Bool {
+        // Try the cmux Unix socket API to focus a specific surface.
+        guard let surfaceID = target.terminalSessionID,
+              !surfaceID.isEmpty else {
+            // No surface ID — fall back to generic app activation.
+            return false
+        }
+
+        let socketPath = "/tmp/cmux.sock"
+        guard FileManager.default.fileExists(atPath: socketPath) else {
+            return false
+        }
+
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return false }
+        defer { close(fd) }
+
+        var addr = sockaddr_un()
+        addr.sun_family = sa_family_t(AF_UNIX)
+        let pathBytes = socketPath.utf8CString
+        precondition(pathBytes.count <= MemoryLayout.size(ofValue: addr.sun_path))
+        withUnsafeMutableBytes(of: &addr.sun_path) { sunPath in
+            for (i, byte) in pathBytes.enumerated() {
+                sunPath[i] = UInt8(bitPattern: byte)
+            }
+        }
+
+        let connectResult = withUnsafePointer(to: &addr) { ptr in
+            ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
+                Darwin.connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+            }
+        }
+        guard connectResult == 0 else { return false }
+
+        // Send JSON-RPC focus_surface request.
+        let request = #"{"jsonrpc":"2.0","method":"focus_surface","params":{"surface_id":"\#(surfaceID)"},"id":1}"# + "\n"
+        let sent = request.withCString { ptr in
+            Darwin.send(fd, ptr, strlen(ptr), 0)
+        }
+        guard sent > 0 else { return false }
+
+        // Best-effort: activate the cmux app window.
+        try? openAction(["-b", "dev.cmux.cmux"])
+
+        return true
     }
 
     private func jumpToGhosttyTerminal(_ target: JumpTarget) throws -> Bool {

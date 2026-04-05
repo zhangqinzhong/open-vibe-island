@@ -390,12 +390,23 @@ public extension CodexHookPayload {
             payload.terminalApp = inferTerminalApp(from: environment)
         }
 
+        // For cmux, use CMUX_SURFACE_ID as the terminal session identifier.
+        if payload.terminalApp == "cmux" {
+            if payload.terminalSessionID == nil {
+                payload.terminalSessionID = environment["CMUX_SURFACE_ID"]
+            }
+        }
+
         if payload.terminalTTY == nil {
             payload.terminalTTY = currentTTYProvider()
         }
 
         let useLocator: Bool
-        if let terminalApp = payload.terminalApp, isGhosttyTerminalApp(terminalApp) {
+        if isCmuxTerminalApp(payload.terminalApp) {
+            // cmux session ID comes from CMUX_SURFACE_ID (set above);
+            // no AppleScript locator is available, so skip entirely.
+            useLocator = false
+        } else if let terminalApp = payload.terminalApp, isGhosttyTerminalApp(terminalApp) {
             if payload.hookEventName == .sessionStart || payload.hookEventName == .userPromptSubmit {
                 useLocator = true
             } else {
@@ -424,16 +435,26 @@ public extension CodexHookPayload {
     }
 
     private func shouldUseFocusedTerminalLocator(for terminalApp: String) -> Bool {
-        !terminalApp.lowercased().contains("ghostty")
+        let lower = terminalApp.lowercased()
+        return !lower.contains("ghostty") && lower != "cmux"
     }
 
     private func isGhosttyTerminalApp(_ terminalApp: String?) -> Bool {
-        terminalApp?.lowercased().contains("ghostty") == true
+        guard let app = terminalApp?.lowercased() else { return false }
+        return app.contains("ghostty")
+    }
+
+    private func isCmuxTerminalApp(_ terminalApp: String?) -> Bool {
+        terminalApp?.lowercased() == "cmux"
     }
 
     private func inferTerminalApp(from environment: [String: String]) -> String? {
         if environment["ITERM_SESSION_ID"] != nil || environment["LC_TERMINAL"] == "iTerm2" {
             return "iTerm"
+        }
+
+        if environment["CMUX_WORKSPACE_ID"] != nil || environment["CMUX_SOCKET_PATH"] != nil {
+            return "cmux"
         }
 
         if environment["GHOSTTY_RESOURCES_DIR"] != nil {
@@ -451,6 +472,9 @@ public extension CodexHookPayload {
         case .some("iterm.app"), .some("iterm2"):
             return "iTerm"
         case let value? where value.contains("ghostty"):
+            // cmux also sets TERM_PROGRAM=ghostty; already handled above via
+            // CMUX_WORKSPACE_ID / CMUX_SOCKET_PATH, so reaching here means
+            // genuine Ghostty.
             return "Ghostty"
         case let value? where value.contains("warp"):
             return "Warp"
@@ -501,6 +525,11 @@ public extension CodexHookPayload {
                 tty: values[safe: 1],
                 title: values[safe: 2]
             )
+        }
+
+        if normalized == "cmux" {
+            // cmux uses its own socket API; AppleScript locator is not available.
+            return (sessionID: nil, tty: nil, title: nil)
         }
 
         if normalized.contains("ghostty") {
