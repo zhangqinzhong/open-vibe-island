@@ -8,7 +8,7 @@ This section is written for humans.
 
 ### What This Is
 
-An open-source Vibe Island alternative for heavy code-agent users on macOS, currently focused on Claude Code, Codex, Terminal.app, and Ghostty.
+An open-source [Vibe Island](https://vibeisland.app/) alternative for heavy code-agent users on macOS. Currently supports **Claude Code** and **Codex**, with terminal integration for **Terminal.app**, **Ghostty**, and **cmux**, plus fallback detection for iTerm2, Warp, and WezTerm.
 
 ### Motivation
 
@@ -18,9 +18,9 @@ I do not want to run a closed-source paid app on my own computer just to monitor
 
 ### How To Use It
 
-- Download a build from GitHub Releases.
-- Fork this repository and vibe your own version. This project is trying to apply harness engineering, so customization should stay straightforward.
-- If you hit a bug or a usage problem, open an issue. Those should get the highest priority.
+- Download a build from GitHub Releases (coming soon), or build from source.
+- Fork this repository and vibe your own version.
+- If you hit a bug or a usage problem, open an issue. Those get the highest priority.
 - If you want support for another terminal app or coding agent, open an issue first. We will expand where practical.
 - If you have a product idea or feature request, open an issue first. A follow-up PR with a demo is welcome.
 
@@ -39,6 +39,8 @@ If you want to start contributing right away, you can join the WeChat group firs
 
 <img src="docs/images/wechat-group.jpg" alt="Open Island WeChat group QR code" width="360">
 
+---
+
 ## Agent Parts
 
 This section is written for agents.
@@ -53,63 +55,61 @@ AI coding is becoming part of the daily development loop, but the surrounding co
 
 `Open Island` takes the opposite approach:
 
-- open source
-- local first
-- native on macOS
-- built to support the terminal workflow, not replace it
+- Open source
+- Local first, no server dependency
+- Native macOS (SwiftUI + AppKit)
+- Built to support the terminal workflow, not replace it
 
 ## Who It Is For
 
-This is for developers who already live in the terminal and want a better way to work with coding agents on macOS without losing context.
+Developers who already live in the terminal and want a better way to work with coding agents on macOS without losing context.
 
-## What You Get
+## Features
 
-- a small native island for live agent activity
-- fast visibility into active Codex sessions
-- quicker return to the active terminal context
-- a companion experience that stays out of the way until it matters
+### Agent Integrations
 
-## Current Product Shape
+- **Codex** — Full hook-based integration. Receives `SessionStart`, `UserPromptSubmit`, and `Stop` events by default. Reads 5-hour and 7-day account usage windows from local rollout files. Install/uninstall managed hooks from the control center or CLI.
+- **Claude Code** — Hook-based integration via `~/.claude/settings.json`. Discovers sessions from `~/.claude/projects/` JSONL transcripts. Persists and restores sessions across app launches. Managed status line bridge with opt-in installation. Reads cached 5-hour and 7-day usage windows.
 
-Right now `Open Island` is focused on one thing: making the Codex-on-macOS workflow feel more native.
+### Terminal Support
 
-Current scope:
+- **Terminal.app**, **Ghostty**, and **cmux** — Full jump-back support with session attachment matching (cmux via Unix socket API)
+- **iTerm2, Warp, WezTerm** — Fallback detection and basic process discovery
 
-- macOS only
-- Codex first
-- experimental Claude Code usage status
-- passive Codex account usage status from local rollout files
-- live session visibility
-- low-noise Codex hook install
-- jump-back behavior
+### UI & Display
 
-## Available Today
+- **Notch overlay** — On Macs with a built-in notch, the island sits in the notch area; on external displays or non-notch Macs, it falls back to a compact top-center bar
+- **Control center** — Codex/Claude hook status, usage dashboard, debug scenarios
+- **Settings** — General, Display, Sound, Shortcuts, Lab (advanced), About
+- **Notification mode** — Auto-height notification panel for permission requests and session events
+- **Notification sounds** — Configurable system sounds (default: Bottle) with mute toggle
+- **i18n** — English and Simplified Chinese
 
-Today the project can already:
+### Session Management
 
-- receive Codex hook events locally
-- surface session and approval state in the app
-- restore recent Codex sessions from local rollout files and cache
-- read Codex 5-hour and 7-day account windows from the latest local `token_count` rollout event
-- install and uninstall managed Codex hooks from `~/.codex`
-- inspect `~/.claude/settings.json` and install a managed Claude usage bridge when no custom status line exists
-- read cached Claude 5-hour and 7-day usage windows in the UI
-- use terminal hints for best-effort jump back behavior
+- Live session visibility with expandable detail rows
+- Session state reducer (`SessionState.apply`) as single source of truth
+- Automatic session discovery from local transcript files and cache
+- Process discovery via `ps`/`lsof` for active agent matching
 
-The managed Codex install keeps the same low-noise footprint and only installs `SessionStart`, `UserPromptSubmit`, and `Stop` hooks by default. The bridge still supports richer interactive hooks, but they are not enabled by default because `PreToolUse` and `PostToolUse` create a lot of terminal noise during normal Codex use.
+### Architecture
 
-The Claude bridge is intentionally conservative. It writes a managed `statusLine.command` to `~/.open-island/bin/open-island-statusline`, caches `rate_limits` into `/tmp/open-island-rl.json`, and refuses to overwrite an existing custom Claude status line automatically.
+Four targets in one Swift package:
+
+| Target | Role |
+|---|---|
+| **OpenIslandApp** | SwiftUI + AppKit shell — menu bar, overlay panel, control center, settings |
+| **OpenIslandCore** | Shared library — models, bridge transport (Unix socket IPC), hooks, session persistence |
+| **OpenIslandHooks** | Lightweight CLI invoked by agent hooks, forwards payloads via Unix socket |
+| **OpenIslandSetup** | Installer CLI for managing `~/.codex/config.toml` and hook entries |
 
 ## Quick Start
 
 Build and run locally:
 
 ```bash
-zsh scripts/harness.sh
 open Package.swift
 ```
-
-The harness entrypoint lives at `scripts/harness.sh`. With no arguments it runs the current repository baseline: docs checks, `swift test`, and `swift build`.
 
 Build a local `.app` bundle:
 
@@ -117,38 +117,36 @@ Build a local `.app` bundle:
 zsh scripts/package-app.sh
 ```
 
-That script creates `output/package/Open Island.app` and `output/package/Open Island.zip`. If this Mac already has a `Developer ID Application` certificate, you can pass `OPEN_ISLAND_SIGN_IDENTITY` to sign the bundle. See [docs/packaging.md](docs/packaging.md) for the full path, including notarization.
+That script creates `output/package/Open Island.app` and `output/package/Open Island.zip`. Pass `OPEN_ISLAND_SIGN_IDENTITY` to sign the bundle. See [docs/packaging.md](docs/packaging.md) for the full path, including notarization.
 
-Connect Codex:
+### Connect Codex
 
-Open the package in Xcode to run the macOS app target. On launch, the app restores its local cache, scans recent `~/.codex/sessions/**/rollout-*.jsonl` files for existing Codex sessions, and then starts the live bridge for new hook events.
+Open the package in Xcode to run the macOS app target. On launch, the app restores its local cache, scans recent `~/.codex/sessions/**/rollout-*.jsonl` files for existing Codex sessions, and starts the live bridge for new hook events.
 
-The control center also shows live Codex hook install status from `~/.codex`, and can install or uninstall the managed hook entries directly if it can locate a local `OpenIslandHooks` executable. Installs copy the helper into `~/Library/Application Support/OpenIsland/bin/OpenIslandHooks` so repo or worktree renames do not break existing hooks. Claude usage setup is available from the app and remains opt-in.
-
-```toml
-[features]
-codex_hooks = true
-```
+The control center shows live Codex hook install status from `~/.codex`, and can install or uninstall managed hook entries directly. Installs copy the helper into `~/Library/Application Support/OpenIsland/bin/OpenIslandHooks` so repo renames do not break existing hooks.
 
 ```bash
 swift build -c release --product OpenIslandHooks
 swift run OpenIslandSetup install
-```
-
-That setup enables `codex_hooks = true` and installs a low-noise hook set matching the original app's Codex integration: `SessionStart`, `UserPromptSubmit`, and `Stop`.
-
-Check or remove the setup later:
-
-```bash
 swift run OpenIslandSetup status
 swift run OpenIslandSetup uninstall
 ```
 
+### Connect Claude Code
+
+Claude usage setup is available from the app's control center and remains opt-in. The bridge writes a managed `statusLine.command` to `~/.open-island/bin/open-island-statusline`, caches `rate_limits` into `/tmp/open-island-rl.json`, and refuses to overwrite an existing custom status line automatically.
+
 ## Repository Map
 
 - Start with [docs/index.md](docs/index.md) for the current doc map.
-- Read [docs/quality.md](docs/quality.md) for the harness contract and verification baseline.
-- Run `zsh scripts/harness.sh smoke` on macOS when you want a deterministic local app smoke pass.
+- Read [docs/quality.md](docs/quality.md) for the quality baseline and verification approach.
+- Run `scripts/harness.sh` for automated checks (docs validation, tests, build).
+
+## Requirements
+
+- macOS 14+
+- Swift 6.2
+- Xcode (for the app target)
 
 ## Product Direction
 
@@ -156,17 +154,10 @@ The goal is simple: make AI coding feel native on macOS.
 
 That means:
 
-- less context switching
-- less tab hunting
-- less friction around session awareness
-- a faster path back to the active agent session
-
-## Roadmap
-
-1. Ship a solid single-agent macOS MVP
-2. Harden approvals and jump-back behavior
-3. Improve multi-session handling
-4. Expand to more agent integrations over time
+- Less context switching
+- Less tab hunting
+- Less friction around session awareness
+- A faster path back to the active agent session
 
 ## Contributing
 
