@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "OpenIsland",
+    defaultLocalization: "en",
     platforms: [
         .macOS(.v14),
     ],
@@ -45,6 +46,9 @@ let package = Package(
             dependencies: [
                 "OpenIslandCore",
                 .product(name: "MarkdownUI", package: "swift-markdown-ui"),
+            ],
+            resources: [
+                .process("Resources"),
             ]
         ),
         .testTarget(
