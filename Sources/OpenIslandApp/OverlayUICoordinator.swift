@@ -198,8 +198,13 @@ final class OverlayUICoordinator {
     func hideOverlay() { notchClose() }
 
     /// Transition from notification mode (single session) to full session list.
-    func expandNotificationToSessionList() {
-        islandSurface = .sessionList()
+    /// - Parameter clearExpansion: If true, clears the actionable session's expansion
+    ///   (used for completion notifications which are informational only).
+    func expandNotificationToSessionList(clearExpansion: Bool = false) {
+        if clearExpansion {
+            islandSurface = .sessionList()
+        }
+        // When not clearing, keep actionableSessionID so approval/question expansion persists
         notchOpenReason = .click
         notificationAutoCollapseTask?.cancel()
         notificationAutoCollapseTask = nil
