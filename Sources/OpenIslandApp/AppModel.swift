@@ -1998,7 +1998,7 @@ final class AppModel {
         now: Date
     ) -> [AgentSession] {
         let activeClaudeProcesses = activeProcesses.filter { process in
-            process.tool == .claudeCode && supportedTerminalApp(for: process.terminalApp) != nil
+            process.tool == .claudeCode
         }
         let trackedClaudeSessions = existingSessions.filter { session in
             session.tool == .claudeCode && !isSyntheticClaudeSession(session)
