@@ -429,10 +429,10 @@ struct IslandPanelView: View {
                 .progressViewStyle(.circular)
                 .tint(.white.opacity(0.7))
                 .scaleEffect(0.8)
-            Text("Checking open terminal sessions")
+            Text(model.lang.t("island.checkingTerminals"))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.58))
-            Text("Open Island will show live agents after terminal ownership is confirmed")
+            Text(model.lang.t("island.terminalOwnership"))
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.28))
             Spacer()
@@ -443,12 +443,12 @@ struct IslandPanelView: View {
     private var emptyState: some View {
         VStack(spacing: 12) {
             Spacer()
-            Text("No open terminal sessions")
+            Text(model.lang.t("island.noTerminals"))
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(.white.opacity(0.4))
             Text(model.recentSessions.isEmpty
-                ? "Start Codex in your terminal"
-                : "Recent sessions remain in Control Center until the terminal is open again")
+                ? model.lang.t("island.startAgent")
+                : model.lang.t("island.recentSessions"))
                 .font(.system(size: 12))
                 .foregroundStyle(.white.opacity(0.25))
             Spacer()
@@ -489,6 +489,7 @@ struct IslandPanelView: View {
                     isActionable: true,
                     useDrawingGroup: model.notchStatus == .opened,
                     isInteractive: model.notchStatus == .opened,
+                    lang: model.lang,
                     onApprove: { model.approvePermission(for: session.id, mode: $0) },
                     onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                     onJump: { model.jumpToSession(session) }
@@ -499,7 +500,7 @@ struct IslandPanelView: View {
                         let isCompletion = session.phase == .completed
                         model.expandNotificationToSessionList(clearExpansion: isCompletion)
                     } label: {
-                        Text("显示全部 \(model.allSessions.count) 个会话")
+                        Text(model.lang.t("island.showAll", model.allSessions.count))
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.white.opacity(0.45))
                             .frame(maxWidth: .infinity)
@@ -515,6 +516,7 @@ struct IslandPanelView: View {
                         isActionable: session.id == actionableSessionID,
                         useDrawingGroup: model.notchStatus == .opened,
                         isInteractive: model.notchStatus == .opened,
+                        lang: model.lang,
                         onApprove: { model.approvePermission(for: session.id, mode: $0) },
                         onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                         onJump: { model.jumpToSession(session) }
@@ -552,11 +554,11 @@ struct IslandPanelView: View {
             }
         } else {
             HStack(spacing: 8) {
-                Text("Open Island")
+                Text(model.lang.t("app.name"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.9))
 
-                Text("Usage waiting")
+                Text(model.lang.t("island.usageWaiting"))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(.white.opacity(0.4))
             }
@@ -936,6 +938,7 @@ private struct IslandSessionRow: View {
     var isActionable: Bool = false
     var useDrawingGroup: Bool = true
     var isInteractive: Bool = true
+    var lang: LanguageManager = .shared
     var onApprove: ((ClaudePermissionMode?) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
     let onJump: () -> Void
@@ -996,7 +999,7 @@ private struct IslandSessionRow: View {
                             HStack(spacing: 5) {
                                 Image(systemName: "arrow.triangle.branch")
                                     .font(.system(size: 9, weight: .medium))
-                                Text("Subagents (\(subagents.count))")
+                                Text(lang.t("subagents.title", subagents.count))
                                     .font(.system(size: 10.5, weight: .medium))
                             }
                             .foregroundStyle(.cyan.opacity(0.8))
@@ -1020,7 +1023,7 @@ private struct IslandSessionRow: View {
                                     }
                                     Spacer(minLength: 0)
                                     if sub.summary != nil {
-                                        Text("完成")
+                                        Text(lang.t("subagents.completed"))
                                             .font(.system(size: 10, weight: .medium))
                                             .foregroundStyle(.white.opacity(0.4))
                                     } else if let started = sub.startedAt {
@@ -1176,11 +1179,11 @@ private struct IslandSessionRow: View {
             )
 
             HStack(spacing: 8) {
-                Button("手动审批") { onApprove?(.default) }
+                Button(lang.t("approval.manual")) { onApprove?(.default) }
                     .buttonStyle(IslandWideButtonStyle(kind: .secondary))
-                Button("自动接受编辑") { onApprove?(.acceptEdits) }
+                Button(lang.t("approval.autoAcceptEdits")) { onApprove?(.acceptEdits) }
                     .buttonStyle(IslandWideButtonStyle(kind: .warning))
-                Button("自动批准权限") { onApprove?(.bypassPermissions) }
+                Button(lang.t("approval.autoBypassPermissions")) { onApprove?(.bypassPermissions) }
                     .buttonStyle(IslandWideButtonStyle(kind: .danger))
             }
         }
@@ -1191,6 +1194,7 @@ private struct IslandSessionRow: View {
     private var questionActionBody: some View {
         StructuredQuestionPromptView(
             prompt: session.questionPrompt,
+            lang: lang,
             onAnswer: { onAnswer?($0) }
         )
     }
@@ -1207,7 +1211,7 @@ private struct IslandSessionRow: View {
 
                 Spacer(minLength: 8)
 
-                Text("完成")
+                Text(lang.t("completion.done"))
                     .font(.system(size: 11, weight: .bold))
                     .foregroundStyle(Color(red: 0.29, green: 0.86, blue: 0.46).opacity(0.96))
             }
@@ -1293,7 +1297,7 @@ private struct IslandSessionRow: View {
         let done = tasks.filter { $0.status == .completed }.count
         let prog = tasks.filter { $0.status == .inProgress }.count
         let pend = tasks.filter { $0.status == .pending }.count
-        return "任务 (\(done) 已完成, \(prog) 进行中, \(pend) 待处理)"
+        return lang.t("tasks.summary", done, prog, pend)
     }
 
     @ViewBuilder
@@ -1404,6 +1408,7 @@ private struct IslandSessionRow: View {
 
 private struct StructuredQuestionPromptView: View {
     let prompt: QuestionPrompt?
+    var lang: LanguageManager = .shared
     let onAnswer: (QuestionPromptResponse) -> Void
 
     @State private var selections: [String: Set<String>] = [:]
@@ -1455,7 +1460,7 @@ private struct StructuredQuestionPromptView: View {
                             }
                         }
 
-                        Button("Submit Answers") {
+                        Button(lang.t("question.submit")) {
                             onAnswer(QuestionPromptResponse(answers: answerMap))
                         }
                         .buttonStyle(IslandWideButtonStyle(kind: .primary))
@@ -1482,7 +1487,7 @@ private struct StructuredQuestionPromptView: View {
     }
 
     private var promptTitle: String {
-        prompt?.title.trimmedForNotificationCard ?? "Answer needed"
+        prompt?.title.trimmedForNotificationCard ?? lang.t("question.answerNeeded")
     }
 
     private var showsPromptTitle: Bool {
@@ -1659,20 +1664,20 @@ struct MenuBarContentView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Open Island OSS")
+            Text(model.lang.t("app.name.oss"))
                 .font(.headline)
-            Text("\(model.liveSessionCount) live · \(model.liveAttentionCount) attention")
+            Text(model.lang.t("menu.status", model.liveSessionCount, model.liveAttentionCount))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
             Divider()
 
-            Button("Settings…") {
+            Button(model.lang.t("menu.settings")) {
                 model.showSettings()
             }
 
             #if DEBUG
-            Button("Open Debug Panel") {
+            Button(model.lang.t("menu.openDebug")) {
                 model.showControlCenter()
             }
             #endif
@@ -1686,7 +1691,7 @@ struct MenuBarContentView: View {
 
             Divider()
 
-            Button(model.isOverlayVisible ? "Hide Island Overlay" : "Show Island Overlay") {
+            Button(model.isOverlayVisible ? model.lang.t("menu.hideOverlay") : model.lang.t("menu.showOverlay")) {
                 model.toggleOverlay()
             }
 
@@ -1699,16 +1704,16 @@ struct MenuBarContentView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Refresh Codex Hook Status") {
+            Button(model.lang.t("menu.refreshCodexHooks")) {
                 model.refreshCodexHookStatus()
             }
 
             if model.codexHooksInstalled {
-                Button("Uninstall Codex Hooks") {
+                Button(model.lang.t("menu.uninstallCodexHooks")) {
                     model.uninstallCodexHooks()
                 }
             } else {
-                Button("Install Codex Hooks") {
+                Button(model.lang.t("menu.installCodexHooks")) {
                     model.installCodexHooks()
                 }
                 .disabled(model.hooksBinaryURL == nil)
@@ -1723,16 +1728,16 @@ struct MenuBarContentView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Button("Refresh Claude Hook Status") {
+            Button(model.lang.t("menu.refreshClaudeHooks")) {
                 model.refreshClaudeHookStatus()
             }
 
             if model.claudeHooksInstalled {
-                Button("Uninstall Claude Hooks") {
+                Button(model.lang.t("menu.uninstallClaudeHooks")) {
                     model.uninstallClaudeHooks()
                 }
             } else {
-                Button("Install Claude Hooks") {
+                Button(model.lang.t("menu.installClaudeHooks")) {
                     model.installClaudeHooks()
                 }
                 .disabled(model.hooksBinaryURL == nil)
@@ -1748,13 +1753,13 @@ struct MenuBarContentView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let currentTool = session.spotlightCurrentToolLabel {
-                    Text("Live tool: \(currentTool)")
+                    Text(model.lang.t("menu.liveTool", currentTool))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
 
                 if let trackingLabel = session.spotlightTrackingLabel {
-                    Text("Tracking: \(trackingLabel)")
+                    Text(model.lang.t("menu.tracking", trackingLabel))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }

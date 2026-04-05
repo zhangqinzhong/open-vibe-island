@@ -13,14 +13,14 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
-    var label: String {
+    func label(_ lang: LanguageManager) -> String {
         switch self {
-        case .general:   "通用"
-        case .display:   "显示"
-        case .sound:     "声音"
-        case .shortcuts: "快捷键"
-        case .lab:       "实验室"
-        case .about:     "关于"
+        case .general:   lang.t("settings.tab.general")
+        case .display:   lang.t("settings.tab.display")
+        case .sound:     lang.t("settings.tab.sound")
+        case .shortcuts: lang.t("settings.tab.shortcuts")
+        case .lab:       lang.t("settings.tab.lab")
+        case .about:     lang.t("settings.tab.about")
         }
     }
 
@@ -60,10 +60,10 @@ enum SettingsSection: String, CaseIterable {
     case advanced
     case app
 
-    var header: String {
+    func header(_ lang: LanguageManager) -> String {
         switch self {
-        case .system:   "系统"
-        case .advanced: "高级"
+        case .system:   lang.t("settings.section.system")
+        case .advanced: lang.t("settings.section.advanced")
         case .app:      "Open Island"
         }
     }
@@ -78,6 +78,8 @@ enum SettingsSection: String, CaseIterable {
 struct SettingsView: View {
     var model: AppModel
     @State private var selectedTab: SettingsTab = .general
+
+    private var lang: LanguageManager { model.lang }
 
     var body: some View {
         NavigationSplitView {
@@ -97,10 +99,10 @@ struct SettingsView: View {
     private var sidebar: some View {
         List(selection: $selectedTab) {
             ForEach(SettingsSection.allCases, id: \.self) { section in
-                Section(section.header) {
+                Section(section.header(lang)) {
                     ForEach(section.tabs) { tab in
                         Label {
-                            Text(tab.label)
+                            Text(tab.label(lang))
                         } icon: {
                             Image(systemName: tab.icon)
                                 .foregroundStyle(tab.iconColor)
@@ -125,11 +127,11 @@ struct SettingsView: View {
         case .sound:
             SoundSettingsPane(model: model)
         case .shortcuts:
-            PlaceholderSettingsPane(title: "快捷键", subtitle: "快捷键设置即将推出。")
+            PlaceholderSettingsPane(model: model, titleKey: "settings.tab.shortcuts", subtitleKey: "settings.shortcuts.comingSoon")
         case .lab:
-            PlaceholderSettingsPane(title: "实验室", subtitle: "实验性功能即将推出。")
+            PlaceholderSettingsPane(model: model, titleKey: "settings.tab.lab", subtitleKey: "settings.lab.comingSoon")
         case .about:
-            AboutSettingsPane()
+            AboutSettingsPane(model: model)
         }
     }
 }
@@ -141,29 +143,42 @@ struct GeneralSettingsPane: View {
 
     @State private var launchAtLogin = false
 
+    private var lang: LanguageManager { model.lang }
+
     var body: some View {
         Form {
-            Section("系统") {
-                Toggle("登录时打开", isOn: $launchAtLogin)
+            Section(lang.t("settings.section.system")) {
+                Toggle(lang.t("settings.general.launchAtLogin"), isOn: $launchAtLogin)
 
-                Picker("显示器", selection: Binding(
+                Picker(lang.t("settings.general.monitor"), selection: Binding(
                     get: { model.overlayDisplaySelectionID },
                     set: { model.overlayDisplaySelectionID = $0 }
                 )) {
-                    Text("自动").tag(OverlayDisplayOption.automaticID)
+                    Text(lang.t("settings.general.automatic")).tag(OverlayDisplayOption.automaticID)
                     ForEach(model.overlayDisplayOptions) { option in
                         Text(option.title).tag(option.id)
                     }
                 }
             }
 
-            Section("行为") {
-                Toggle("全屏时隐藏", isOn: .constant(false))
-                Toggle("无活跃会话时自动隐藏", isOn: .constant(false))
-                Toggle("鼠标离开时自动收起", isOn: .constant(true))
+            Section(lang.t("settings.general.language")) {
+                Picker(lang.t("settings.general.language"), selection: Binding(
+                    get: { lang.language },
+                    set: { lang.language = $0 }
+                )) {
+                    Text(lang.t("settings.general.languageSystem")).tag(LanguageManager.AppLanguage.system)
+                    Text(lang.t("settings.general.languageEnglish")).tag(LanguageManager.AppLanguage.en)
+                    Text(lang.t("settings.general.languageChinese")).tag(LanguageManager.AppLanguage.zhHans)
+                }
             }
 
-            Section("CLI Hooks") {
+            Section(lang.t("settings.general.behavior")) {
+                Toggle(lang.t("settings.general.hideFullscreen"), isOn: .constant(false))
+                Toggle(lang.t("settings.general.autoHideNoSessions"), isOn: .constant(false))
+                Toggle(lang.t("settings.general.autoCollapse"), isOn: .constant(true))
+            }
+
+            Section(lang.t("settings.general.cliHooks")) {
                 HStack {
                     Text("Claude Code")
                     Spacer()
@@ -171,11 +186,11 @@ struct GeneralSettingsPane: View {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
-                            Text("已激活")
+                            Text(lang.t("settings.general.activated"))
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        Button("安装") {
+                        Button(lang.t("settings.general.install")) {
                             model.installClaudeHooks()
                         }
                         .disabled(model.hooksBinaryURL == nil)
@@ -189,11 +204,11 @@ struct GeneralSettingsPane: View {
                         HStack(spacing: 4) {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundStyle(.green)
-                            Text("已激活")
+                            Text(lang.t("settings.general.activated"))
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        Button("安装") {
+                        Button(lang.t("settings.general.install")) {
                             model.installCodexHooks()
                         }
                         .disabled(model.hooksBinaryURL == nil)
@@ -202,7 +217,7 @@ struct GeneralSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("通用")
+        .navigationTitle(lang.t("settings.tab.general"))
     }
 }
 
@@ -211,14 +226,16 @@ struct GeneralSettingsPane: View {
 struct DisplaySettingsPane: View {
     var model: AppModel
 
+    private var lang: LanguageManager { model.lang }
+
     var body: some View {
         Form {
-            Section("显示器") {
-                Picker("显示位置", selection: Binding(
+            Section(lang.t("settings.display.monitor")) {
+                Picker(lang.t("settings.display.position"), selection: Binding(
                     get: { model.overlayDisplaySelectionID },
                     set: { model.overlayDisplaySelectionID = $0 }
                 )) {
-                    Text("自动").tag(OverlayDisplayOption.automaticID)
+                    Text(lang.t("settings.general.automatic")).tag(OverlayDisplayOption.automaticID)
                     ForEach(model.overlayDisplayOptions) { option in
                         Text(option.title).tag(option.id)
                     }
@@ -226,14 +243,14 @@ struct DisplaySettingsPane: View {
             }
 
             if let diag = model.overlayPlacementDiagnostics {
-                Section("诊断") {
-                    LabeledContent("当前屏幕", value: diag.targetScreenName)
-                    LabeledContent("布局模式", value: diag.modeDescription)
+                Section(lang.t("settings.display.diagnostics")) {
+                    LabeledContent(lang.t("settings.display.currentScreen"), value: diag.targetScreenName)
+                    LabeledContent(lang.t("settings.display.layoutMode"), value: diag.modeDescription)
                 }
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("显示")
+        .navigationTitle(lang.t("settings.tab.display"))
     }
 }
 
@@ -242,20 +259,22 @@ struct DisplaySettingsPane: View {
 struct SoundSettingsPane: View {
     var model: AppModel
 
+    private var lang: LanguageManager { model.lang }
+
     private var availableSounds: [String] {
         NotificationSoundService.availableSounds()
     }
 
     var body: some View {
         Form {
-            Section("通知音效") {
-                Toggle("静音", isOn: Binding(
+            Section(lang.t("settings.sound.notifications")) {
+                Toggle(lang.t("settings.sound.mute"), isOn: Binding(
                     get: { model.isSoundMuted },
                     set: { _ in model.toggleSoundMuted() }
                 ))
             }
 
-            Section("选择音效") {
+            Section(lang.t("settings.sound.selectSound")) {
                 List(availableSounds, id: \.self) { name in
                     Button {
                         model.selectedSoundName = name
@@ -278,49 +297,56 @@ struct SoundSettingsPane: View {
             }
         }
         .formStyle(.grouped)
-        .navigationTitle("声音")
+        .navigationTitle(lang.t("settings.tab.sound"))
     }
 }
 
 // MARK: - About
 
 struct AboutSettingsPane: View {
+    var model: AppModel
+
+    private var lang: LanguageManager { model.lang }
+
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
             Image(systemName: "island")
                 .font(.system(size: 48))
                 .foregroundStyle(.secondary)
-            Text("Open Island")
+            Text(lang.t("app.name"))
                 .font(.title.bold())
-            Text("macOS companion for AI coding agents")
+            Text(lang.t("app.description"))
                 .foregroundStyle(.secondary)
             if let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String {
-                Text("Version \(version)")
+                Text(lang.t("settings.about.version", version))
                     .font(.caption)
                     .foregroundStyle(.tertiary)
             }
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .navigationTitle("关于")
+        .navigationTitle(lang.t("settings.tab.about"))
     }
 }
 
 // MARK: - Placeholder
 
 struct PlaceholderSettingsPane: View {
-    let title: String
-    let subtitle: String
+    var model: AppModel
+    let titleKey: String
+    let subtitleKey: String
+
+    private var lang: LanguageManager { model.lang }
 
     var body: some View {
         VStack(spacing: 12) {
             Spacer()
-            Text(subtitle)
+            Text(lang.t(subtitleKey))
                 .foregroundStyle(.secondary)
             Spacer()
         }
         .frame(maxWidth: .infinity)
-        .navigationTitle(title)
+        .navigationTitle(lang.t(titleKey))
     }
 }
