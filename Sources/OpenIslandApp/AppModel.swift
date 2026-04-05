@@ -155,6 +155,9 @@ final class AppModel {
     private let terminalSessionAttachmentProbe = TerminalSessionAttachmentProbe()
 
     @ObservationIgnored
+    private let terminalJumpTargetResolver = TerminalJumpTargetResolver()
+
+    @ObservationIgnored
     var harnessRuntimeMonitor: HarnessRuntimeMonitor?
 
     @ObservationIgnored
@@ -1889,6 +1892,21 @@ final class AppModel {
                 let newVisible = session.isVisibleInIsland
                 if oldVisible != newVisible {
                     print("[Phase1 Δ] session=\(session.id.prefix(12)) old=\(oldVisible) new=\(newVisible) phase=\(session.phase) processAlive=\(session.isProcessAlive) notSeenCount=\(session.processNotSeenCount)")
+                }
+            }
+        }
+
+        // Phase 2: resolve jump targets via the new focused resolver (parallel with old probe).
+        let resolverJumpTargets = terminalJumpTargetResolver.resolveJumpTargets(
+            for: state.sessions.filter(\.isTrackedLiveSession),
+            activeProcesses: activeProcesses
+        )
+        if !resolverJumpTargets.isEmpty {
+            // Phase 2 diagnostic: compare with old probe's jump targets.
+            for (sessionID, newTarget) in resolverJumpTargets {
+                let oldTarget = jumpTargetUpdates[sessionID]
+                if oldTarget != newTarget {
+                    print("[Phase2 Δ] session=\(sessionID.prefix(12)) jumpTarget old=\(String(describing: oldTarget?.terminalSessionID)) new=\(String(describing: newTarget.terminalSessionID))")
                 }
             }
         }
