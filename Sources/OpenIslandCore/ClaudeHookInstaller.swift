@@ -143,7 +143,7 @@ public enum ClaudeHookInstaller {
         return ClaudeHookFileMutation(
             contents: contents,
             changed: mutated || contents != existingData,
-            managedHooksPresent: false,
+            managedHooksPresent: mutated,
             hasClaudeIslandHooks: containsClaudeIslandHook(in: hooksObject)
         )
     }

@@ -61,7 +61,7 @@ public final class ClaudeHookInstallationManager: @unchecked Sendable {
             settingsURL: settingsURL,
             manifestURL: manifestURL,
             hooksBinaryURL: resolvedHooksBinaryURL,
-            managedHooksPresent: uninstallMutation.changed,
+            managedHooksPresent: uninstallMutation.managedHooksPresent,
             hasClaudeIslandHooks: uninstallMutation.hasClaudeIslandHooks,
             manifest: manifest
         )
