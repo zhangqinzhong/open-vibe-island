@@ -1881,34 +1881,19 @@ final class AppModel {
         let aliveIDs = sessionIDsWithAliveProcesses(activeProcesses: activeProcesses)
         let livenessChanges = state.markProcessLiveness(aliveSessionIDs: aliveIDs)
 
-        // Phase 1 diagnostic: log discrepancies between old and new visibility models.
-        if !livenessChanges.isEmpty {
-            for sessionID in livenessChanges {
-                guard let session = state.sessions.first(where: { $0.id == sessionID }) else { continue }
-                let oldVisible = session.isAttachedToTerminal
-                let newVisible = session.isVisibleInIsland
-                if oldVisible != newVisible {
-                    print("[Phase1 Δ] session=\(session.id.prefix(12)) old=\(oldVisible) new=\(newVisible) phase=\(session.phase) processAlive=\(session.isProcessAlive) notSeenCount=\(session.processNotSeenCount)")
-                }
-            }
-        }
-
-        // Phase 2: resolve jump targets via the new focused resolver (parallel with old probe).
+        // Resolve jump targets via the new focused resolver.
         let resolverJumpTargets = terminalJumpTargetResolver.resolveJumpTargets(
             for: state.sessions.filter(\.isTrackedLiveSession),
             activeProcesses: activeProcesses
         )
         if !resolverJumpTargets.isEmpty {
-            // Phase 2 diagnostic: compare with old probe's jump targets.
-            for (sessionID, newTarget) in resolverJumpTargets {
-                let oldTarget = jumpTargetUpdates[sessionID]
-                if oldTarget != newTarget {
-                    print("[Phase2 Δ] session=\(sessionID.prefix(12)) jumpTarget old=\(String(describing: oldTarget?.terminalSessionID)) new=\(String(describing: newTarget.terminalSessionID))")
-                }
-            }
+            _ = state.reconcileJumpTargets(resolverJumpTargets)
         }
 
-        guard sanitizedSessionsChanged || syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged else {
+        // Phase 4: remove sessions that are no longer visible.
+        let removedInvisible = state.removeInvisibleSessions()
+
+        guard sanitizedSessionsChanged || syntheticSessionsChanged || attachmentsChanged || jumpTargetsChanged || removedInvisible else {
             if resolutionReport.isAuthoritative {
                 isResolvingInitialLiveSessions = false
             }
