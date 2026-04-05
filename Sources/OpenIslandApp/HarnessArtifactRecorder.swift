@@ -281,14 +281,10 @@ enum HarnessArtifactRecorder {
 
     private static func surfaceDescription(_ surface: IslandSurface) -> String {
         switch surface {
-        case .sessionList:
+        case .sessionList(actionableSessionID: nil):
             "sessionList"
-        case let .approvalCard(sessionID):
-            "approvalCard:\(sessionID)"
-        case let .questionCard(sessionID):
-            "questionCard:\(sessionID)"
-        case let .completionCard(sessionID):
-            "completionCard:\(sessionID)"
+        case let .sessionList(actionableSessionID: sessionID?):
+            "sessionList:actionable(\(sessionID))"
         }
     }
 

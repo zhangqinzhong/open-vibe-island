@@ -195,7 +195,7 @@ struct AppModelSessionListTests {
         }
         model.notchStatus = .opened
         model.notchOpenReason = .click
-        model.islandSurface = .sessionList
+        model.islandSurface = .sessionList()
 
         let session = AgentSession(
             id: "live-session",
@@ -219,7 +219,7 @@ struct AppModelSessionListTests {
 
         #expect(model.notchStatus == .closed)
         #expect(model.notchOpenReason == nil)
-        #expect(model.islandSurface == .sessionList)
+        #expect(model.islandSurface == .sessionList())
 
         let expected = "Focused the matching Ghostty terminal."
         for _ in 0..<20 {
@@ -340,7 +340,7 @@ struct AppModelSessionListTests {
 
         #expect(model.notchStatus == .closed)
         #expect(model.notchOpenReason == nil)
-        #expect(model.islandSurface == .sessionList)
+        #expect(model.islandSurface == .sessionList())
     }
 
     @Test
@@ -348,7 +348,7 @@ struct AppModelSessionListTests {
         let model = AppModel()
         model.notchStatus = .opened
         model.notchOpenReason = .hover
-        model.islandSurface = .sessionList
+        model.islandSurface = .sessionList()
 
         #expect(model.shouldAutoCollapseOnMouseLeave)
 
@@ -356,7 +356,7 @@ struct AppModelSessionListTests {
 
         #expect(model.notchStatus == .closed)
         #expect(model.notchOpenReason == nil)
-        #expect(model.islandSurface == .sessionList)
+        #expect(model.islandSurface == .sessionList())
     }
 
     @Test
@@ -364,7 +364,7 @@ struct AppModelSessionListTests {
         let model = AppModel()
         model.notchStatus = .opened
         model.notchOpenReason = .click
-        model.islandSurface = .sessionList
+        model.islandSurface = .sessionList()
 
         #expect(!model.shouldAutoCollapseOnMouseLeave)
 
@@ -373,15 +373,34 @@ struct AppModelSessionListTests {
 
         #expect(model.notchStatus == .opened)
         #expect(model.notchOpenReason == .click)
-        #expect(model.islandSurface == .sessionList)
+        #expect(model.islandSurface == .sessionList())
     }
 
     @Test
     func completionNotificationRequiresSurfaceEntryBeforePointerExitCollapse() {
         let model = AppModel()
+        // Add a completed session so autoDismissesWhenPresentedAsNotification can check phase
+        model.applyTrackedEvent(
+            .sessionStarted(SessionStarted(
+                sessionID: "session-1",
+                title: "Test",
+                tool: .codex,
+                summary: "Done",
+                timestamp: .now
+            )),
+            updateLastActionMessage: false
+        )
+        model.applyTrackedEvent(
+            .sessionCompleted(SessionCompleted(
+                sessionID: "session-1",
+                summary: "Done",
+                timestamp: .now
+            )),
+            updateLastActionMessage: false
+        )
         model.notchStatus = .opened
         model.notchOpenReason = .notification
-        model.islandSurface = .completionCard(sessionID: "session-1")
+        model.islandSurface = .sessionList(actionableSessionID: "session-1")
 
         #expect(model.shouldAutoCollapseOnMouseLeave)
 
