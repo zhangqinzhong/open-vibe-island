@@ -417,13 +417,15 @@ struct IslandPanelView: View {
         model.notchOpenReason == .notification && actionableSessionID != nil
     }
 
-    private static let maxSessionListHeight: CGFloat = 480
+    private static let maxSessionListHeight: CGFloat = 560
 
     private var sessionList: some View {
         TimelineView(.periodic(from: .now, by: 30)) { context in
-            ScrollView(.vertical, showsIndicators: true) {
+            ScrollView(.vertical) {
                 sessionListContent(context: context)
             }
+            .scrollIndicators(.automatic, axes: .vertical)
+            .scrollContentBackground(.hidden)
             .frame(maxHeight: Self.maxSessionListHeight)
             .padding(.vertical, 2)
         }
@@ -432,23 +434,21 @@ struct IslandPanelView: View {
     @ViewBuilder
     private func sessionListContent(context: TimelineViewDefaultContext) -> some View {
         VStack(spacing: 6) {
-            if isNotificationMode {
-                if let session = model.activeIslandCardSession {
-                    IslandSessionRow(
-                        session: session,
-                        referenceDate: context.date,
-                        isActionable: true,
-                        useDrawingGroup: model.notchStatus == .opened,
-                        isInteractive: model.notchStatus == .opened,
-                        onApprove: { model.approvePermission(for: session.id, mode: $0) },
-                        onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
-                        onJump: { model.jumpToSession(session) }
-                    )
-                }
+            if isNotificationMode, let session = model.activeIslandCardSession {
+                IslandSessionRow(
+                    session: session,
+                    referenceDate: context.date,
+                    isActionable: true,
+                    useDrawingGroup: model.notchStatus == .opened,
+                    isInteractive: model.notchStatus == .opened,
+                    onApprove: { model.approvePermission(for: session.id, mode: $0) },
+                    onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
+                    onJump: { model.jumpToSession(session) }
+                )
 
                 if model.allSessions.count > 1 {
                     Button {
-                        let isCompletion = model.activeIslandCardSession?.phase == .completed
+                        let isCompletion = session.phase == .completed
                         model.expandNotificationToSessionList(clearExpansion: isCompletion)
                     } label: {
                         Text("显示全部 \(model.allSessions.count) 个会话")
