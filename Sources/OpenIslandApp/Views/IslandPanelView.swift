@@ -217,8 +217,8 @@ struct IslandPanelView: View {
         .padding(.horizontal, panelShadowHorizontalInset)
         .padding(.bottom, panelShadowBottomInset)
         .animation(isOpened ? openAnimation : closeAnimation, value: model.notchStatus)
-        .animation(.smooth, value: closedPresenceAnimationKey)
-        .animation(popAnimation, value: isPopping)
+        .animation(isOpened ? nil : .smooth, value: closedPresenceAnimationKey)
+        .animation(isOpened ? nil : popAnimation, value: isPopping)
         .contentShape(Rectangle())
         .onHover { hovering in
             withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
