@@ -8,6 +8,8 @@ struct ControlCenterView: View {
     @State private var previewModel = AppModel()
     @State private var previewSnapshot = IslandDebugScenario.approvalCard.snapshot()
 
+    private var lang: LanguageManager { model.lang }
+
     var body: some View {
         HStack(spacing: 28) {
             controlColumn
@@ -29,18 +31,18 @@ struct ControlCenterView: View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 18) {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Open Island Debug")
+                    Text(lang.t("debug.title"))
                         .font(.system(size: 30, weight: .bold))
                         .foregroundStyle(.white)
 
-                    Text("Mock-driven notch surface harness for validating session list, approval, question, and completion cards.")
+                    Text(lang.t("debug.description"))
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.68))
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("Scenarios")
+                    Text(lang.t("debug.scenarios"))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.58))
 
@@ -65,12 +67,12 @@ struct ControlCenterView: View {
                     }
                 } actions: {
                     HStack(spacing: 10) {
-                        Button("Refresh") {
+                        Button(lang.t("debug.refresh")) {
                             model.refreshClaudeHookStatus()
                         }
                         .buttonStyle(DebugActionButtonStyle(kind: .secondary))
 
-                        Button(model.claudeHooksInstalled ? "Remove Hooks" : "Install Hooks") {
+                        Button(model.claudeHooksInstalled ? lang.t("debug.removeHooks") : lang.t("debug.installHooks")) {
                             if model.claudeHooksInstalled {
                                 model.uninstallClaudeHooks()
                             } else {
@@ -100,12 +102,12 @@ struct ControlCenterView: View {
                     }
                 } actions: {
                     HStack(spacing: 10) {
-                        Button("Refresh") {
+                        Button(lang.t("debug.refresh")) {
                             model.refreshClaudeUsageState()
                         }
                         .buttonStyle(DebugActionButtonStyle(kind: .secondary))
 
-                        Button(model.claudeUsageInstalled ? "Remove Bridge" : "Install Bridge") {
+                        Button(model.claudeUsageInstalled ? lang.t("debug.removeBridge") : lang.t("debug.installBridge")) {
                             if model.claudeUsageInstalled {
                                 model.uninstallClaudeUsageBridge()
                             } else {
@@ -144,7 +146,7 @@ struct ControlCenterView: View {
                     }
                 } actions: {
                     HStack(spacing: 10) {
-                        Button("Refresh") {
+                        Button(lang.t("debug.refresh")) {
                             model.refreshCodexUsageState()
                         }
                         .buttonStyle(DebugActionButtonStyle(kind: .secondary))
@@ -218,22 +220,22 @@ struct ControlCenterView: View {
 
     private var actionCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Actions")
+            Text(lang.t("debug.actions"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.58))
 
-            Text("The inline preview is isolated. Use the button below if you want the real top-of-screen island to mirror the current mock.")
+            Text(lang.t("debug.actionsDescription"))
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(.white.opacity(0.5))
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 10) {
-                Button("Mirror To Island") {
+                Button(lang.t("debug.mirrorToIsland")) {
                     model.loadDebugSnapshot(previewSnapshot, presentOverlay: true, autoCollapseNotificationCards: false)
                 }
                 .buttonStyle(DebugActionButtonStyle(kind: .primary))
 
-                Button("Close Island") {
+                Button(lang.t("debug.closeIsland")) {
                     model.notchClose()
                 }
                 .buttonStyle(DebugActionButtonStyle(kind: .secondary))
@@ -246,7 +248,7 @@ struct ControlCenterView: View {
 
     private var transcriptCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Current Mock")
+            Text(lang.t("debug.currentMock"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.58))
 
@@ -272,14 +274,14 @@ struct ControlCenterView: View {
 
     private var liveOverlayCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Live Overlay")
+            Text(lang.t("debug.liveOverlay"))
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.58))
 
-            debugMetricRow(label: "Visible", value: model.isOverlayVisible ? "Yes" : "No")
-            debugMetricRow(label: "Surface", value: liveSurfaceTitle)
-            debugMetricRow(label: "Sessions", value: "\(model.sessions.count)")
-            debugMetricRow(label: "Message", value: model.lastActionMessage)
+            debugMetricRow(label: lang.t("debug.visible"), value: model.isOverlayVisible ? lang.t("debug.yes") : lang.t("debug.no"))
+            debugMetricRow(label: lang.t("debug.surface"), value: liveSurfaceTitle)
+            debugMetricRow(label: lang.t("debug.sessions"), value: "\(model.sessions.count)")
+            debugMetricRow(label: lang.t("debug.message"), value: model.lastActionMessage)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -290,10 +292,10 @@ struct ControlCenterView: View {
         VStack(alignment: .leading, spacing: 18) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Inline Preview")
+                    Text(lang.t("debug.inlinePreview"))
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(.white)
-                    Text("This preview is stable and ignores live bridge activity.")
+                    Text(lang.t("debug.previewDescription"))
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(.white.opacity(0.48))
                 }
@@ -358,9 +360,9 @@ struct ControlCenterView: View {
     private var liveSurfaceTitle: String {
         switch model.islandSurface {
         case .sessionList(actionableSessionID: nil):
-            "Session List"
+            lang.t("debug.sessionList")
         case .sessionList(actionableSessionID: .some):
-            "Session List (Actionable)"
+            lang.t("debug.sessionListActionable")
         }
     }
 

@@ -20,6 +20,8 @@ final class AppModel {
         let isComplete: Bool
     }
 
+    let lang = LanguageManager.shared
+
     var state = SessionState() {
         didSet {
             _cachedSessionBuckets = nil
