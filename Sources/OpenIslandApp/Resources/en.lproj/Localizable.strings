@@ -56,6 +56,9 @@
 /* Settings - About */
 "settings.about.version" = "Version %@";
 
+/* Settings - Update */
+"settings.update.available" = "v%@ Available";
+
 /* Island Panel - Bootstrap */
 "island.checkingTerminals" = "Checking open terminal sessions";
 "island.terminalOwnership" = "Open Island will show live agents after terminal ownership is confirmed";

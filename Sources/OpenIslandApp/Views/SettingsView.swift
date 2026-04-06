@@ -119,19 +119,27 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch selectedTab {
-        case .general:
-            GeneralSettingsPane(model: model)
-        case .display:
-            DisplaySettingsPane(model: model)
-        case .sound:
-            SoundSettingsPane(model: model)
-        case .shortcuts:
-            PlaceholderSettingsPane(model: model, titleKey: "settings.tab.shortcuts", subtitleKey: "settings.shortcuts.comingSoon")
-        case .lab:
-            PlaceholderSettingsPane(model: model, titleKey: "settings.tab.lab", subtitleKey: "settings.lab.comingSoon")
-        case .about:
-            AboutSettingsPane(model: model)
+        ZStack(alignment: .topTrailing) {
+            switch selectedTab {
+            case .general:
+                GeneralSettingsPane(model: model)
+            case .display:
+                DisplaySettingsPane(model: model)
+            case .sound:
+                SoundSettingsPane(model: model)
+            case .shortcuts:
+                PlaceholderSettingsPane(model: model, titleKey: "settings.tab.shortcuts", subtitleKey: "settings.shortcuts.comingSoon")
+            case .lab:
+                PlaceholderSettingsPane(model: model, titleKey: "settings.tab.lab", subtitleKey: "settings.lab.comingSoon")
+            case .about:
+                AboutSettingsPane(model: model)
+            }
+
+            if model.updateChecker.hasUpdate, let version = model.updateChecker.latestVersion {
+                UpdateBanner(version: version, lang: lang)
+                    .padding(.top, 8)
+                    .padding(.trailing, 16)
+            }
         }
     }
 }
@@ -380,5 +388,34 @@ struct PlaceholderSettingsPane: View {
         }
         .frame(maxWidth: .infinity)
         .navigationTitle(lang.t(titleKey))
+    }
+}
+
+// MARK: - Update Banner
+
+struct UpdateBanner: View {
+    let version: String
+    let lang: LanguageManager
+
+    var body: some View {
+        Link(destination: UpdateChecker.releasesURL) {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 13, weight: .semibold))
+                Text(lang.t("settings.update.available", version))
+                    .font(.system(size: 12, weight: .medium))
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 10, weight: .bold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(
+                Capsule()
+                    .fill(Color.blue)
+            )
+        }
+        .buttonStyle(.plain)
+        .shadow(color: .blue.opacity(0.3), radius: 4, y: 2)
     }
 }

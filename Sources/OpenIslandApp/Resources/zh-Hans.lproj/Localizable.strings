@@ -56,6 +56,9 @@
 /* Settings - About */
 "settings.about.version" = "版本 %@";
 
+/* Settings - Update */
+"settings.update.available" = "v%@ 可更新";
+
 /* Island Panel - Bootstrap */
 "island.checkingTerminals" = "正在检查打开的终端会话";
 "island.terminalOwnership" = "Open Island 将在确认终端归属后显示实时代理";

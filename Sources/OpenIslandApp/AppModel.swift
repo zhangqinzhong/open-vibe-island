@@ -34,6 +34,7 @@ final class AppModel {
     let overlay = OverlayUICoordinator()
     let discovery = SessionDiscoveryCoordinator()
     let monitoring = ProcessMonitoringCoordinator()
+    let updateChecker = UpdateChecker()
 
     var notchStatus: NotchStatus {
         get { overlay.notchStatus }
@@ -391,6 +392,7 @@ final class AppModel {
             hooks.startClaudeUsageMonitoringIfNeeded()
             hooks.refreshCodexUsageState()
             hooks.startCodexUsageMonitoringIfNeeded()
+            updateChecker.checkIfNeeded()
         } else {
             isResolvingInitialLiveSessions = false
         }
