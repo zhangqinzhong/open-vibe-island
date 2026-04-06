@@ -23,6 +23,10 @@ run_step() {
             echo "==> test"
             swift test
             ;;
+        lint)
+            echo "==> lint"
+            zsh "$repo_root/scripts/lint-strings.sh"
+            ;;
         build)
             echo "==> build"
             swift build
@@ -36,6 +40,7 @@ run_step() {
             zsh "$repo_root/scripts/smoke-all-scenarios.sh"
             ;;
         ci)
+            run_step lint
             run_step docs
             run_step test
             run_step build
