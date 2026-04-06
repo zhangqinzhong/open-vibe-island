@@ -197,6 +197,8 @@ final class ProcessMonitoringCoordinator {
             payload.sessionID
         case let .claudeSessionMetadataUpdated(payload):
             payload.sessionID
+        case let .openCodeSessionMetadataUpdated(payload):
+            payload.sessionID
         case let .actionableStateResolved(payload):
             payload.sessionID
         }
@@ -257,6 +259,16 @@ final class ProcessMonitoringCoordinator {
             ) else { continue }
             aliveIDs.insert(matched.id)
             claimedSessionIDs.insert(matched.id)
+        }
+
+        // OpenCode sessions: the JS plugin runs inside the OpenCode process.
+        // We can't match by session ID (plugin doesn't expose it to ps), so
+        // keep all OpenCode sessions alive as long as any OpenCode process exists.
+        let hasOpenCodeProcess = activeProcesses.contains { $0.tool == .openCode }
+        if hasOpenCodeProcess {
+            for session in sessions where session.tool == .openCode && !session.isDemoSession {
+                aliveIDs.insert(session.id)
+            }
         }
 
         // Synthetic sessions: always alive if the process exists.
@@ -686,6 +698,8 @@ final class ProcessMonitoringCoordinator {
             return "Claude \(session.id.prefix(8))"
         case .geminiCLI:
             return "Gemini \(session.id.prefix(8))"
+        case .openCode:
+            return "OpenCode \(session.id.prefix(8))"
         }
     }
 }
