@@ -90,6 +90,21 @@ struct ActiveAgentProcessDiscovery {
                 }
 
                 snapshots.append(snapshot)
+                continue
+            }
+
+            if isOpenCodeProcess(command: process.command) {
+                let claimKey = "opencode:\(process.pid)"
+                guard claimedKeys.insert(claimKey).inserted else {
+                    continue
+                }
+
+                snapshots.append(ProcessSnapshot(
+                    tool: .openCode,
+                    sessionID: nil,
+                    workingDirectory: nil,
+                    terminalTTY: process.terminalTTY
+                ))
             }
         }
 
@@ -387,6 +402,12 @@ struct ActiveAgentProcessDiscovery {
         return firstToken == "codex"
             || firstToken.hasSuffix("/codex")
             || lowered.contains("/codex/codex")
+    }
+
+    private func isOpenCodeProcess(command: String) -> Bool {
+        let lowered = command.lowercased()
+        return lowered.contains("/opencode-ai/") || lowered.contains("/opencode")
+            || lowered.contains("/.opencode")
     }
 
     private func isClaudeProcess(command: String) -> Bool {
