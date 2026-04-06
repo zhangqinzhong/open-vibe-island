@@ -56,8 +56,8 @@ This app may install hooks for Claude Code or Codex, so you may see hook-related
 |---|---|---|
 | **Claude Code** | Supported | Hook integration, JSONL session discovery, status line bridge, usage tracking |
 | **Codex** | Supported | Full hook integration (SessionStart, UserPromptSubmit, Stop), usage tracking |
-| **Cursor** | Planned | — |
-| **Windsurf** | Planned | — |
+| **OpenCode** | Planned | — |
+| **Gemini CLI** | Planned | — |
 
 #### Supported Terminals
 
@@ -84,7 +84,7 @@ This app may install hooks for Claude Code or Codex, so you may see hook-related
 | Session discovery | Supported | Auto-discover from local transcripts, persist across launches |
 | Process discovery | Supported | Match active agents via `ps`/`lsof` |
 | DMG packaging | Supported | Signing, notarization, GitHub Actions release workflow |
-| Auto-update | Planned | — |
+| Auto-update | Supported | Sparkle-based automatic updates with appcast |
 
 ## Community
 
@@ -126,6 +126,22 @@ Repository: Octane0411/open-vibe-island
 ```
 
 </details>
+
+### Star History
+
+<a href="https://star-history.com/#Octane0411/open-vibe-island&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
+ </picture>
+</a>
+
+### Contributors
+
+<a href="https://github.com/Octane0411/open-vibe-island/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island" />
+</a>
 
 ---
 

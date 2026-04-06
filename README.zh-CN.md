@@ -82,7 +82,7 @@
 | askUserQuestion通知 | 已支持 | 已支持claude code |
 | 通知音效 | 已支持 | 可配置系统音效、静音切换 |
 | 国际化 | 已支持 | English、简体中文 |
-| 自动更新 | 规划中 | — |
+| 自动更新 | 已支持 | 基于 Sparkle 的自动更新，支持 appcast |
 
 ## 社区
 
@@ -125,6 +125,22 @@
 ```
 
 </details>
+
+### Star History
+
+<a href="https://star-history.com/#Octane0411/open-vibe-island&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=Octane0411/open-vibe-island&type=Date" />
+ </picture>
+</a>
+
+### Contributors
+
+<a href="https://github.com/Octane0411/open-vibe-island/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island" />
+</a>
 
 ## 路线图
 
