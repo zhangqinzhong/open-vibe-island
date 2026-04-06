@@ -83,7 +83,9 @@ final class SessionDiscoveryCoordinator {
             claudeRecordsNeedPrune: claudeRecords != allClaude,
             discoveredCodexRecords: discoveredCodex,
             discoveredClaudeSessions: discoveredClaude,
-            hooksBinaryURL: HooksBinaryLocator.locate()
+            hooksBinaryURL: HooksBinaryLocator.locate(
+                executableDirectory: Bundle.main.executableURL?.deletingLastPathComponent()
+            )
         )
     }
 
