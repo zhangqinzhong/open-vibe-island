@@ -261,6 +261,14 @@ struct ActiveAgentProcessDiscovery {
             return "iTerm"
         }
 
+        if lowered.contains("/kaku.app/contents/macos/kaku-gui") || lowered.hasSuffix("/kaku-gui") {
+            return "Kaku"
+        }
+
+        if lowered.contains("/wezterm.app/contents/macos/wezterm-gui") || lowered.hasSuffix("/wezterm-gui") {
+            return "WezTerm"
+        }
+
         return nil
     }
 
