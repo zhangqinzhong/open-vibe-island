@@ -54,11 +54,11 @@ else
     echo "WARNING: Sparkle.framework not found at $sparkle_framework — run 'swift package resolve' first." >&2
 fi
 
-# Copy SPM resource bundle into Contents/Resources/ so Bundle.module can find it
-# and codesign does not complain about unsealed contents in the bundle root.
+# Copy SPM resource bundle to .app root — SPM's generated Bundle.module accessor
+# searches Bundle.main.bundleURL (the .app root), NOT Contents/Resources/.
 spm_resource_bundle="$build_bin_dir/OpenIsland_OpenIslandApp.bundle"
 if [[ -d "$spm_resource_bundle" ]]; then
-    cp -R "$spm_resource_bundle" "$bundle_dir/Contents/Resources/"
+    cp -R "$spm_resource_bundle" "$bundle_dir/"
 else
     echo "WARNING: SPM resource bundle not found at $spm_resource_bundle — app may crash on launch." >&2
 fi
@@ -121,7 +121,7 @@ for required in \
     "Contents/Helpers/OpenIslandHooks" \
     "Contents/Helpers/OpenIslandSetup" \
     "Contents/Resources/OpenIsland.icns" \
-    "Contents/Resources/OpenIsland_OpenIslandApp.bundle" \
+    "OpenIsland_OpenIslandApp.bundle" \
 ; do
     if [[ ! -e "$bundle_dir/$required" ]]; then
         echo "ERROR: missing required file: $required" >&2
@@ -134,6 +134,35 @@ if [[ $verify_errors -gt 0 ]]; then
     exit 1
 fi
 echo "Bundle structure verified."
+
+# --- Smoke-test the app outside the repo to catch Bundle.module fallback hacks ---
+# SPM's generated resource accessor has a hardcoded fallback to the local .build/
+# directory. Running from /tmp ensures the app works without that crutch.
+smoke_dir="$(mktemp -d)/smoke-test"
+mkdir -p "$smoke_dir"
+cp -R "$bundle_dir" "$smoke_dir/"
+smoke_app="$smoke_dir/$(basename "$bundle_dir")"
+smoke_binary="$smoke_app/Contents/MacOS/OpenIslandApp"
+if [[ -x "$smoke_binary" ]]; then
+    # Launch and give it a few seconds — if it crashes, the pid disappears.
+    "$smoke_binary" &
+    smoke_pid=$!
+    sleep 3
+    if kill -0 "$smoke_pid" 2>/dev/null; then
+        kill "$smoke_pid" 2>/dev/null || true
+        wait "$smoke_pid" 2>/dev/null || true
+        echo "Smoke test passed — app launched successfully outside repo."
+    else
+        wait "$smoke_pid" 2>/dev/null || true
+        echo "ERROR: app crashed when launched outside the repo directory." >&2
+        echo "       This likely means Bundle.module cannot find its resource bundle." >&2
+        rm -rf "$(dirname "$smoke_dir")"
+        exit 1
+    fi
+    rm -rf "$(dirname "$smoke_dir")"
+else
+    echo "WARNING: smoke test skipped — binary not found at $smoke_binary" >&2
+fi
 
 if [[ -n "$signing_identity" ]]; then
     codesign \
