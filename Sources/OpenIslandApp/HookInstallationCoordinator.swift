@@ -584,16 +584,16 @@ final class HookInstallationCoordinator {
     }
 
     private func loadBundledOpenCodePlugin() -> Data? {
-        guard let url = Bundle.main.url(forResource: "open-island-opencode", withExtension: "js") else {
-            // Fallback: look relative to executable for development builds
-            if let execDir = Bundle.main.executableURL?.deletingLastPathComponent() {
-                let devPath = execDir
-                    .deletingLastPathComponent()
-                    .appendingPathComponent("Sources/OpenIslandApp/Resources/open-island-opencode.js")
-                return try? Data(contentsOf: devPath)
-            }
-            return nil
+        // SPM resource bundles use Bundle.module
+        if let url = Bundle.module.url(forResource: "open-island-opencode", withExtension: "js") {
+            return try? Data(contentsOf: url)
         }
-        return try? Data(contentsOf: url)
+
+        // Fallback: Bundle.main for Xcode builds
+        if let url = Bundle.main.url(forResource: "open-island-opencode", withExtension: "js") {
+            return try? Data(contentsOf: url)
+        }
+
+        return nil
     }
 }
