@@ -189,8 +189,6 @@ struct GeneralSettingsPane: View {
             }
 
             Section(lang.t("settings.general.behavior")) {
-                Toggle(lang.t("settings.general.hideFullscreen"), isOn: .constant(false))
-                Toggle(lang.t("settings.general.autoHideNoSessions"), isOn: .constant(false))
                 Toggle(lang.t("settings.general.autoCollapse"), isOn: .constant(true))
                 Toggle(lang.t("settings.general.showDockIcon"), isOn: Binding(
                     get: { model.showDockIcon },
