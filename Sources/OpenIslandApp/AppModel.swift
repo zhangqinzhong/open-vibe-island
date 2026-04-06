@@ -117,6 +117,15 @@ final class AppModel {
             guard showDockIcon != oldValue else { return }
             UserDefaults.standard.set(showDockIcon, forKey: Self.showDockIconDefaultsKey)
             NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
+            if !showDockIcon {
+                // macOS does not immediately refresh the Dock when switching to
+                // .accessory at runtime. Briefly activating another app forces
+                // the Dock to drop the icon.
+                NSApp.hide(nil)
+                DispatchQueue.main.async {
+                    NSApp.unhide(nil)
+                }
+            }
         }
     }
     var isSoundMuted = false {
