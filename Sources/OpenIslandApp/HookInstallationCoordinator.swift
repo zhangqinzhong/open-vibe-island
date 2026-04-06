@@ -7,12 +7,14 @@ import OpenIslandCore
 final class HookInstallationCoordinator {
     var codexHookStatus: CodexHookInstallationStatus?
     var claudeHookStatus: ClaudeHookInstallationStatus?
+    var openCodePluginStatus: OpenCodePluginInstallationStatus?
     var claudeStatusLineStatus: ClaudeStatusLineInstallationStatus?
     var claudeUsageSnapshot: ClaudeUsageSnapshot?
     var codexUsageSnapshot: CodexUsageSnapshot?
     var hooksBinaryURL: URL?
     var isCodexSetupBusy = false
     var isClaudeHookSetupBusy = false
+    var isOpenCodeSetupBusy = false
     var isClaudeUsageSetupBusy = false
 
     @ObservationIgnored
@@ -23,6 +25,9 @@ final class HookInstallationCoordinator {
 
     @ObservationIgnored
     private let claudeHookInstallationManager = ClaudeHookInstallationManager()
+
+    @ObservationIgnored
+    private let openCodePluginInstallationManager = OpenCodePluginInstallationManager()
 
     @ObservationIgnored
     private let claudeStatusLineInstallationManager = ClaudeStatusLineInstallationManager()
@@ -48,6 +53,10 @@ final class HookInstallationCoordinator {
 
     var claudeHooksInstalled: Bool {
         claudeHookStatus?.managedHooksPresent == true
+    }
+
+    var openCodePluginInstalled: Bool {
+        openCodePluginStatus?.isInstalled == true
     }
 
     var claudeUsageInstalled: Bool {
@@ -186,6 +195,30 @@ final class HookInstallationCoordinator {
         return components.isEmpty ? nil : components.joined(separator: " · ")
     }
 
+    var openCodePluginStatusTitle: String {
+        if openCodePluginInstalled {
+            return "OpenCode plugin installed"
+        }
+
+        return "OpenCode plugin not installed"
+    }
+
+    var openCodePluginStatusSummary: String {
+        guard let status = openCodePluginStatus else {
+            return "Reading ~/.config/opencode state."
+        }
+
+        if status.isInstalled {
+            return "managed plugin present in \(status.pluginsDirectory.path)"
+        }
+
+        if status.pluginFilePresent && !status.pluginRegistered {
+            return "plugin file present but not registered in config.json"
+        }
+
+        return "no managed OpenCode plugin"
+    }
+
     var codexHookStatusTitle: String {
         if codexHooksInstalled {
             return "Codex hooks installed"
@@ -268,6 +301,19 @@ final class HookInstallationCoordinator {
         }
     }
 
+    func refreshOpenCodePluginStatus() {
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let status = try self.openCodePluginInstallationManager.status()
+                self.openCodePluginStatus = status
+            } catch {
+                self.onStatusMessage?("Failed to read OpenCode plugin status: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func refreshClaudeUsageState() {
         let manager = claudeStatusLineInstallationManager
         Task { [weak self] in
@@ -343,6 +389,53 @@ final class HookInstallationCoordinator {
     func uninstallClaudeHooks() {
         updateClaudeHooks(userMessage: "Removing Claude hooks.") { manager in
             try manager.uninstall()
+        }
+    }
+
+    func installOpenCodePlugin() {
+        guard let pluginData = loadBundledOpenCodePlugin() else {
+            onStatusMessage?("Could not find the bundled OpenCode plugin resource.")
+            return
+        }
+
+        isOpenCodeSetupBusy = true
+        onStatusMessage?("Installing OpenCode plugin.")
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            defer { self.isOpenCodeSetupBusy = false }
+
+            do {
+                let status = try self.openCodePluginInstallationManager.install(pluginSourceData: pluginData)
+                self.openCodePluginStatus = status
+                if status.isInstalled {
+                    self.onStatusMessage?("OpenCode plugin is installed. Restart OpenCode to activate.")
+                } else {
+                    self.onStatusMessage?("OpenCode plugin installation incomplete.")
+                }
+            } catch {
+                self.onStatusMessage?("OpenCode plugin install failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func uninstallOpenCodePlugin() {
+        isOpenCodeSetupBusy = true
+        onStatusMessage?("Removing OpenCode plugin.")
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            defer { self.isOpenCodeSetupBusy = false }
+
+            do {
+                let status = try self.openCodePluginInstallationManager.uninstall()
+                self.openCodePluginStatus = status
+                self.onStatusMessage?("OpenCode plugin removed.")
+            } catch {
+                self.onStatusMessage?("OpenCode plugin removal failed: \(error.localizedDescription)")
+            }
         }
     }
 
@@ -488,5 +581,19 @@ final class HookInstallationCoordinator {
                 self.onStatusMessage?("Claude usage bridge update failed: \(error.localizedDescription)")
             }
         }
+    }
+
+    private func loadBundledOpenCodePlugin() -> Data? {
+        guard let url = Bundle.main.url(forResource: "open-island-opencode", withExtension: "js") else {
+            // Fallback: look relative to executable for development builds
+            if let execDir = Bundle.main.executableURL?.deletingLastPathComponent() {
+                let devPath = execDir
+                    .deletingLastPathComponent()
+                    .appendingPathComponent("Sources/OpenIslandApp/Resources/open-island-opencode.js")
+                return try? Data(contentsOf: devPath)
+            }
+            return nil
+        }
+        return try? Data(contentsOf: url)
     }
 }

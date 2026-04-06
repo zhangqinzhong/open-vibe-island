@@ -61,6 +61,7 @@ final class AppModel {
     var hooksBinaryURL: URL? { hooks.hooksBinaryURL }
     var codexHooksInstalled: Bool { hooks.codexHooksInstalled }
     var claudeHooksInstalled: Bool { hooks.claudeHooksInstalled }
+    var openCodePluginInstalled: Bool { hooks.openCodePluginInstalled }
     var claudeUsageInstalled: Bool { hooks.claudeUsageInstalled }
     var claudeHookStatusTitle: String { hooks.claudeHookStatusTitle }
     var claudeHookStatusSummary: String { hooks.claudeHookStatusSummary }
@@ -70,16 +71,23 @@ final class AppModel {
     var codexUsageStatusTitle: String { hooks.codexUsageStatusTitle }
     var codexUsageStatusSummary: String { hooks.codexUsageStatusSummary }
     var codexUsageSummaryText: String? { hooks.codexUsageSummaryText }
+    var openCodePluginStatus: OpenCodePluginInstallationStatus? { hooks.openCodePluginStatus }
+    var isOpenCodeSetupBusy: Bool { hooks.isOpenCodeSetupBusy }
+    var openCodePluginStatusTitle: String { hooks.openCodePluginStatusTitle }
+    var openCodePluginStatusSummary: String { hooks.openCodePluginStatusSummary }
     var codexHookStatusTitle: String { hooks.codexHookStatusTitle }
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
     func refreshCodexHookStatus() { hooks.refreshCodexHookStatus() }
     func refreshClaudeHookStatus() { hooks.refreshClaudeHookStatus() }
+    func refreshOpenCodePluginStatus() { hooks.refreshOpenCodePluginStatus() }
     func refreshClaudeUsageState() { hooks.refreshClaudeUsageState() }
     func refreshCodexUsageState() { hooks.refreshCodexUsageState() }
     func installCodexHooks() { hooks.installCodexHooks() }
     func uninstallCodexHooks() { hooks.uninstallCodexHooks() }
     func installClaudeHooks() { hooks.installClaudeHooks() }
     func uninstallClaudeHooks() { hooks.uninstallClaudeHooks() }
+    func installOpenCodePlugin() { hooks.installOpenCodePlugin() }
+    func uninstallOpenCodePlugin() { hooks.uninstallOpenCodePlugin() }
     func installClaudeUsageBridge() { hooks.installClaudeUsageBridge() }
     func uninstallClaudeUsageBridge() { hooks.uninstallClaudeUsageBridge() }
     var isBridgeReady = false
@@ -397,6 +405,7 @@ final class AppModel {
             // These are already async or lightweight — safe to start immediately.
             hooks.refreshCodexHookStatus()
             hooks.refreshClaudeHookStatus()
+            hooks.refreshOpenCodePluginStatus()
             hooks.refreshClaudeUsageState()
             hooks.startClaudeUsageMonitoringIfNeeded()
             hooks.refreshCodexUsageState()
@@ -805,6 +814,7 @@ final class AppModel {
                 guard let self else { return }
                 if !self.claudeHooksInstalled { self.installClaudeHooks() }
                 if !self.codexHooksInstalled { self.installCodexHooks() }
+                if !self.openCodePluginInstalled { self.installOpenCodePlugin() }
                 if !self.claudeUsageInstalled { self.installClaudeUsageBridge() }
             }
         }
