@@ -70,6 +70,7 @@ public struct SessionState: Equatable, Sendable {
                 claudeMetadata: payload.claudeMetadata?.isEmpty == true ? nil : payload.claudeMetadata,
                 openCodeMetadata: payload.openCodeMetadata?.isEmpty == true ? nil : payload.openCodeMetadata
             )
+            session.isRemote = payload.isRemote
             session.isProcessAlive = true
             session.processNotSeenCount = 0
             upsert(session)
@@ -298,6 +299,12 @@ public struct SessionState: Equatable, Sendable {
         var changed: Set<String> = []
 
         for (id, var session) in sessionsByID {
+            // Remote sessions have no local process — keep them alive as long
+            // as the bridge is delivering hook events.
+            if session.isRemote {
+                continue
+            }
+
             let wasAlive = session.isProcessAlive
 
             if aliveSessionIDs.contains(id) {
