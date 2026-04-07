@@ -28,6 +28,12 @@ struct WatchCompletionEvent: Codable, Sendable {
     var summary: String
 }
 
+/// Sent by macOS when an actionable request has been resolved (e.g. user acted on Mac).
+struct WatchResolvedEvent: Codable, Sendable {
+    var requestID: String
+    var sessionID: String
+}
+
 // MARK: - Pairing
 
 struct WatchPairRequest: Codable, Sendable {
@@ -60,12 +66,26 @@ struct WatchEvent: Identifiable {
     let kind: Kind
     let agentTool: String
     let sessionID: String
+    /// Whether this event has been resolved (user acted on it or Mac resolved it).
+    var isResolved: Bool = false
 
     enum Kind {
         case permissionRequested(title: String, summary: String, requestID: String,
                                  primaryAction: String, secondaryAction: String)
         case questionAsked(title: String, options: [String], requestID: String)
         case sessionCompleted(summary: String)
+    }
+
+    /// The requestID associated with actionable events (permission/question), nil for completion.
+    var requestID: String? {
+        switch kind {
+        case let .permissionRequested(_, _, requestID, _, _):
+            return requestID
+        case let .questionAsked(_, _, requestID):
+            return requestID
+        case .sessionCompleted:
+            return nil
+        }
     }
 
     var title: String {

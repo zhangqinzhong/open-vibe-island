@@ -157,6 +157,32 @@ final class NotificationManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Notification Cleanup
+
+    /// Remove a delivered notification after the user acted on it or it was resolved remotely.
+    func removeNotification(forRequestID requestID: String) {
+        let identifiers = [
+            "permission-\(requestID)",
+            "question-\(requestID)",
+        ]
+        center.removeDeliveredNotifications(withIdentifiers: identifiers)
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+        Self.logger.info("Removed notifications for requestID \(requestID)")
+    }
+
+    /// Remove the dynamically registered question category after it's been resolved.
+    func removeQuestionCategory(forRequestID requestID: String) {
+        let categoryID = "\(Self.questionCategoryPrefix)\(requestID)"
+        center.getNotificationCategories { [weak self] existing in
+            guard let self else { return }
+            let filtered = existing.filter { $0.identifier != categoryID }
+            if filtered.count < existing.count {
+                self.center.setNotificationCategories(filtered)
+                Self.logger.info("Removed dynamic category \(categoryID)")
+            }
+        }
+    }
+
     func sendCompletionNotification(_ event: WatchCompletionEvent) {
         guard isAuthorized else { return }
 
@@ -238,10 +264,15 @@ extension NotificationManager: UNUserNotificationCenterDelegate {
             }
         }
 
-        // Post resolution back to Mac (Step 4 will wire this up fully)
         NotificationManager.logger.info("Notification action: \(actionID) → \(action) for request \(requestID)")
 
-        // Notify ConnectionManager to post resolution
+        // Clean up the notification and dynamic category after user acted
+        await MainActor.run {
+            removeNotification(forRequestID: requestID)
+            removeQuestionCategory(forRequestID: requestID)
+        }
+
+        // Notify ConnectionManager to post resolution and mark event as resolved
         await MainActor.run {
             NotificationActionRelay.shared.pendingResolution = (requestID: requestID, action: action)
         }

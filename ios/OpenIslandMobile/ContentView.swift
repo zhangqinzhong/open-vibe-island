@@ -93,14 +93,25 @@ struct ContentView: View {
     @ViewBuilder
     private func eventRow(_ event: WatchEvent) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: event.iconName)
-                .foregroundStyle(event.iconColor)
+            Image(systemName: event.isResolved ? "checkmark.circle.fill" : event.iconName)
+                .foregroundStyle(event.isResolved ? .green : event.iconColor)
                 .frame(width: 24)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(event.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                HStack(spacing: 6) {
+                    Text(event.title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+
+                    if event.isResolved {
+                        Text("已处理")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .background(.green.opacity(0.1), in: Capsule())
+                    }
+                }
 
                 if let subtitle = event.subtitle {
                     Text(subtitle)
@@ -117,5 +128,6 @@ struct ContentView: View {
                 .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 6)
+        .opacity(event.isResolved ? 0.7 : 1.0)
     }
 }

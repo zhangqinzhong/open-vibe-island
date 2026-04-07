@@ -89,6 +89,7 @@ final class ConnectionManager: ObservableObject {
                 guard !Task.isCancelled, let resolution else { continue }
                 do {
                     try await self?.postResolution(requestID: resolution.requestID, action: resolution.action)
+                    self?.markEventResolved(requestID: resolution.requestID)
                 } catch {
                     Self.logger.error("Failed to post resolution from notification: \(error.localizedDescription)")
                 }
@@ -223,6 +224,13 @@ final class ConnectionManager: ObservableObject {
                 event = nil
             }
 
+        case "actionableStateResolved":
+            if let e = try? decoder.decode(WatchResolvedEvent.self, from: data) {
+                handleRemoteResolution(e)
+                Self.logger.info("Remote resolution for request \(e.requestID)")
+            }
+            event = nil
+
         default:
             Self.logger.debug("Unknown SSE event type: \(eventType)")
             event = nil
@@ -241,6 +249,23 @@ final class ConnectionManager: ObservableObject {
         state = .paired
         Self.logger.info("SSE disconnected, will attempt reconnect")
         scheduleReconnect()
+    }
+
+    // MARK: - Resolution Handling
+
+    /// Called when Mac reports that an actionable request was resolved (e.g. user acted on Mac).
+    /// Clears the corresponding notification and marks the event as resolved in the UI.
+    private func handleRemoteResolution(_ event: WatchResolvedEvent) {
+        notificationManager?.removeNotification(forRequestID: event.requestID)
+        notificationManager?.removeQuestionCategory(forRequestID: event.requestID)
+        markEventResolved(requestID: event.requestID)
+    }
+
+    /// Marks a recent event as resolved by requestID.
+    func markEventResolved(requestID: String) {
+        if let index = recentEvents.firstIndex(where: { $0.requestID == requestID }) {
+            recentEvents[index].isResolved = true
+        }
     }
 
     // MARK: - Reconnection
