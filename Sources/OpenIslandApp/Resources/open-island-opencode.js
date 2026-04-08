@@ -99,6 +99,11 @@ function terminalFields() {
   } else if (env.CMUX_WORKSPACE_ID || env.CMUX_SOCKET_PATH) {
     result.terminal_app = "cmux";
     if (env.CMUX_SURFACE_ID) result.terminal_session_id = env.CMUX_SURFACE_ID;
+  } else if (env.ZELLIJ != null) {
+    result.terminal_app = "Zellij";
+    const paneID = env.ZELLIJ_PANE_ID || "";
+    const sessionName = env.ZELLIJ_SESSION_NAME || "";
+    if (paneID) result.terminal_session_id = `${paneID}:${sessionName}`;
   } else if (env.GHOSTTY_RESOURCES_DIR || (env.TERM_PROGRAM || "").toLowerCase().includes("ghostty")) {
     result.terminal_app = "Ghostty";
   } else if (env.TERM_PROGRAM === "Apple_Terminal") {
