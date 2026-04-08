@@ -232,7 +232,9 @@ final class SessionDiscoveryCoordinator {
             lastAssistantMessage: discovered.lastAssistantMessage ?? existing.lastAssistantMessage,
             currentTool: discovered.currentTool ?? existing.currentTool,
             currentToolInputPreview: discovered.currentToolInputPreview ?? existing.currentToolInputPreview,
-            currentCommandPreview: discovered.currentCommandPreview ?? existing.currentCommandPreview
+            currentCommandPreview: discovered.currentCommandPreview ?? existing.currentCommandPreview,
+            model: discovered.model ?? existing.model,
+            transcriptPath: discovered.transcriptPath ?? existing.transcriptPath
         )
         return merged.isEmpty ? nil : merged
     }

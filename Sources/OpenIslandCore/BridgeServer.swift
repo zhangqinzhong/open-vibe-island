@@ -1266,17 +1266,31 @@ public final class BridgeServer: @unchecked Sendable {
     }
 
     private func synchronizeCursorMetadata(for payload: CursorHookPayload) {
-        let newMetadata = payload.defaultCursorMetadata
-        guard let existing = localState.session(id: payload.sessionID)?.cursorMetadata,
-              existing != newMetadata else {
-            return
-        }
+        let existing = localState.session(id: payload.sessionID)?.cursorMetadata
+        let update = payload.defaultCursorMetadata
+        let clearToolState = payload.hookEventName == .stop
+
+        let merged = CursorSessionMetadata(
+            conversationId: update.conversationId ?? existing?.conversationId,
+            generationId: update.generationId ?? existing?.generationId,
+            workspaceRoots: update.workspaceRoots ?? existing?.workspaceRoots,
+            initialUserPrompt: existing?.initialUserPrompt ?? update.initialUserPrompt,
+            lastUserPrompt: update.lastUserPrompt ?? existing?.lastUserPrompt,
+            lastAssistantMessage: update.lastAssistantMessage ?? existing?.lastAssistantMessage,
+            currentTool: clearToolState ? nil : (update.currentTool ?? existing?.currentTool),
+            currentToolInputPreview: clearToolState ? nil : (update.currentToolInputPreview ?? existing?.currentToolInputPreview),
+            currentCommandPreview: clearToolState ? nil : (update.currentCommandPreview ?? existing?.currentCommandPreview),
+            model: update.model ?? existing?.model,
+            transcriptPath: update.transcriptPath ?? existing?.transcriptPath
+        )
+
+        guard existing != merged else { return }
 
         emit(
             .cursorSessionMetadataUpdated(
                 CursorSessionMetadataUpdated(
                     sessionID: payload.sessionID,
-                    cursorMetadata: newMetadata,
+                    cursorMetadata: merged,
                     timestamp: .now
                 )
             )

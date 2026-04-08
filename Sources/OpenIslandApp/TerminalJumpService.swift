@@ -117,6 +117,10 @@ struct TerminalJumpService {
                     return "Focused the matching \(descriptor.displayName) pane."
                 }
             case "com.todesktop.230313mzl4w4u92":
+                if appIsRunning {
+                    try openAction(["-b", descriptor.bundleIdentifier])
+                    return "Activated Cursor."
+                }
                 if let workingDirectory = target.workingDirectory,
                    jumpToCursorWorkspace(workingDirectory) {
                     return "Focused the matching Cursor workspace."

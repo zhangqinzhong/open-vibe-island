@@ -194,5 +194,7 @@ struct CursorHooksTests {
         #expect(payload.permissionRequestSummary == "npm run build")
         #expect(payload.defaultJumpTarget.terminalApp == "Cursor")
         #expect(payload.defaultJumpTarget.workingDirectory == "/Users/test/my-project")
+        #expect(payload.defaultCursorMetadata.initialUserPrompt == nil)
+        #expect(payload.defaultCursorMetadata.lastUserPrompt == nil)
     }
 }
