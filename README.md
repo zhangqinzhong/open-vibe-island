@@ -24,6 +24,39 @@
 
 ---
 
+## 📰 News
+
+> Open Island is evolving fast — here's what's new.
+
+- **2026-04-08** 🎨 **v1.0.7** — Animation polish & docs overhaul. Smoother overlay transitions, contributing guide split, updated architecture docs. (#185 #186 #187)
+
+- **2026-04-08** ✅ **v1.0.6** — Approval UI & performance. Dynamic approval buttons, approval state fixes, UI performance improvements. (#170 #177 #179)
+
+- **2026-04-08** 🔌 **v1.0.5** — Hook health check & multi-agent support. Added **Qoder**, **Factory**, **CodeBuddy** (Claude Code forks). Auto-update via Sparkle. (#163 #165 #166)
+
+- **2026-04-08** 🖥️ **v1.0.3** — Intel Mac support & UX polish. Badge width fix, reduced animation delay, dock icon default. (#145 #146 #147)
+
+- **2026-04-08** 🔐 **v1.0.0** — First signed & notarized release. Apple code signing, notarization, and DMG packaging via GitHub Actions.
+
+<details>
+<summary>Earlier news (Apr 5–7)</summary>
+
+- **2026-04-07** 🌐 **v0.2.1** — SSH remote support.
+
+- **2026-04-07** 🔏 **v0.2.0** — Code signing infrastructure.
+
+- **2026-04-06** 🧩 **v0.1.9** — **OpenCode** plugin integration & **iTerm2** jump-back support. (#105 #107 #108)
+
+- **2026-04-06** 🖱️ **v0.1.8** — Dock icon toggle. (#111)
+
+- **2026-04-06** 🔄 **v0.1.6** — Sparkle auto-update framework.
+
+- **2026-04-05** 🚀 **v0.1.1** — First public release with Claude Code & Codex support, Terminal.app & Ghostty integration.
+
+</details>
+
+---
+
 ## Human Parts
 
 This section is written for humans.
