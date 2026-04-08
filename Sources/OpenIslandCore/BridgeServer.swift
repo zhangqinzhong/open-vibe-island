@@ -1111,58 +1111,40 @@ public final class BridgeServer: @unchecked Sendable {
             send(.response(.acknowledged), to: clientID)
 
         case .beforeShellExecution:
+            clearStaleCursorInteractionIfNeeded(for: payload.sessionID)
             ensureCursorSessionExists(for: payload)
             synchronizeCursorJumpTarget(for: payload)
             synchronizeCursorMetadata(for: payload)
-
+            let shellSummary = payload.commandPreview.map { "Running: \($0)" } ?? "Running shell command"
             emit(
-                .permissionRequested(
-                    PermissionRequested(
+                .activityUpdated(
+                    SessionActivityUpdated(
                         sessionID: payload.sessionID,
-                        request: PermissionRequest(
-                            title: payload.permissionRequestTitle,
-                            summary: payload.permissionRequestSummary,
-                            affectedPath: payload.permissionAffectedPath,
-                            primaryActionTitle: "Allow",
-                            secondaryActionTitle: "Deny",
-                            toolName: "shell"
-                        ),
+                        summary: shellSummary,
+                        phase: .running,
                         timestamp: .now
                     )
                 )
             )
-
-            pendingCursorInteractions[payload.sessionID] = PendingCursorInteraction(
-                clientID: clientID,
-                payload: payload
-            )
+            send(.response(.cursorHookDirective(CursorHookDirective(permission: .allow))), to: clientID)
 
         case .beforeMCPExecution:
+            clearStaleCursorInteractionIfNeeded(for: payload.sessionID)
             ensureCursorSessionExists(for: payload)
             synchronizeCursorJumpTarget(for: payload)
             synchronizeCursorMetadata(for: payload)
-
+            let mcpSummary = payload.toolName.map { "Calling \($0)" } ?? "Calling MCP tool"
             emit(
-                .permissionRequested(
-                    PermissionRequested(
+                .activityUpdated(
+                    SessionActivityUpdated(
                         sessionID: payload.sessionID,
-                        request: PermissionRequest(
-                            title: payload.permissionRequestTitle,
-                            summary: payload.permissionRequestSummary,
-                            affectedPath: payload.permissionAffectedPath,
-                            primaryActionTitle: "Allow",
-                            secondaryActionTitle: "Deny",
-                            toolName: payload.toolName
-                        ),
+                        summary: mcpSummary,
+                        phase: .running,
                         timestamp: .now
                     )
                 )
             )
-
-            pendingCursorInteractions[payload.sessionID] = PendingCursorInteraction(
-                clientID: clientID,
-                payload: payload
-            )
+            send(.response(.cursorHookDirective(CursorHookDirective(permission: .allow))), to: clientID)
 
         case .beforeReadFile:
             clearStaleCursorInteractionIfNeeded(for: payload.sessionID)

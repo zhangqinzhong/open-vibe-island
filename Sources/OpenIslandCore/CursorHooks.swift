@@ -43,6 +43,12 @@ public struct CursorHookPayload: Equatable, Codable, Sendable {
     public var status: String?
     public var attachments: [String]?
 
+    // Cursor-specific metadata
+    public var model: String?
+    public var cursorVersion: String?
+    public var transcriptPath: String?
+    public var sandbox: Bool?
+
     private enum CodingKeys: String, CodingKey {
         case hookEventName = "hook_event_name"
         case conversationId = "conversation_id"
@@ -59,6 +65,10 @@ public struct CursorHookPayload: Equatable, Codable, Sendable {
         case content
         case status
         case attachments
+        case model
+        case cursorVersion = "cursor_version"
+        case transcriptPath = "transcript_path"
+        case sandbox
     }
 
     public init(
@@ -76,7 +86,11 @@ public struct CursorHookPayload: Equatable, Codable, Sendable {
         edits: [CursorFileEdit]? = nil,
         content: String? = nil,
         status: String? = nil,
-        attachments: [String]? = nil
+        attachments: [String]? = nil,
+        model: String? = nil,
+        cursorVersion: String? = nil,
+        transcriptPath: String? = nil,
+        sandbox: Bool? = nil
     ) {
         self.hookEventName = hookEventName
         self.conversationId = conversationId
@@ -93,6 +107,10 @@ public struct CursorHookPayload: Equatable, Codable, Sendable {
         self.content = content
         self.status = status
         self.attachments = attachments
+        self.model = model
+        self.cursorVersion = cursorVersion
+        self.transcriptPath = transcriptPath
+        self.sandbox = sandbox
     }
 }
 
@@ -131,6 +149,8 @@ public struct CursorSessionMetadata: Equatable, Codable, Sendable {
     public var currentTool: String?
     public var currentToolInputPreview: String?
     public var currentCommandPreview: String?
+    public var model: String?
+    public var transcriptPath: String?
 
     public init(
         conversationId: String? = nil,
@@ -141,7 +161,9 @@ public struct CursorSessionMetadata: Equatable, Codable, Sendable {
         lastAssistantMessage: String? = nil,
         currentTool: String? = nil,
         currentToolInputPreview: String? = nil,
-        currentCommandPreview: String? = nil
+        currentCommandPreview: String? = nil,
+        model: String? = nil,
+        transcriptPath: String? = nil
     ) {
         self.conversationId = conversationId
         self.generationId = generationId
@@ -152,6 +174,8 @@ public struct CursorSessionMetadata: Equatable, Codable, Sendable {
         self.currentTool = currentTool
         self.currentToolInputPreview = currentToolInputPreview
         self.currentCommandPreview = currentCommandPreview
+        self.model = model
+        self.transcriptPath = transcriptPath
     }
 
     public var isEmpty: Bool {
@@ -164,6 +188,8 @@ public struct CursorSessionMetadata: Equatable, Codable, Sendable {
             && currentTool == nil
             && currentToolInputPreview == nil
             && currentCommandPreview == nil
+            && model == nil
+            && transcriptPath == nil
     }
 }
 
@@ -204,7 +230,9 @@ public extension CursorHookPayload {
             lastUserPrompt: prompt ?? promptPreview,
             currentTool: toolName,
             currentToolInputPreview: toolInputPreview,
-            currentCommandPreview: commandPreview
+            currentCommandPreview: commandPreview,
+            model: model,
+            transcriptPath: transcriptPath
         )
     }
 

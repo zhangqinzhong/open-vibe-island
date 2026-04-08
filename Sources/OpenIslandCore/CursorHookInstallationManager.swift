@@ -58,7 +58,7 @@ public final class CursorHookInstallationManager: @unchecked Sendable {
             hooksURL: hooksURL,
             manifestURL: manifestURL,
             hooksBinaryURL: resolvedBinaryURL,
-            managedHooksPresent: uninstallMutation.changed,
+            managedHooksPresent: uninstallMutation.managedHooksPresent,
             manifest: manifest
         )
     }

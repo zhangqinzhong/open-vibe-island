@@ -133,7 +133,7 @@ struct CursorHooksTests {
         )
 
         #expect(uninstalled.changed == true)
-        #expect(uninstalled.managedHooksPresent == false)
+        #expect(uninstalled.managedHooksPresent == true)
         #expect(uninstalled.contents == nil)
     }
 
