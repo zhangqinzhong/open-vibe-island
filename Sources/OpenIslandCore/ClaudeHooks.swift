@@ -931,13 +931,25 @@ public extension ClaudeHookPayload {
             }
         }
 
+        // For Zellij, encode pane ID and session name so the jump service
+        // can focus the correct pane via the Zellij CLI.
+        if isZellijTerminalApp(payload.terminalApp) {
+            if payload.terminalSessionID == nil {
+                let paneID = environment["ZELLIJ_PANE_ID"] ?? ""
+                let sessionName = environment["ZELLIJ_SESSION_NAME"] ?? ""
+                if !paneID.isEmpty {
+                    payload.terminalSessionID = "\(paneID):\(sessionName)"
+                }
+            }
+        }
+
         if payload.terminalTTY == nil {
             payload.terminalTTY = currentTTYProvider()
         }
 
         let useLocator: Bool
-        if isCmuxTerminalApp(payload.terminalApp) {
-            // cmux session ID comes from CMUX_SURFACE_ID (set above);
+        if isCmuxTerminalApp(payload.terminalApp) || isZellijTerminalApp(payload.terminalApp) {
+            // cmux/Zellij session IDs come from environment variables;
             // no AppleScript locator is available, so skip entirely.
             useLocator = false
         } else if let terminalApp = payload.terminalApp, isGhosttyTerminalApp(terminalApp) {
@@ -977,7 +989,7 @@ public extension ClaudeHookPayload {
     private func shouldUseFocusedTerminalLocator(for terminalApp: String) -> Bool {
         let lower = terminalApp.lowercased()
         return !lower.contains("ghostty") && lower != "cmux"
-            && lower != "kaku" && lower != "wezterm"
+            && lower != "kaku" && lower != "wezterm" && lower != "zellij"
     }
 
     private func isGhosttyTerminalApp(_ terminalApp: String?) -> Bool {
@@ -987,6 +999,10 @@ public extension ClaudeHookPayload {
 
     private func isCmuxTerminalApp(_ terminalApp: String?) -> Bool {
         terminalApp?.lowercased() == "cmux"
+    }
+
+    private func isZellijTerminalApp(_ terminalApp: String?) -> Bool {
+        terminalApp?.lowercased() == "zellij"
     }
 
     private var extractedPathValue: String? {
@@ -1070,6 +1086,12 @@ public extension ClaudeHookPayload {
 
         if environment["CMUX_WORKSPACE_ID"] != nil || environment["CMUX_SOCKET_PATH"] != nil {
             return "cmux"
+        }
+
+        // Zellij runs inside another terminal; detect it before the parent
+        // terminal so we can capture pane context for jump-back.
+        if environment["ZELLIJ"] != nil {
+            return "Zellij"
         }
 
         if environment["GHOSTTY_RESOURCES_DIR"] != nil {
