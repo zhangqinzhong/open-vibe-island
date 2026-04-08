@@ -381,6 +381,9 @@ public final class BridgeServer: @unchecked Sendable {
 
         case let .processOpenCodeHook(payload):
             handleOpenCodeHook(payload, from: clientID)
+
+        case let .processCursorHook(payload):
+            handleCursorHook(payload, from: clientID)
         }
     }
 
@@ -1040,6 +1043,10 @@ public final class BridgeServer: @unchecked Sendable {
             )
             send(.response(.acknowledged), to: clientID)
         }
+    }
+
+    private func handleCursorHook(_: CursorHookPayload, from clientID: UUID) {
+        send(.response(.acknowledged), to: clientID)
     }
 
     private func clearStaleOpenCodeInteractionIfNeeded(for sessionID: String) {
