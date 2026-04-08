@@ -505,7 +505,7 @@ public final class BridgeServer: @unchecked Sendable {
                     SessionStarted(
                         sessionID: payload.sessionID,
                         title: payload.sessionTitle,
-                        tool: .claudeCode,
+                        tool: payload.resolvedAgentTool,
                         origin: .live,
                         initialPhase: .completed,
                         summary: payload.implicitStartSummary,
@@ -1371,7 +1371,7 @@ public final class BridgeServer: @unchecked Sendable {
                 SessionStarted(
                     sessionID: payload.sessionID,
                     title: payload.sessionTitle,
-                    tool: .claudeCode,
+                    tool: payload.resolvedAgentTool,
                     origin: .live,
                     initialPhase: .completed,
                     summary: payload.implicitStartSummary,
