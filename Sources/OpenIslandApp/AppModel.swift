@@ -185,6 +185,7 @@ final class AppModel {
         }
     ) {
         self.terminalJumpAction = terminalJumpAction
+        UserDefaults.standard.register(defaults: [Self.showDockIconDefaultsKey: true])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
         showDockIcon = UserDefaults.standard.bool(forKey: Self.showDockIconDefaultsKey)
