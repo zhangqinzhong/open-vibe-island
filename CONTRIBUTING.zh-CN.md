@@ -1,0 +1,130 @@
+# 为 Open Island 做贡献
+
+<strong>中文</strong> | <a href="CONTRIBUTING.md">English</a>
+
+感谢你对 Open Island 项目的关注与贡献！
+
+---
+
+## Human Parts
+
+*这部分内容是给人类阅读的。*
+
+我们欢迎一切好的想法，只要你有意愿，你可以把任何想法变成这个项目的代码，并被其他人使用。
+
+本项目所有代码均由 AI 产出，因此你也不应该贡献人类产出的代码。
+
+### 如何开始
+
+我们在让 AI 更好迭代这个项目上做了一些功夫。想要开始贡献，你需要在你的 code agent 中输入下面这段话：
+
+```
+帮我阅读这个项目的 CONTRIBUTING.md 并说明我应该如何迭代这个项目，
+然后向我列出你已知的信息，例如发布构建/仓库架构/代码规范/在仓库中的PR规范等等。
+```
+
+### 用你的代理上报 Bug
+
+如果你遇到了问题，把下面的 prompt 复制到你的代理（Claude Code、Codex 等）中，它会自动收集环境信息并帮你创建一个结构清晰的 issue。
+
+<details>
+<summary>点击展开 prompt</summary>
+
+```
+I'm having an issue with Open Island (https://github.com/Octane0411/open-vibe-island).
+
+Please help me file a GitHub issue. Do the following:
+
+1. Collect my environment info:
+   - Run `sw_vers` to get macOS version
+   - Run `swift --version` to get Swift version
+   - Check if Open Island is running: `ps aux | grep -i "open.island\|OpenIslandApp" | grep -v grep`
+   - Get the app version: `defaults read ~/Applications/Open\ Island\ Dev.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null || echo "unknown"`
+   - Check which terminal I'm using
+
+2. Ask me to describe:
+   - What I expected to happen
+   - What actually happened
+   - Steps to reproduce
+
+3. Create the issue on GitHub using `gh issue create` with this format:
+   - Title: concise summary
+   - Body with sections: **Environment**, **Description**, **Steps to Reproduce**, **Expected vs Actual Behavior**
+   - Add label "bug" if applicable
+
+Repository: Octane0411/open-vibe-island
+```
+
+</details>
+
+### 用你的代理提交功能建议
+
+有新想法？让你的代理帮你起草提案。
+
+<details>
+<summary>点击展开 prompt</summary>
+
+```
+I'd like to request a feature for Open Island (https://github.com/Octane0411/open-vibe-island).
+
+Please help me file a GitHub issue. Do the following:
+
+1. Ask me to describe:
+   - What feature I want
+   - Why it would be useful (what problem it solves)
+   - Any ideas on how it should work
+
+2. Create the issue on GitHub using `gh issue create` with this format:
+   - Title: concise summary prefixed with "feat: "
+   - Body with sections: **Feature Description**, **Motivation**, **Proposed Behavior**
+   - Add label "enhancement" if applicable
+
+Repository: Octane0411/open-vibe-island
+```
+
+</details>
+
+---
+
+## Agent Parts
+
+*这部分内容是给 agent 阅读的。*
+
+### 项目简介
+
+Open Island 是一个原生 macOS 应用，作为 AI 编程代理的桌面伴侣。它驻留在刘海/顶栏区域，监控本地代理会话、展示权限请求、回答问题，并提供"跳转回"对应终端上下文的能力。完全本地运行，无需服务端。
+
+**支持的代理**: Codex, Claude Code
+
+**支持的终端**: Terminal.app, Ghostty
+
+### 环境要求
+
+- macOS 14+
+- Swift 6.2+
+- Xcode（用于 app target）
+
+### 构建与测试
+
+```bash
+# 构建项目
+swift build
+
+# 运行测试
+swift test
+
+# 运行应用
+swift run OpenIslandApp
+
+# 构建 Hook 可执行文件（Release）
+swift build -c release --product OpenIslandHooks
+```
+
+也可以在 Xcode 中打开 `Package.swift`，直接构建和运行应用。
+
+### 进一步了解
+
+- [`CLAUDE.md`](CLAUDE.md) — 架构、代码规范、分支规则、提交规范、发版流程。
+- [`docs/architecture.md`](docs/architecture.md) — 系统设计与工程决策。
+- [`docs/product.md`](docs/product.md) — 产品范围与 MVP 边界。
+- [`docs/hooks.md`](docs/hooks.md) — 支持的 Hook 事件、Payload 字段、指令协议。
