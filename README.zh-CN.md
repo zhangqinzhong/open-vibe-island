@@ -13,6 +13,7 @@
 <p align="center">
   <a href="https://github.com/Octane0411/open-vibe-island/releases">下载</a> ·
   <a href="#快速开始">快速开始</a> ·
+  <a href="docs/roadmap.md#路线图">路线图</a> ·
   <a href="#贡献">参与贡献</a>
 </p>
 
@@ -154,7 +155,7 @@
 
 ## 路线图
 
-4.6 发布测试版
+详见 [docs/roadmap.md](docs/roadmap.md#路线图)。
 
 ---
 

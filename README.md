@@ -13,6 +13,7 @@
 <p align="center">
   <a href="https://github.com/Octane0411/open-vibe-island/releases">Releases</a> ·
   <a href="#quick-start">Quick Start</a> ·
+  <a href="docs/roadmap.md">Roadmap</a> ·
   <a href="#contributing">Contributing</a>
 </p>
 
