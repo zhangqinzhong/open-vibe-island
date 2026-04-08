@@ -84,6 +84,12 @@ struct ControlCenterView: View {
                     }
                 }
 
+                ccForkHookCard(title: "Qoder Hooks", installed: model.qoderHooksInstalled, status: model.qoderHookStatus, isBusy: model.isQoderHookSetupBusy, install: model.installQoderHooks, uninstall: model.uninstallQoderHooks)
+
+                ccForkHookCard(title: "Factory Hooks", installed: model.factoryHooksInstalled, status: model.factoryHookStatus, isBusy: model.isFactoryHookSetupBusy, install: model.installFactoryHooks, uninstall: model.uninstallFactoryHooks)
+
+                ccForkHookCard(title: "CodeBuddy Hooks", installed: model.codebuddyHooksInstalled, status: model.codebuddyHookStatus, isBusy: model.isCodebuddyHookSetupBusy, install: model.installCodebuddyHooks, uninstall: model.uninstallCodebuddyHooks)
+
                 usageDebugCard(
                     title: "Claude Usage",
                     statusTitle: model.claudeUsageStatusTitle,
@@ -370,6 +376,55 @@ struct ControlCenterView: View {
         let snapshot = scenario.snapshot()
         previewSnapshot = snapshot
         previewModel.loadDebugSnapshot(snapshot)
+    }
+
+    private func ccForkHookCard(
+        title: String,
+        installed: Bool,
+        status: ClaudeHookInstallationStatus?,
+        isBusy: Bool,
+        install: @escaping () -> Void,
+        uninstall: @escaping () -> Void
+    ) -> some View {
+        usageDebugCard(
+            title: title,
+            statusTitle: installed ? "\(title) installed" : "\(title) not installed",
+            statusSummary: {
+                guard status != nil else {
+                    return "Reading settings.json."
+                }
+                if installed {
+                    return "managed hooks present"
+                }
+                if model.hooksBinaryURL == nil {
+                    return "Build OpenIslandHooks before installing."
+                }
+                return "no managed hooks"
+            }(),
+            isActive: installed,
+            accentColor: installed ? .mint : .blue
+        ) {
+            if let status {
+                metadataRow(title: "settings", value: status.settingsURL.path)
+            }
+        } actions: {
+            HStack(spacing: 10) {
+                Button(lang.t("debug.refresh")) {
+                    model.refreshCCForkHookStatuses()
+                }
+                .buttonStyle(DebugActionButtonStyle(kind: .secondary))
+
+                Button(installed ? lang.t("debug.removeHooks") : lang.t("debug.installHooks")) {
+                    if installed {
+                        uninstall()
+                    } else {
+                        install()
+                    }
+                }
+                .buttonStyle(DebugActionButtonStyle(kind: .primary))
+                .disabled(isBusy || model.hooksBinaryURL == nil)
+            }
+        }
     }
 
     private func usageDebugCard<Content: View, Actions: View>(
