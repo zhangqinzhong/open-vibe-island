@@ -8,6 +8,7 @@ struct OpenIslandHooksCLI {
     private enum HookSource: String {
         case codex
         case claude
+        case cursor
     }
 
     static func main() {
@@ -49,6 +50,23 @@ struct OpenIslandHooksCLI {
 
                 if let output = try ClaudeHookOutputEncoder.standardOutput(for: response) {
                     FileHandle.standardOutput.write(output)
+                }
+            case .cursor:
+                let payload = try decoder.decode(CursorHookPayload.self, from: input)
+
+                let timeout: TimeInterval = payload.isBlockingHook
+                    ? Self.interactiveClaudeHookTimeout
+                    : 45
+
+                guard let response = try? client.send(.processCursorHook(payload), timeout: timeout) else {
+                    return
+                }
+
+                if case let .cursorHookDirective(directive) = response {
+                    let encoder = JSONEncoder()
+                    let output = try encoder.encode(directive)
+                    FileHandle.standardOutput.write(output)
+                    FileHandle.standardOutput.write(Data("\n".utf8))
                 }
             }
         } catch {
