@@ -7,6 +7,9 @@ import OpenIslandCore
 final class HookInstallationCoordinator {
     var codexHookStatus: CodexHookInstallationStatus?
     var claudeHookStatus: ClaudeHookInstallationStatus?
+    var qoderHookStatus: ClaudeHookInstallationStatus?
+    var factoryHookStatus: ClaudeHookInstallationStatus?
+    var codebuddyHookStatus: ClaudeHookInstallationStatus?
     var openCodePluginStatus: OpenCodePluginInstallationStatus?
     var claudeStatusLineStatus: ClaudeStatusLineInstallationStatus?
     var claudeUsageSnapshot: ClaudeUsageSnapshot?
@@ -14,6 +17,9 @@ final class HookInstallationCoordinator {
     var hooksBinaryURL: URL?
     var isCodexSetupBusy = false
     var isClaudeHookSetupBusy = false
+    var isQoderHookSetupBusy = false
+    var isFactoryHookSetupBusy = false
+    var isCodebuddyHookSetupBusy = false
     var isOpenCodeSetupBusy = false
     var isClaudeUsageSetupBusy = false
 
@@ -25,6 +31,24 @@ final class HookInstallationCoordinator {
 
     @ObservationIgnored
     private let claudeHookInstallationManager = ClaudeHookInstallationManager()
+
+    @ObservationIgnored
+    private let qoderHookInstallationManager = ClaudeHookInstallationManager(
+        claudeDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".qoder", isDirectory: true),
+        hookSource: "qoder"
+    )
+
+    @ObservationIgnored
+    private let factoryHookInstallationManager = ClaudeHookInstallationManager(
+        claudeDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".factory", isDirectory: true),
+        hookSource: "factory"
+    )
+
+    @ObservationIgnored
+    private let codebuddyHookInstallationManager = ClaudeHookInstallationManager(
+        claudeDirectory: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codebuddy", isDirectory: true),
+        hookSource: "codebuddy"
+    )
 
     @ObservationIgnored
     private let openCodePluginInstallationManager = OpenCodePluginInstallationManager()
@@ -53,6 +77,18 @@ final class HookInstallationCoordinator {
 
     var claudeHooksInstalled: Bool {
         claudeHookStatus?.managedHooksPresent == true
+    }
+
+    var qoderHooksInstalled: Bool {
+        qoderHookStatus?.managedHooksPresent == true
+    }
+
+    var factoryHooksInstalled: Bool {
+        factoryHookStatus?.managedHooksPresent == true
+    }
+
+    var codebuddyHooksInstalled: Bool {
+        codebuddyHookStatus?.managedHooksPresent == true
     }
 
     var openCodePluginInstalled: Bool {
@@ -301,6 +337,29 @@ final class HookInstallationCoordinator {
         }
     }
 
+    func refreshCCForkHookStatuses() {
+        refreshCCForkHookStatus(manager: qoderHookInstallationManager, name: "Qoder") { [weak self] in self?.qoderHookStatus = $0 }
+        refreshCCForkHookStatus(manager: factoryHookInstallationManager, name: "Factory") { [weak self] in self?.factoryHookStatus = $0 }
+        refreshCCForkHookStatus(manager: codebuddyHookInstallationManager, name: "CodeBuddy") { [weak self] in self?.codebuddyHookStatus = $0 }
+    }
+
+    private func refreshCCForkHookStatus(
+        manager: ClaudeHookInstallationManager,
+        name: String,
+        apply: @MainActor @escaping (ClaudeHookInstallationStatus) -> Void
+    ) {
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let status = try manager.status(hooksBinaryURL: self.hooksBinaryURL)
+                apply(status)
+            } catch {
+                self.onStatusMessage?("Failed to read \(name) hook status: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func refreshOpenCodePluginStatus() {
         Task { [weak self] in
             guard let self else { return }
@@ -389,6 +448,66 @@ final class HookInstallationCoordinator {
     func uninstallClaudeHooks() {
         updateClaudeHooks(userMessage: "Removing Claude hooks.") { manager in
             try manager.uninstall()
+        }
+    }
+
+    func installQoderHooks() {
+        updateCCForkHooks(manager: qoderHookInstallationManager, name: "Qoder", isBusySetter: { [weak self] in self?.isQoderHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.qoderHookStatus = $0 }, install: true)
+    }
+
+    func uninstallQoderHooks() {
+        updateCCForkHooks(manager: qoderHookInstallationManager, name: "Qoder", isBusySetter: { [weak self] in self?.isQoderHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.qoderHookStatus = $0 }, install: false)
+    }
+
+    func installFactoryHooks() {
+        updateCCForkHooks(manager: factoryHookInstallationManager, name: "Factory", isBusySetter: { [weak self] in self?.isFactoryHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.factoryHookStatus = $0 }, install: true)
+    }
+
+    func uninstallFactoryHooks() {
+        updateCCForkHooks(manager: factoryHookInstallationManager, name: "Factory", isBusySetter: { [weak self] in self?.isFactoryHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.factoryHookStatus = $0 }, install: false)
+    }
+
+    func installCodebuddyHooks() {
+        updateCCForkHooks(manager: codebuddyHookInstallationManager, name: "CodeBuddy", isBusySetter: { [weak self] in self?.isCodebuddyHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.codebuddyHookStatus = $0 }, install: true)
+    }
+
+    func uninstallCodebuddyHooks() {
+        updateCCForkHooks(manager: codebuddyHookInstallationManager, name: "CodeBuddy", isBusySetter: { [weak self] in self?.isCodebuddyHookSetupBusy = $0 }, statusSetter: { [weak self] in self?.codebuddyHookStatus = $0 }, install: false)
+    }
+
+    private func updateCCForkHooks(
+        manager: ClaudeHookInstallationManager,
+        name: String,
+        isBusySetter: @MainActor @escaping (Bool) -> Void,
+        statusSetter: @MainActor @escaping (ClaudeHookInstallationStatus) -> Void,
+        install: Bool
+    ) {
+        guard let hooksBinaryURL else {
+            onStatusMessage?("Could not find a local OpenIslandHooks binary. Build the package first.")
+            return
+        }
+
+        isBusySetter(true)
+        onStatusMessage?(install ? "Installing \(name) hooks." : "Removing \(name) hooks.")
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            defer { isBusySetter(false) }
+
+            do {
+                let status = install
+                    ? try manager.install(hooksBinaryURL: hooksBinaryURL)
+                    : try manager.uninstall()
+                statusSetter(status)
+                if status.managedHooksPresent {
+                    self.onStatusMessage?("\(name) hooks are installed and ready.")
+                } else {
+                    self.onStatusMessage?("\(name) hooks are not installed.")
+                }
+            } catch {
+                self.onStatusMessage?("\(name) hook update failed: \(error.localizedDescription)")
+            }
         }
     }
 

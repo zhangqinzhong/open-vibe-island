@@ -61,6 +61,15 @@ final class AppModel {
     var hooksBinaryURL: URL? { hooks.hooksBinaryURL }
     var codexHooksInstalled: Bool { hooks.codexHooksInstalled }
     var claudeHooksInstalled: Bool { hooks.claudeHooksInstalled }
+    var qoderHooksInstalled: Bool { hooks.qoderHooksInstalled }
+    var factoryHooksInstalled: Bool { hooks.factoryHooksInstalled }
+    var codebuddyHooksInstalled: Bool { hooks.codebuddyHooksInstalled }
+    var qoderHookStatus: ClaudeHookInstallationStatus? { hooks.qoderHookStatus }
+    var factoryHookStatus: ClaudeHookInstallationStatus? { hooks.factoryHookStatus }
+    var codebuddyHookStatus: ClaudeHookInstallationStatus? { hooks.codebuddyHookStatus }
+    var isQoderHookSetupBusy: Bool { hooks.isQoderHookSetupBusy }
+    var isFactoryHookSetupBusy: Bool { hooks.isFactoryHookSetupBusy }
+    var isCodebuddyHookSetupBusy: Bool { hooks.isCodebuddyHookSetupBusy }
     var openCodePluginInstalled: Bool { hooks.openCodePluginInstalled }
     var claudeUsageInstalled: Bool { hooks.claudeUsageInstalled }
     var claudeHookStatusTitle: String { hooks.claudeHookStatusTitle }
@@ -86,6 +95,13 @@ final class AppModel {
     func uninstallCodexHooks() { hooks.uninstallCodexHooks() }
     func installClaudeHooks() { hooks.installClaudeHooks() }
     func uninstallClaudeHooks() { hooks.uninstallClaudeHooks() }
+    func installQoderHooks() { hooks.installQoderHooks() }
+    func uninstallQoderHooks() { hooks.uninstallQoderHooks() }
+    func installFactoryHooks() { hooks.installFactoryHooks() }
+    func uninstallFactoryHooks() { hooks.uninstallFactoryHooks() }
+    func installCodebuddyHooks() { hooks.installCodebuddyHooks() }
+    func uninstallCodebuddyHooks() { hooks.uninstallCodebuddyHooks() }
+    func refreshCCForkHookStatuses() { hooks.refreshCCForkHookStatuses() }
     func installOpenCodePlugin() { hooks.installOpenCodePlugin() }
     func uninstallOpenCodePlugin() { hooks.uninstallOpenCodePlugin() }
     func installClaudeUsageBridge() { hooks.installClaudeUsageBridge() }
@@ -419,6 +435,7 @@ final class AppModel {
             // These are already async or lightweight — safe to start immediately.
             hooks.refreshCodexHookStatus()
             hooks.refreshClaudeHookStatus()
+            hooks.refreshCCForkHookStatuses()
             hooks.refreshOpenCodePluginStatus()
             hooks.refreshClaudeUsageState()
             hooks.startClaudeUsageMonitoringIfNeeded()
@@ -828,6 +845,9 @@ final class AppModel {
                 guard let self else { return }
                 if !self.claudeHooksInstalled { self.installClaudeHooks() }
                 if !self.codexHooksInstalled { self.installCodexHooks() }
+                if !self.qoderHooksInstalled { self.installQoderHooks() }
+                if !self.factoryHooksInstalled { self.installFactoryHooks() }
+                if !self.codebuddyHooksInstalled { self.installCodebuddyHooks() }
                 if !self.openCodePluginInstalled { self.installOpenCodePlugin() }
                 if !self.claudeUsageInstalled { self.installClaudeUsageBridge() }
             }
