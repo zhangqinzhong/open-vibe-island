@@ -114,7 +114,7 @@ final class AppModel {
     }
     var showDockIcon: Bool = false {
         didSet {
-            guard showDockIcon != oldValue else { return }
+            guard hasFinishedInit, showDockIcon != oldValue else { return }
             UserDefaults.standard.set(showDockIcon, forKey: Self.showDockIconDefaultsKey)
             NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
             if !showDockIcon {
@@ -152,6 +152,9 @@ final class AppModel {
     }
     @ObservationIgnored
     var openSettingsWindow: (() -> Void)?
+
+    @ObservationIgnored
+    private var hasFinishedInit = false
 
     var ignoresPointerExitDuringHarness = false
     var disablesOverlayEventMonitoringDuringHarness = false
@@ -243,6 +246,7 @@ final class AppModel {
         }
 
         refreshOverlayDisplayConfiguration()
+        hasFinishedInit = true
     }
 
     var sessions: [AgentSession] {
