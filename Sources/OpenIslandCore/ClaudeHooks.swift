@@ -135,6 +135,35 @@ public enum ClaudePermissionUpdate: Equatable, Codable, Sendable {
             try container.encode(directories, forKey: .directories)
         }
     }
+
+    /// Human-readable label for rendering as a button in the approval card.
+    public var displayLabel: String {
+        switch self {
+        case let .addRules(_, rules, behavior):
+            let toolNames = rules.map(\.toolName).joined(separator: ", ")
+            let verb = behavior == .allow ? "Always Allow" : "Always Deny"
+            return toolNames.isEmpty ? verb : "\(verb) \(toolNames)"
+        case let .setMode(_, mode):
+            switch mode {
+            case .acceptEdits:
+                return "Auto-accept Edits"
+            case .bypassPermissions, .dontAsk:
+                return "Bypass Permissions"
+            case .plan:
+                return "Plan Mode"
+            case .default:
+                return "Manual Mode"
+            }
+        case .replaceRules:
+            return "Update Rules"
+        case .removeRules:
+            return "Remove Rules"
+        case .addDirectories:
+            return "Add Directories"
+        case .removeDirectories:
+            return "Remove Directories"
+        }
+    }
 }
 
 public struct ClaudeSubagentInfo: Equatable, Codable, Sendable {

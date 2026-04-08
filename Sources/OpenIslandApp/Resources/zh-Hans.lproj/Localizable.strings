@@ -98,9 +98,9 @@
 "island.usageWaiting" = "等待用量数据";
 
 /* Island Panel - Approval */
-"approval.manual" = "手动审批";
-"approval.autoAcceptEdits" = "自动接受编辑";
-"approval.autoBypassPermissions" = "自动批准权限";
+"approval.deny" = "拒绝";
+"approval.allowOnce" = "允许一次";
+"approval.alwaysAllow" = "始终允许";
 
 /* Island Panel - Subagents & Tasks */
 "subagents.title" = "子代理 (%lld)";
