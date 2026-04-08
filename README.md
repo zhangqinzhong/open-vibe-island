@@ -50,7 +50,7 @@ I do not want to run a closed-source paid app on my own computer just to monitor
 - Download an early build from [GitHub Releases](https://github.com/Octane0411/open-vibe-island/releases), or build from source.
 - Fork this repository and vibe your own version.
 - If you hit a bug or a usage problem, open an issue or report it in the WeChat group — we'll do our best to address it.
-- If you have a good idea, open an issue or discuss it in the WeChat group — we welcome any product suggestions and ideas.
+- If you have a good idea, open an issue or discuss it in the WeChat group, or directly submit a PR with a demo and feature description — we welcome any product suggestions and ideas.
 
 ### Community
 

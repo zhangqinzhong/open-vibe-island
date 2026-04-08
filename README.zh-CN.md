@@ -50,7 +50,7 @@
 - 从 [GitHub Releases](https://github.com/Octane0411/open-vibe-island/releases) 下载早期版本并安装，或从源码构建。
 - Fork 这个仓库，然后 vibe 你自己的版本。
 - 如果你遇到 bug 或使用问题，请优先提 issue，或者在微信群中报告，我们会尽可能的处理。
-- 如果你有好的想法，请优先提issue，或者在微信群中讨论，我们欢迎任何产品建议和想法
+- 如果你有好的想法，请优先提issue，或者在微信群中讨论，也直接发起一个附带demo和功能描述的PR，我们欢迎任何产品建议和想法。
 
 ### 社区
 
