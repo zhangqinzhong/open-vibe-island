@@ -644,6 +644,12 @@ public final class BridgeServer: @unchecked Sendable {
                 )
             }
 
+            // When the Agent tool completes, the corresponding subagent is done.
+            // This serves as a fallback in case SubagentStop was not received.
+            if payload.toolName == "Agent" {
+                removeOldestActiveSubagent(fromSession: payload.sessionID)
+            }
+
             let summary = {
                 if payload.toolName == "AskUserQuestion" {
                     return "Claude captured your answers."
@@ -742,6 +748,9 @@ public final class BridgeServer: @unchecked Sendable {
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
 
+            // Turn is complete — all subagents from this turn must be finished.
+            clearAllActiveSubagents(fromSession: payload.sessionID)
+
             emit(
                 .sessionCompleted(
                     SessionCompleted(
@@ -759,6 +768,9 @@ public final class BridgeServer: @unchecked Sendable {
             ensureClaudeSessionExists(for: payload)
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
+
+            // Turn failed — all subagents from this turn must be finished.
+            clearAllActiveSubagents(fromSession: payload.sessionID)
 
             emit(
                 .sessionCompleted(
@@ -852,6 +864,9 @@ public final class BridgeServer: @unchecked Sendable {
             ensureClaudeSessionExists(for: payload)
             synchronizeClaudeJumpTarget(for: payload)
             synchronizeClaudeMetadata(for: payload)
+
+            // Session is ending — clean up any lingering subagents.
+            clearAllActiveSubagents(fromSession: payload.sessionID)
 
             emit(
                 .sessionCompleted(
@@ -1541,6 +1556,56 @@ public final class BridgeServer: @unchecked Sendable {
         }
 
         metadata.activeSubagents.removeAll { $0.agentID == agentID }
+
+        emit(
+            .claudeSessionMetadataUpdated(
+                ClaudeSessionMetadataUpdated(
+                    sessionID: sessionID,
+                    claudeMetadata: metadata,
+                    timestamp: .now
+                )
+            )
+        )
+    }
+
+    /// Removes the oldest active (not yet completed) subagent from the session.
+    /// Used as a fallback when `postToolUse` for the Agent tool arrives but
+    /// the corresponding `SubagentStop` event was missed.
+    private func removeOldestActiveSubagent(fromSession sessionID: String) {
+        guard var metadata = localState.session(id: sessionID)?.claudeMetadata,
+              !metadata.activeSubagents.isEmpty else {
+            return
+        }
+
+        // Remove the first (oldest) subagent that has no summary (i.e. not yet marked completed).
+        if let idx = metadata.activeSubagents.firstIndex(where: { $0.summary == nil }) {
+            metadata.activeSubagents.remove(at: idx)
+        } else {
+            // All have summaries (already marked completed) — remove the oldest one.
+            metadata.activeSubagents.removeFirst()
+        }
+
+        emit(
+            .claudeSessionMetadataUpdated(
+                ClaudeSessionMetadataUpdated(
+                    sessionID: sessionID,
+                    claudeMetadata: metadata,
+                    timestamp: .now
+                )
+            )
+        )
+    }
+
+    /// Clears all active subagents from the session.
+    /// Called when the session's turn ends (`stop`, `stopFailure`, `sessionEnd`)
+    /// to ensure no stale subagent indicators linger.
+    private func clearAllActiveSubagents(fromSession sessionID: String) {
+        guard var metadata = localState.session(id: sessionID)?.claudeMetadata,
+              !metadata.activeSubagents.isEmpty else {
+            return
+        }
+
+        metadata.activeSubagents.removeAll()
 
         emit(
             .claudeSessionMetadataUpdated(
