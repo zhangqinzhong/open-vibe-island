@@ -1,14 +1,16 @@
 # Roadmap
 
-<a href="#路线图">中文</a> | <strong>English</strong>
+<a href="roadmap.zh-CN.md">中文</a> | <strong>English</strong>
 
 Open Island is community-driven. The best product experiences are created by deep users of each tool. We welcome contributions of all kinds — pick an area below and start vibing.
 
 Think of Open Island as having done the basics: a macOS island shell + code agent communication layer + fundamental features like notifications and terminal jump-back. Everything else can be defined by you.
 
-You can also fork your own version and modify it however you like — but PRing here gives it a chance to reach more people.
+You can also fork your own version and modify it however you like — but PRing here gives it a chance to reach more people (btw, we use the GPL license).
 
-> **How to contribute**: Open an issue describing your idea clearly, then submit a PR. See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
+> **How to contribute**:
+> 1. Describe your idea clearly in an issue, then submit a PR. See [CONTRIBUTING.md](../CONTRIBUTING.md) for details.
+> 2. After any contribution (code or otherwise) gets merged, you can become a maintainer — just reach out to [@Octane0411](https://github.com/Octane0411) (you can usually find me in the WeChat group, or by email).
 
 ## Focus Areas
 
@@ -24,32 +26,3 @@ You can also fork your own version and modify it however you like — but PRing 
 | 8 | **Architecture & Code Quality** | Think the current code is poorly structured? We agree it can always be better. We fully welcome and support architectural opinions, refactoring proposals, or even rewriting modules from scratch. | Open | — |
 
 **Status legend**: `Active` = core team focus · `In Progress` = work started · `Planned` = accepted, not started · `Open` = community-driven, all contributions welcome · `Conditionally Open` = open an issue or start a discussion first
-
----
-
-<h2 id="路线图">路线图</h2>
-
-<strong>中文</strong> | <a href="#roadmap">English</a>
-
-Open Island 由社区驱动。我们相信最好的产品体验会由每个工具的深度用户创造。欢迎任何形式的贡献——选一个你感兴趣的方向，开始 vibe。
-
-你可以认为Open Island做了那些最基础的事：一个mac island的壳子 + code agent通信层 + 基础的功能如通知/终端跳转，其他的一切都可以由你定义
-
-当然你也可以fork自己的版本并任意改造，不过PR到这里有机会让他被更多人使用
-
-> **如何参与**：在 issue 中清晰描述你的想法，然后提交 PR。详见 [CONTRIBUTING.zh-CN.md](../CONTRIBUTING.zh-CN.md)。
-
-## 重点方向
-
-| # | 方向 | 说明 | 状态 | 链接 |
-|---|------|------|------|------|
-| 1 | **Code Agent 集成体验** | 我们目前主要只关注了 Claude Code 和 Codex，希望和社区一起改进体验。对于其他 agent（OpenCode、Gemini CLI 等），我们相信最好的体验会由这些产品的深度用户创造——欢迎社区自由迭代。 | 活跃 | — |
-| 2 | **IDE / 插件跳转** | 支持跳转回 IDE 或 IDE 内 terminal，或集成了 code agent 插件的 app 窗口（Cursor、VSCode、GoLand、Obsidian 等）。 | 已规划 | [#173](https://github.com/Octane0411/open-vibe-island/issues/173), [#183](https://github.com/Octane0411/open-vibe-island/issues/183) |
-| 3 | **更多终端支持** | 为尚未支持的终端 app 添加支持。如果你用的终端还不在列表里，你就是最适合做这件事的人。 | 开放 | — |
-| 4 | **SSH 跳转** | 我们目前只支持了 SSH 内 code agent 的识别和通知，跳转会更麻烦，需要更多的工作。 | 开放 | — |
-| 5 | **交互体验提升** | 更好的 UX、UI、动画、音效设计和整体质感。[Vibe Island](https://vibeisland.app/) 在这方面做得非常出色——我们非常欢迎社区在这个方向上的意见和贡献。 | 开放 | — |
-| 6 | **超越 macOS：Apple Watch、iOS 与新交互形态** | 我们认为 island 本质上是在重塑长程 agent 和人的交互形式，手腕上的控制界面是自然延伸。Watch app 已经在开发中。我们同样对 iOS app 或任何其他形式的人机交互充满兴趣——我们有预感会提前找到未来 agent 产品的交互形式。 | 进行中 | — |
-| 7 | **关于产品形态和功能的任何想法：语音、通知回复等** | 语音输入/输出、通知回复，以及任何其他想法。只要你能在 issue 中清晰描述你的想法，并且愿意花时间把它 vibe 出来，就有机会让所有人用上它。 | 有条件的开放 | — |
-| 8 | **架构与代码质量** | 觉得当前代码写得烂？我们也觉得总有改进空间。我们完全欢迎并支持对架构提出意见、提交重构方案，甚至从头重写某些模块。 | 开放 | — |
-
-**状态说明**：`活跃` = 核心团队重点 · `进行中` = 已开始 · `已规划` = 已接受，未开始 · `开放` = 社区驱动，欢迎所有贡献 · `有条件的开放` = 需要先发起 issue 描述功能或在微信群讨论
