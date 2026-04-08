@@ -271,7 +271,7 @@ struct IslandPanelView: View {
         .scaleEffect(usesOpenedVisualState ? 1 : (isHovering ? IslandChromeMetrics.closedHoverScale : 1), anchor: .top)
         .padding(.horizontal, panelShadowHorizontalInset)
         .padding(.bottom, panelShadowBottomInset)
-        .animation(isOpened ? openAnimation : closeAnimation, value: model.notchStatus)
+        .animation(usesOpenedVisualState ? openAnimation : closeAnimation, value: usesOpenedVisualState)
         .animation(isOpened ? nil : .smooth, value: closedPresenceAnimationKey)
         .animation(isOpened ? nil : popAnimation, value: isPopping)
         .contentShape(Rectangle())

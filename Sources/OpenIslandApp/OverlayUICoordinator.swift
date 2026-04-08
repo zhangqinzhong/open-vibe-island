@@ -57,7 +57,6 @@ final class OverlayUICoordinator {
     @ObservationIgnored
     private var autoCollapseSurfaceHasBeenEntered = false
 
-    @ObservationIgnored
     private(set) var isCloseTransitionPending = false
 
     private var activeIslandCardSession: AgentSession? {
