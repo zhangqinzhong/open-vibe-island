@@ -49,11 +49,17 @@ struct OverlayPanelControllerTests {
     // MARK: - islandClosedHeight
 
     @Test
-    func islandClosedHeightPrefersNotchHeightOverMenuBarReservedArea() {
+    func islandClosedHeightClampsToNotchHeightWhenSmallerThanMenuBar() {
         // Simulates MacBook Air M2: physical notch ≈ 34 pt, menu bar reserved ≈ 37 pt.
-        // The old code returned 37, making the island protrude below the notch.
-        // The fix must return 34 (safeAreaInsetsTop) so the island sits flush.
+        // Must return 34 (the smaller value) so the island sits flush with the notch.
         let height = NSScreen.computeIslandClosedHeight(safeAreaInsetsTop: 34, topStatusBarHeight: 37)
+        #expect(height == 34)
+    }
+
+    @Test
+    func islandClosedHeightClampsToMenuBarHeightWhenSmallerThanNotch() {
+        // Defensive: if menu bar reserved < notch for some future model, don't exceed it.
+        let height = NSScreen.computeIslandClosedHeight(safeAreaInsetsTop: 37, topStatusBarHeight: 34)
         #expect(height == 34)
     }
 
