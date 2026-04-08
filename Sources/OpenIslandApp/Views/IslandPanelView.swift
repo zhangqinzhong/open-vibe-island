@@ -507,7 +507,7 @@ struct IslandPanelView: View {
                     useDrawingGroup: model.notchStatus == .opened,
                     isInteractive: model.notchStatus == .opened,
                     lang: model.lang,
-                    onApprove: { model.approvePermission(for: session.id, mode: $0) },
+                    onApprove: { model.approvePermission(for: session.id, action: $0) },
                     onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                     onJump: { model.jumpToSession(session) }
                 )
@@ -534,7 +534,7 @@ struct IslandPanelView: View {
                         useDrawingGroup: model.notchStatus == .opened,
                         isInteractive: model.notchStatus == .opened,
                         lang: model.lang,
-                        onApprove: { model.approvePermission(for: session.id, mode: $0) },
+                        onApprove: { model.approvePermission(for: session.id, action: $0) },
                         onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
                         onJump: { model.jumpToSession(session) }
                     )
@@ -956,7 +956,7 @@ private struct IslandSessionRow: View {
     var useDrawingGroup: Bool = true
     var isInteractive: Bool = true
     var lang: LanguageManager = .shared
-    var onApprove: ((ClaudePermissionMode?) -> Void)?
+    var onApprove: ((ApprovalAction) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
     let onJump: () -> Void
 
@@ -1199,12 +1199,21 @@ private struct IslandSessionRow: View {
             )
 
             HStack(spacing: 8) {
-                Button(lang.t("approval.manual")) { onApprove?(.default) }
+                Button(lang.t("approval.deny")) { onApprove?(.deny) }
                     .buttonStyle(IslandWideButtonStyle(kind: .secondary))
-                Button(lang.t("approval.autoAcceptEdits")) { onApprove?(.acceptEdits) }
+                Button(lang.t("approval.allowOnce")) { onApprove?(.allowOnce) }
                     .buttonStyle(IslandWideButtonStyle(kind: .warning))
-                Button(lang.t("approval.autoBypassPermissions")) { onApprove?(.bypassPermissions) }
-                    .buttonStyle(IslandWideButtonStyle(kind: .danger))
+
+                let updates = session.permissionRequest?.suggestedUpdates ?? []
+                if updates.isEmpty {
+                    Button(lang.t("approval.alwaysAllow")) { onApprove?(.allowWithUpdates([])) }
+                        .buttonStyle(IslandWideButtonStyle(kind: .danger))
+                } else {
+                    ForEach(Array(updates.enumerated()), id: \.offset) { _, update in
+                        Button(update.displayLabel) { onApprove?(.allowWithUpdates([update])) }
+                            .buttonStyle(IslandWideButtonStyle(kind: .danger))
+                    }
+                }
             }
         }
     }
@@ -1296,17 +1305,6 @@ private struct IslandSessionRow: View {
         return session.permissionRequest?.summary.trimmedForNotificationCard ?? session.summary.trimmedForNotificationCard
     }
 
-    private var allowTitle: String {
-        let title = session.permissionRequest?.primaryActionTitle.trimmedForNotificationCard
-        if title == nil || title == "Allow" {
-            return "Allow Once"
-        }
-        return title ?? "Allow Once"
-    }
-
-    private var denyTitle: String {
-        session.permissionRequest?.secondaryActionTitle.trimmedForNotificationCard ?? "Deny"
-    }
 
     private func subagentElapsed(since start: Date, at now: Date) -> String {
         let seconds = Int(now.timeIntervalSince(start))

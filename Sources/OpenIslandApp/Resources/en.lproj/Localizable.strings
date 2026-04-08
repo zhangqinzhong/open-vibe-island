@@ -98,9 +98,9 @@
 "island.usageWaiting" = "Usage waiting";
 
 /* Island Panel - Approval */
-"approval.manual" = "Manual Approval";
-"approval.autoAcceptEdits" = "Auto-accept Edits";
-"approval.autoBypassPermissions" = "Auto-bypass Permissions";
+"approval.deny" = "Deny";
+"approval.allowOnce" = "Allow Once";
+"approval.alwaysAllow" = "Always Allow";
 
 /* Island Panel - Subagents & Tasks */
 "subagents.title" = "Subagents (%lld)";

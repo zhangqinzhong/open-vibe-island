@@ -269,6 +269,13 @@ public struct QuestionPromptResponse: Equatable, Codable, Sendable {
     }
 }
 
+/// User-facing approval action shown in the island notification card.
+public enum ApprovalAction: Sendable {
+    case deny
+    case allowOnce
+    case allowWithUpdates([ClaudePermissionUpdate])
+}
+
 public enum PermissionResolution: Equatable, Codable, Sendable {
     case allowOnce(updatedInput: ClaudeHookJSONValue? = nil, updatedPermissions: [ClaudePermissionUpdate] = [])
     case deny(message: String? = nil, interrupt: Bool = false)

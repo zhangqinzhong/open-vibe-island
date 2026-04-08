@@ -733,32 +733,30 @@ final class AppModel {
         )
     }
 
-    func approvePermission(for sessionID: String, mode: ClaudePermissionMode?) {
+    func approvePermission(for sessionID: String, action: ApprovalAction) {
         guard let session = state.session(id: sessionID) else {
             return
         }
 
-        let resolution = permissionResolution(for: mode)
+        let resolution: PermissionResolution
+        let message: String
+
+        switch action {
+        case .deny:
+            resolution = .deny(message: "Permission denied in Open Island.", interrupt: false)
+            message = "Denying permission for \(session.title)."
+        case .allowOnce:
+            resolution = .allowOnce()
+            message = "Approving permission for \(session.title)."
+        case let .allowWithUpdates(updates):
+            resolution = .allowOnce(updatedPermissions: updates)
+            message = "Always allowing for \(session.title)."
+        }
+
         dismissNotificationSurfaceIfPresent(for: sessionID)
         state.resolvePermission(sessionID: session.id, resolution: resolution)
         synchronizeSelection()
         refreshOverlayPlacementIfVisible()
-
-        let message: String
-        if let mode {
-            switch mode {
-            case .default:
-                message = "Approving permission for \(session.title)."
-            case .acceptEdits:
-                message = "Auto-accepting edits for \(session.title)."
-            case .bypassPermissions, .dontAsk:
-                message = "Auto-approving all permissions for \(session.title)."
-            case .plan:
-                message = "Switching to plan mode for \(session.title)."
-            }
-        } else {
-            message = "Denying permission for \(session.title)."
-        }
 
         send(
             .resolvePermission(sessionID: session.id, resolution: resolution),
@@ -796,19 +794,6 @@ final class AppModel {
             } catch {
                 self.lastActionMessage = "Failed to send bridge command: \(error.localizedDescription)"
             }
-        }
-    }
-
-    private func permissionResolution(for mode: ClaudePermissionMode?) -> PermissionResolution {
-        guard let mode else {
-            return .deny(message: "Permission denied in Open Island.", interrupt: false)
-        }
-
-        switch mode {
-        case .default:
-            return .allowOnce()
-        case .acceptEdits, .plan, .dontAsk, .bypassPermissions:
-            return .allowOnce(updatedPermissions: [.setMode(destination: .session, mode: mode)])
         }
     }
 
