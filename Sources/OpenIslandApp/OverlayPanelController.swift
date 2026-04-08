@@ -751,13 +751,25 @@ extension NSScreen {
     }
 
     var islandClosedHeight: CGFloat {
-        // On notch screens, safeAreaInsets.top is the authoritative notch height.
-        // topStatusBarHeight (frame.maxY - visibleFrame.maxY) reflects the menu bar
-        // reserved area, which can exceed the physical notch height on some models
-        // (e.g. MacBook Air M2: notch ~34pt, menu bar ~37pt), causing the island to
-        // protrude below the notch in closed/idle state.
-        if safeAreaInsets.top > 0 {
-            return safeAreaInsets.top
+        NSScreen.computeIslandClosedHeight(
+            safeAreaInsetsTop: safeAreaInsets.top,
+            topStatusBarHeight: topStatusBarHeight
+        )
+    }
+
+    /// Pure helper so the height selection logic can be unit-tested without real screen hardware.
+    ///
+    /// On notch screens `safeAreaInsets.top` is the authoritative physical notch height.
+    /// `topStatusBarHeight` (derived from `frame.maxY - visibleFrame.maxY`) reflects the
+    /// menu bar reserved area, which can exceed the notch height on some models — e.g.
+    /// MacBook Air M2 notch ≈ 34 pt while menu bar reserved ≈ 37 pt — causing the idle
+    /// island to protrude below the physical notch.
+    static func computeIslandClosedHeight(
+        safeAreaInsetsTop: CGFloat,
+        topStatusBarHeight: CGFloat
+    ) -> CGFloat {
+        if safeAreaInsetsTop > 0 {
+            return safeAreaInsetsTop
         }
         return topStatusBarHeight
     }
