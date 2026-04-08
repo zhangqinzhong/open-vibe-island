@@ -31,28 +31,28 @@
 <summary>点击展开 prompt</summary>
 
 ```
-I'm having an issue with Open Island (https://github.com/Octane0411/open-vibe-island).
+我在使用 Open Island (https://github.com/Octane0411/open-vibe-island) 时遇到了问题。
 
-Please help me file a GitHub issue. Do the following:
+请帮我提交一个 GitHub issue，步骤如下：
 
-1. Collect my environment info:
-   - Run `sw_vers` to get macOS version
-   - Run `swift --version` to get Swift version
-   - Check if Open Island is running: `ps aux | grep -i "open.island\|OpenIslandApp" | grep -v grep`
-   - Get the app version: `defaults read ~/Applications/Open\ Island\ Dev.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null || echo "unknown"`
-   - Check which terminal I'm using
+1. 收集我的环境信息：
+   - 运行 `sw_vers` 获取 macOS 版本
+   - 运行 `swift --version` 获取 Swift 版本
+   - 检查 Open Island 是否在运行：`ps aux | grep -i "open.island\|OpenIslandApp" | grep -v grep`
+   - 获取应用版本：`defaults read ~/Applications/Open\ Island\ Dev.app/Contents/Info.plist CFBundleShortVersionString 2>/dev/null || echo "unknown"`
+   - 检查我正在使用的终端
 
-2. Ask me to describe:
-   - What I expected to happen
-   - What actually happened
-   - Steps to reproduce
+2. 询问我：
+   - 我期望发生什么
+   - 实际发生了什么
+   - 复现步骤
 
-3. Create the issue on GitHub using `gh issue create` with this format:
-   - Title: concise summary
-   - Body with sections: **Environment**, **Description**, **Steps to Reproduce**, **Expected vs Actual Behavior**
-   - Add label "bug" if applicable
+3. 使用 `gh issue create` 在 GitHub 上创建 issue，格式如下：
+   - 标题：简洁的摘要
+   - 正文包含以下部分：**环境信息**、**问题描述**、**复现步骤**、**期望行为 vs 实际行为**
+   - 如适用，添加 "bug" 标签
 
-Repository: Octane0411/open-vibe-island
+仓库：Octane0411/open-vibe-island
 ```
 
 </details>
@@ -65,21 +65,21 @@ Repository: Octane0411/open-vibe-island
 <summary>点击展开 prompt</summary>
 
 ```
-I'd like to request a feature for Open Island (https://github.com/Octane0411/open-vibe-island).
+我想为 Open Island (https://github.com/Octane0411/open-vibe-island) 提一个功能建议。
 
-Please help me file a GitHub issue. Do the following:
+请帮我提交一个 GitHub issue，步骤如下：
 
-1. Ask me to describe:
-   - What feature I want
-   - Why it would be useful (what problem it solves)
-   - Any ideas on how it should work
+1. 询问我：
+   - 我想要什么功能
+   - 为什么有用（解决什么问题）
+   - 对实现方式有什么想法
 
-2. Create the issue on GitHub using `gh issue create` with this format:
-   - Title: concise summary prefixed with "feat: "
-   - Body with sections: **Feature Description**, **Motivation**, **Proposed Behavior**
-   - Add label "enhancement" if applicable
+2. 使用 `gh issue create` 在 GitHub 上创建 issue，格式如下：
+   - 标题：简洁的摘要，前缀为 "feat: "
+   - 正文包含以下部分：**功能描述**、**动机**、**预期行为**
+   - 如适用，添加 "enhancement" 标签
 
-Repository: Octane0411/open-vibe-island
+仓库：Octane0411/open-vibe-island
 ```
 
 </details>
