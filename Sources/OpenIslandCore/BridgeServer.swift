@@ -497,6 +497,10 @@ public final class BridgeServer: @unchecked Sendable {
             return
         }
 
+        // On every event from the parent session, opportunistically clean up
+        // subagents whose SubagentStop was never received.
+        cleanUpStaleSubagents(forSession: payload.sessionID)
+
         switch payload.hookEventName {
         case .sessionStart:
             clearStaleClaudeInteractionIfNeeded(for: payload.sessionID)
@@ -642,12 +646,6 @@ public final class BridgeServer: @unchecked Sendable {
                     tempID: tempID,
                     response: payload.toolResponse
                 )
-            }
-
-            // When the Agent tool completes, the corresponding subagent is done.
-            // This serves as a fallback in case SubagentStop was not received.
-            if payload.toolName == "Agent" {
-                removeOldestActiveSubagent(fromSession: payload.sessionID)
             }
 
             let summary = {
@@ -1568,22 +1566,25 @@ public final class BridgeServer: @unchecked Sendable {
         )
     }
 
-    /// Removes the oldest active (not yet completed) subagent from the session.
-    /// Used as a fallback when `postToolUse` for the Agent tool arrives but
-    /// the corresponding `SubagentStop` event was missed.
-    private func removeOldestActiveSubagent(fromSession sessionID: String) {
+    /// Removes subagents that have been inactive for too long.
+    /// Called on each hook event from the parent session as a fallback
+    /// in case `SubagentStop` was never received (e.g. hook connection dropped).
+    private static let subagentStaleTimeout: TimeInterval = 3 * 60  // 3 minutes
+
+    private func cleanUpStaleSubagents(forSession sessionID: String) {
         guard var metadata = localState.session(id: sessionID)?.claudeMetadata,
               !metadata.activeSubagents.isEmpty else {
             return
         }
 
-        // Remove the first (oldest) subagent that has no summary (i.e. not yet marked completed).
-        if let idx = metadata.activeSubagents.firstIndex(where: { $0.summary == nil }) {
-            metadata.activeSubagents.remove(at: idx)
-        } else {
-            // All have summaries (already marked completed) — remove the oldest one.
-            metadata.activeSubagents.removeFirst()
+        let now = Date.now
+        let before = metadata.activeSubagents.count
+        metadata.activeSubagents.removeAll { sub in
+            guard let started = sub.startedAt else { return false }
+            return now.timeIntervalSince(started) > Self.subagentStaleTimeout
         }
+
+        guard metadata.activeSubagents.count != before else { return }
 
         emit(
             .claudeSessionMetadataUpdated(
