@@ -88,6 +88,30 @@ final class OverlayPanelController {
         }
     }
 
+    /// Fade the panel out, then call completion so the caller can snap state.
+    func fadeOutAndClose(
+        duration: TimeInterval,
+        completion: @escaping @MainActor () -> Void
+    ) {
+        guard let panel else {
+            completion()
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            panel.animator().alphaValue = 0
+        }, completionHandler: {
+            Task { @MainActor in completion() }
+        })
+    }
+
+    /// Restore panel alpha after a fade-out close.
+    func restoreAlpha() {
+        panel?.alphaValue = 1
+    }
+
     func reposition(preferredScreenID: String?) -> OverlayPlacementDiagnostics? {
         guard let panel else {
             return placementDiagnostics(preferredScreenID: preferredScreenID)

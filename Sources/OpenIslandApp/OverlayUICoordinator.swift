@@ -131,19 +131,15 @@ final class OverlayUICoordinator {
         )
     }
 
-    /// Duration (in seconds) to wait before shrinking the panel after a close
-    /// transition, matching the SwiftUI close animation.
-    private static let panelShrinkDelay: TimeInterval = 0.50
+    /// Duration of the panel fade-out on close.
+    private static let closeFadeDuration: TimeInterval = 0.18
 
-    /// Coordinates overlay transitions.  The NSPanel frame is set instantly
-    /// (no NSAnimationContext) — all visual animation is driven by SwiftUI's
-    /// `.animation()` modifier on the content view.
+    /// Coordinates overlay transitions.
     ///
-    /// **Open**: expand the panel first so SwiftUI has full rendering space,
-    /// then set state to trigger the SwiftUI animation.
+    /// **Open**: expand the panel frame instantly, then set state so SwiftUI
+    /// animates content from closed → opened inside the already-large panel.
     ///
-    /// **Close**: set state first so SwiftUI starts the close animation inside
-    /// the still-large panel, then shrink the panel after the animation ends.
+    /// **Close**: fade panel out, then snap state and window frame to closed.
     private func transitionOverlay(
         to status: NotchStatus,
         reason: NotchOpenReason?,
@@ -180,21 +176,29 @@ final class OverlayUICoordinator {
 
         case .closed, .popping:
             let wasOpened = notchStatus == .opened
+            // Set state immediately — usesOpenedVisualState keeps the view
+            // looking opened while isCloseTransitionPending is true.
             isCloseTransitionPending = wasOpened
-            // State change FIRST so SwiftUI starts the close animation inside
-            // the still-large panel.  Shrink the panel after the animation.
             islandSurface = surface
             notchOpenReason = reason
             notchStatus = status
             overlayPanelController.setInteractive(interactive)
             afterStateChange?()
 
-            DispatchQueue.main.asyncAfter(deadline: .now() + Self.panelShrinkDelay) { [weak self] in
-                guard let self else { return }
-                // Only shrink if no newer transition superseded this one.
-                guard self.overlayTransitionGeneration == capturedGeneration else { return }
-                self.isCloseTransitionPending = false
-                self.refreshOverlayPlacement()
+            if wasOpened {
+                // Fade the panel out, then snap window frame to closed size.
+                overlayPanelController.fadeOutAndClose(
+                    duration: Self.closeFadeDuration
+                ) { [weak self] in
+                    guard let self else { return }
+                    guard self.overlayTransitionGeneration == capturedGeneration else { return }
+                    self.isCloseTransitionPending = false
+                    self.refreshOverlayPlacement()
+                    self.overlayPanelController.restoreAlpha()
+                    onPlacementResolved?()
+                }
+            } else {
+                refreshOverlayPlacement()
                 onPlacementResolved?()
             }
         }
