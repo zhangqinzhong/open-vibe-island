@@ -698,12 +698,53 @@ final class ProcessMonitoringCoordinator {
         }
 
         switch normalized {
+        // Standalone terminals
         case "ghostty":
             return "Ghostty"
         case "terminal", "apple_terminal":
             return "Terminal"
+        case "iterm", "iterm2", "iterm.app":
+            return "iTerm"
         case "cmux":
             return "cmux"
+        case "warp", "warpterminal":
+            return "Warp"
+        case "kaku":
+            return "Kaku"
+        case "wezterm":
+            return "WezTerm"
+        case "zellij":
+            return "Zellij"
+        // VS Code family
+        case "vscode", "code", "visual studio code":
+            return "VS Code"
+        case "vscode-insiders", "code-insiders":
+            return "VS Code Insiders"
+        case "cursor":
+            return "Cursor"
+        case "windsurf":
+            return "Windsurf"
+        case "trae":
+            return "Trae"
+        // JetBrains family
+        case "intellij", "idea":
+            return "IntelliJ IDEA"
+        case "webstorm":
+            return "WebStorm"
+        case "pycharm":
+            return "PyCharm"
+        case "goland":
+            return "GoLand"
+        case "clion":
+            return "CLion"
+        case "rubymine":
+            return "RubyMine"
+        case "phpstorm":
+            return "PhpStorm"
+        case "rider":
+            return "Rider"
+        case "rustrover":
+            return "RustRover"
         default:
             return nil
         }
