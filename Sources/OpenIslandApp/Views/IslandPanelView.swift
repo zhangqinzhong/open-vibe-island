@@ -29,7 +29,7 @@ private struct AutoHeightScrollView<Content: View>: View {
             ScrollView(.vertical) {
                 measuredContent
             }
-            .scrollIndicators(.automatic)
+            .scrollIndicators(.hidden)
             .frame(height: maxHeight)
         } else {
             // Fits within max → direct render, auto-height
