@@ -118,6 +118,61 @@ final class TerminalJumpServiceTests: XCTestCase {
         XCTAssertEqual(result, "Activated Ghostty. Exact pane targeting could not find the live terminal.")
         XCTAssertEqual(openedArguments.values, [["-b", "com.mitchellh.ghostty"]])
     }
+
+    func testCursorJumpActivatesRunningAppWithoutWorkspaceReuse() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                bundleIdentifier == "com.todesktop.230313mzl4w4u92" ? URL(fileURLWithPath: "/Applications/Cursor.app") : nil
+            },
+            appRunningChecker: { bundleIdentifier in
+                bundleIdentifier == "com.todesktop.230313mzl4w4u92"
+            },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Cursor",
+                workspaceName: "open-vibe-island",
+                paneTitle: "Cursor abc123",
+                workingDirectory: "/Users/test/open-vibe-island"
+            )
+        )
+
+        XCTAssertEqual(result, "Activated Cursor.")
+        XCTAssertEqual(openedArguments.values, [["-b", "com.todesktop.230313mzl4w4u92"]])
+    }
+
+    func testCursorJumpFallsBackToWorkspaceWhenAppNotRunning() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                bundleIdentifier == "com.todesktop.230313mzl4w4u92" ? URL(fileURLWithPath: "/Applications/Cursor.app") : nil
+            },
+            appRunningChecker: { _ in false },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" },
+            processRunner: { _, _ in true }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Cursor",
+                workspaceName: "open-vibe-island",
+                paneTitle: "Cursor abc123",
+                workingDirectory: "/Users/test/open-vibe-island"
+            )
+        )
+
+        XCTAssertEqual(result, "Focused the matching Cursor workspace.")
+        XCTAssertTrue(openedArguments.values.isEmpty)
+    }
 }
 
 private struct LiveGhosttyTerminal: Equatable {

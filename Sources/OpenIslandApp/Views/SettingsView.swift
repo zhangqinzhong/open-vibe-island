@@ -326,6 +326,7 @@ struct SetupSettingsPane: View {
     @State private var confirmingUninstallQoder = false
     @State private var confirmingUninstallFactory = false
     @State private var confirmingUninstallCodebuddy = false
+    @State private var confirmingUninstallCursor = false
 
     private var lang: LanguageManager { model.lang }
 
@@ -428,6 +429,23 @@ struct SetupSettingsPane: View {
                 } message: {
                     Text("This will remove Open Island hooks from ~/.codebuddy/settings.json.")
                 }
+
+                hookRow(
+                    name: "Cursor",
+                    installed: model.cursorHooksInstalled,
+                    busy: model.isCursorHookSetupBusy,
+                    requiresBinary: true,
+                    installAction: { model.installCursorHooks() },
+                    uninstallAction: { confirmingUninstallCursor = true }
+                )
+                .alert(lang.t("settings.general.uninstallConfirmTitle"), isPresented: $confirmingUninstallCursor) {
+                    Button(lang.t("settings.general.uninstallConfirmAction"), role: .destructive) {
+                        model.uninstallCursorHooks()
+                    }
+                    Button(lang.t("settings.general.cancel"), role: .cancel) {}
+                } message: {
+                    Text("This will remove the Open Island hooks from ~/.cursor/hooks.json.")
+                }
             }
 
             Section {
@@ -485,6 +503,7 @@ struct SetupSettingsPane: View {
                     if !model.qoderHooksInstalled { model.installQoderHooks() }
                     if !model.factoryHooksInstalled { model.installFactoryHooks() }
                     if !model.codebuddyHooksInstalled { model.installCodebuddyHooks() }
+                    if !model.cursorHooksInstalled { model.installCursorHooks() }
                     if !model.claudeUsageInstalled { model.installClaudeUsageBridge() }
                 }
                 .disabled(model.hooksBinaryURL == nil || allReady)
@@ -498,7 +517,7 @@ struct SetupSettingsPane: View {
     private var allReady: Bool {
         model.claudeHooksInstalled && model.codexHooksInstalled && model.openCodePluginInstalled
             && model.qoderHooksInstalled && model.factoryHooksInstalled && model.codebuddyHooksInstalled
-            && model.claudeUsageInstalled
+            && model.cursorHooksInstalled && model.claudeUsageInstalled
     }
 
     private var hasErrors: Bool {

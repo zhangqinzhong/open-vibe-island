@@ -7,6 +7,7 @@ struct TerminalJumpService {
     typealias AppRunningChecker = @Sendable (String) -> Bool
     typealias OpenAction = @Sendable ([String]) throws -> Void
     typealias AppleScriptRunner = @Sendable (String) throws -> String
+    typealias ProcessRunner = @Sendable (String, [String]) -> Bool
 
     private struct TerminalAppDescriptor {
         let displayName: String
@@ -50,6 +51,11 @@ struct TerminalJumpService {
             bundleIdentifier: "fun.tw93.kaku",
             aliases: ["kaku"]
         ),
+        TerminalAppDescriptor(
+            displayName: "Cursor",
+            bundleIdentifier: "com.todesktop.230313mzl4w4u92",
+            aliases: ["cursor"]
+        ),
     ]
 
     /// Bundle identifiers of terminal emulators that commonly host Zellij,
@@ -64,6 +70,7 @@ struct TerminalJumpService {
     private let appRunningChecker: AppRunningChecker
     private let openAction: OpenAction
     private let appleScriptRunner: AppleScriptRunner
+    private let processRunner: ProcessRunner
 
     init(
         applicationResolver: @escaping ApplicationResolver = { bundleIdentifier in
@@ -73,12 +80,14 @@ struct TerminalJumpService {
             NSRunningApplication.runningApplications(withBundleIdentifier: bundleIdentifier).isEmpty == false
         },
         openAction: @escaping OpenAction = Self.defaultOpenAction(arguments:),
-        appleScriptRunner: @escaping AppleScriptRunner = Self.defaultAppleScriptRunner(script:)
+        appleScriptRunner: @escaping AppleScriptRunner = Self.defaultAppleScriptRunner(script:),
+        processRunner: @escaping ProcessRunner = Self.defaultProcessRunner(executable:arguments:)
     ) {
         self.applicationResolver = applicationResolver
         self.appRunningChecker = appRunningChecker
         self.openAction = openAction
         self.appleScriptRunner = appleScriptRunner
+        self.processRunner = processRunner
     }
 
     func jump(to target: JumpTarget) throws -> String {
@@ -128,6 +137,17 @@ struct TerminalJumpService {
                 if let cliPath = weztermFamilyCLIPath(for: descriptor.bundleIdentifier),
                    jumpToWeztermFamilyTerminal(target, cliPath: cliPath, bundleIdentifier: descriptor.bundleIdentifier) {
                     return "Focused the matching \(descriptor.displayName) pane."
+                }
+            case "com.todesktop.230313mzl4w4u92":
+                if appIsRunning {
+                    try openAction(["-b", descriptor.bundleIdentifier])
+                    return "Activated Cursor."
+                }
+                if let workingDirectory = target.workingDirectory {
+                    let opened = jumpToCursorWorkspace(workingDirectory)
+                    return opened
+                        ? "Focused the matching Cursor workspace."
+                        : "Focused the matching Cursor workspace. The cursor CLI may not be available."
                 }
             default:
                 break
@@ -186,6 +206,10 @@ struct TerminalJumpService {
         """
 
         return try runAppleScript(script) == "matched"
+    }
+
+    private func jumpToCursorWorkspace(_ workspacePath: String) -> Bool {
+        processRunner("cursor", ["-r", workspacePath])
     }
 
     private func jumpToCmuxTerminal(_ target: JumpTarget) -> Bool {
@@ -754,6 +778,22 @@ struct TerminalJumpService {
         }
 
         return output
+    }
+
+    private static func defaultProcessRunner(executable: String, arguments: [String]) -> Bool {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        process.arguments = [executable] + arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus == 0
+        } catch {
+            return false
+        }
     }
 
     private func escapeAppleScript(_ value: String?) -> String {
