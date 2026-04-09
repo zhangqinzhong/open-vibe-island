@@ -105,6 +105,39 @@ StreamLocalBindUnlink yes
 
 Without this, reconnecting after a dropped SSH session will fail with "Address already in use" because the old socket file is still on disk.
 
+## Mac-to-Mac Setup (Different UIDs)
+
+When both machines are macOS but have different UIDs (common when local and remote machines were set up independently), the default socket path on the remote will not match the forwarded socket from the local machine.
+
+**Check your UIDs:**
+
+```bash
+# On local Mac
+id -u  # e.g. 502
+
+# On remote Mac
+id -u  # e.g. 501
+```
+
+**If UIDs differ**, configure `RemoteForward` to map the remote UID socket to the local UID socket:
+
+```
+Host myserver
+    HostName 192.168.x.x
+    User youruser
+    RemoteForward /tmp/open-island-<remote-uid>.sock /tmp/open-island-<local-uid>.sock
+```
+
+Then set the socket path explicitly on the remote machine so the hook can find it:
+
+```bash
+# Add to ~/.zshrc on remote Mac
+export OPEN_ISLAND_SOCKET_PATH=/tmp/open-island-<remote-uid>.sock
+export VIBE_ISLAND_SOCKET_PATH=/tmp/open-island-<remote-uid>.sock
+```
+
+> **Note:** This was tested on a Mac-to-Mac configuration. The default documentation assumes matching UIDs (e.g. Docker environments where UID is typically `1000` on both ends).
+
 ## Troubleshooting
 
 **Sessions not appearing?**
