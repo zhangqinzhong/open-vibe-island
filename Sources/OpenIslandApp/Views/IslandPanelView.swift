@@ -76,7 +76,7 @@ extension AgentSession {
 // MARK: - Animations
 
 private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
-private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+private let closeAnimation = Animation.smooth(duration: 0.3)
 private let popAnimation = Animation.spring(response: 0.3, dampingFraction: 0.5)
 
 /// Composite equatable key so `hasClosedPresence` and `expansionWidth` share
@@ -118,11 +118,20 @@ struct IslandPanelView: View {
     }
 
     private var usesOpenedVisualState: Bool {
-        isOpened || model.isOverlayCloseTransitionPending
+        isOpened
     }
 
     private var isPopping: Bool {
         model.notchStatus == .popping
+    }
+
+    /// Single animation selection based on the current notch status.
+    private var notchTransitionAnimation: Animation {
+        switch model.notchStatus {
+        case .opened:  return openAnimation
+        case .closed:  return closeAnimation
+        case .popping: return popAnimation
+        }
     }
 
     private var closedSpotlightSession: AgentSession? {
@@ -213,20 +222,24 @@ struct IslandPanelView: View {
 
     @ViewBuilder
     private func notchContent(availableSize: CGSize) -> some View {
-        let panelShadowHorizontalInset = usesOpenedVisualState
-            ? IslandChromeMetrics.openedShadowHorizontalInset
-            : IslandChromeMetrics.closedShadowHorizontalInset
-        let panelShadowBottomInset = usesOpenedVisualState
-            ? IslandChromeMetrics.openedShadowBottomInset
-            : IslandChromeMetrics.closedShadowBottomInset
+        // Window is always at opened size — use opened insets unconditionally.
+        let panelShadowHorizontalInset = IslandChromeMetrics.openedShadowHorizontalInset
+        let panelShadowBottomInset = IslandChromeMetrics.openedShadowBottomInset
         let layoutWidth = max(0, availableSize.width - (panelShadowHorizontalInset * 2))
         let layoutHeight = max(0, availableSize.height - panelShadowBottomInset)
-        let outerHorizontalPadding: CGFloat = usesOpenedVisualState ? 28 : 0
-        let outerBottomPadding: CGFloat = usesOpenedVisualState ? 14 : 0
+
+        // Opened dimensions: fill the layout area with outer padding.
+        let outerHorizontalPadding: CGFloat = 28
+        let outerBottomPadding: CGFloat = 14
         let openedWidth = max(0, layoutWidth - outerHorizontalPadding)
-        let closedWidth = layoutWidth
-        let currentWidth = usesOpenedVisualState ? openedWidth : closedWidth
-        let currentHeight = usesOpenedVisualState ? max(closedNotchHeight, layoutHeight - outerBottomPadding) : layoutHeight
+        let openedHeight = max(closedNotchHeight, layoutHeight - outerBottomPadding)
+
+        // Closed dimensions: sized to the actual notch + session indicators.
+        let closedTotalWidth = closedNotchWidth + expansionWidth + (isPopping ? 18 : 0)
+        let closedTotalHeight = closedNotchHeight
+
+        let currentWidth = usesOpenedVisualState ? openedWidth : closedTotalWidth
+        let currentHeight = usesOpenedVisualState ? openedHeight : closedTotalHeight
         let horizontalInset = usesOpenedVisualState ? 14.0 : 0.0
         let bottomInset = usesOpenedVisualState ? 14.0 : 0.0
         let surfaceWidth = currentWidth + (horizontalInset * 2)
@@ -271,9 +284,8 @@ struct IslandPanelView: View {
         .scaleEffect(usesOpenedVisualState ? 1 : (isHovering ? IslandChromeMetrics.closedHoverScale : 1), anchor: .top)
         .padding(.horizontal, panelShadowHorizontalInset)
         .padding(.bottom, panelShadowBottomInset)
-        .animation(isOpened ? openAnimation : nil, value: model.notchStatus)
-        .animation(isOpened ? nil : .smooth, value: closedPresenceAnimationKey)
-        .animation(isOpened ? nil : popAnimation, value: isPopping)
+        .animation(notchTransitionAnimation, value: model.notchStatus)
+        .animation(.smooth, value: closedPresenceAnimationKey)
         .contentShape(Rectangle())
         .onHover { hovering in
             withAnimation(.spring(response: 0.38, dampingFraction: 0.8)) {
