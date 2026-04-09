@@ -43,7 +43,7 @@ This section is written for humans.
 
 ### What This Is
 
-An open-source [Vibe Island](https://vibeisland.app/) alternative for heavy code-agent users on macOS. Currently supports **Claude Code**, **Codex**, **Cursor**, **OpenCode**, **Qoder**, **Factory**, and **CodeBuddy**, with terminal integration for **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, **iTerm2**, and **Zellij**, plus fallback detection for Warp.
+An open-source [Vibe Island](https://vibeisland.app/) alternative for heavy code-agent users on macOS. Currently supports **Claude Code**, **Codex**, **Cursor**, **OpenCode**, **Qoder**, **Factory**, and **CodeBuddy**, with terminal integration for **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, **iTerm2**, and **Zellij**, workspace-level jump for **VS Code**, **Cursor**, **Windsurf**, **Trae**, and **JetBrains IDEs** (IDEA, WebStorm, PyCharm, GoLand, CLion, RubyMine, PhpStorm, Rider, RustRover), plus fallback detection for Warp.
 
 This is a community project. We provide the basics: code agent communication, a mac island app shell, and some fundamental features. We welcome anyone to build on top of this and turn ideas into real features for everyone. Read the [Roadmap](docs/roadmap.md) and [Contributing](CONTRIBUTING.md) docs for more info.
 
@@ -101,6 +101,12 @@ This app may install hooks for Claude Code, Codex, or Cursor, so you may see hoo
 | **WezTerm** | Full Support | Jump-back via CLI pane targeting |
 | **iTerm2** | Full Support | Jump-back with session ID / TTY matching |
 | **Zellij** | Full Support | Jump-back via CLI pane/tab targeting |
+| **VS Code** | Workspace Jump | Activate workspace via `code` CLI |
+| **VS Code Insiders** | Workspace Jump | Activate workspace via `code-insiders` CLI |
+| **Cursor** | Workspace Jump | Activate workspace via `cursor` CLI |
+| **Windsurf** | Workspace Jump | Activate workspace via `windsurf` CLI |
+| **Trae** | Workspace Jump | Activate workspace via `trae` CLI |
+| **JetBrains IDEs** | Workspace Jump | Activate project via IDE CLI (IDEA, WebStorm, PyCharm, GoLand, CLion, RubyMine, PhpStorm, Rider, RustRover) |
 | **Warp** | Planned | Fallback detection only |
 
 #### Other Features
@@ -208,6 +214,8 @@ Developers who already live in the terminal and want a better way to work with c
 ### Terminal Support
 
 - **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, **iTerm2**, and **Zellij** — Full jump-back support with session attachment matching (cmux via Unix socket API, Kaku/WezTerm/Zellij via CLI pane targeting, iTerm2 via AppleScript session/TTY probe)
+- **VS Code**, **VS Code Insiders**, **Cursor**, **Windsurf**, **Trae** — Workspace-level jump via respective CLI (`code -r`, `cursor -r`, etc.)
+- **JetBrains IDEs** (IntelliJ IDEA, WebStorm, PyCharm, GoLand, CLion, RubyMine, PhpStorm, Rider, RustRover) — Workspace-level jump via IDE CLI launcher
 - **Warp** — Fallback detection and basic process discovery
 
 ### UI & Display
