@@ -484,9 +484,17 @@ final class OverlayPanelController {
             if model.measuredNotificationContentHeight > 0 {
                 return model.measuredNotificationContentHeight + 28
             }
-            // First render: use generous height so content isn't clipped.
-            // SwiftUI will measure actual height and trigger a resize.
-            return 500
+            // First render: estimate from the actionable session's content so the
+            // initial window is close to the final size. This avoids a large blank
+            // panel flash (the previous 500pt fallback) and reduces the chance of
+            // a measurement→reposition cycle.
+            if let actionableID,
+               let session = model.state.session(id: actionableID) {
+                let rowHeight = session.estimatedIslandRowHeight(at: now)
+                let bodyHeight = actionableBodyHeight(for: session, model: model)
+                return rowHeight + bodyHeight + Self.openedContentVerticalInsets
+            }
+            return 300
         }
 
         let rowHeights = visibleSessions.map { session -> CGFloat in
@@ -675,14 +683,16 @@ final class NotchHostingView<Content: View>: NSHostingView<Content> {
         // SwiftUI may recreate them when the view tree changes (e.g.
         // AutoHeightScrollView toggling between scroll/non-scroll mode),
         // so we must re-disable on every layout pass.
+        // Guard: only modify properties when they differ to avoid
+        // triggering additional layout passes that could loop.
         disableInternalScrollers(in: self)
     }
 
     private func disableInternalScrollers(in view: NSView) {
         if let scrollView = view as? NSScrollView {
-            scrollView.hasVerticalScroller = false
-            scrollView.hasHorizontalScroller = false
-            scrollView.scrollerStyle = .overlay
+            if scrollView.hasVerticalScroller { scrollView.hasVerticalScroller = false }
+            if scrollView.hasHorizontalScroller { scrollView.hasHorizontalScroller = false }
+            if scrollView.scrollerStyle != .overlay { scrollView.scrollerStyle = .overlay }
             return
         }
         for child in view.subviews {
