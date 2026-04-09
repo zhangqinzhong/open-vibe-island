@@ -450,10 +450,19 @@ public extension CodexHookPayload {
         return payload
     }
 
+    private static let noLocatorTerminalApps: Set<String> = [
+        "cmux", "kaku", "wezterm", "zellij",
+        "vs code", "vs code insiders", "cursor", "windsurf", "trae",
+        "intellij idea", "webstorm", "pycharm", "goland", "clion",
+        "rubymine", "phpstorm", "rider", "rustrover",
+    ]
+
     private func shouldUseFocusedTerminalLocator(for terminalApp: String) -> Bool {
         let lower = terminalApp.lowercased()
-        return !lower.contains("ghostty") && lower != "cmux"
-            && lower != "kaku" && lower != "wezterm" && lower != "zellij"
+        if lower.contains("ghostty") || lower.contains("jetbrains") {
+            return false
+        }
+        return !Self.noLocatorTerminalApps.contains(lower)
     }
 
     private func isGhosttyTerminalApp(_ terminalApp: String?) -> Bool {
@@ -509,9 +518,36 @@ public extension CodexHookPayload {
             return "WezTerm"
         case .some("kaku"):
             return "Kaku"
+        case .some("vscode"):
+            return "VS Code"
+        case .some("vscode-insiders"):
+            return "VS Code Insiders"
+        case .some("windsurf"):
+            return "Windsurf"
+        case .some("trae"):
+            return "Trae"
         default:
-            return nil
+            break
         }
+
+        // JetBrains IDEs set TERMINAL_EMULATOR=JetBrains-JediTerm.
+        if let terminalEmulator = environment["TERMINAL_EMULATOR"]?.lowercased(),
+           terminalEmulator.contains("jetbrains") {
+            if let bundleID = environment["__CFBundleIdentifier"]?.lowercased() {
+                if bundleID.contains("webstorm") { return "WebStorm" }
+                if bundleID.contains("pycharm") { return "PyCharm" }
+                if bundleID.contains("goland") { return "GoLand" }
+                if bundleID.contains("clion") { return "CLion" }
+                if bundleID.contains("rubymine") { return "RubyMine" }
+                if bundleID.contains("phpstorm") { return "PhpStorm" }
+                if bundleID.contains("rider") { return "Rider" }
+                if bundleID.contains("rustrover") { return "RustRover" }
+                if bundleID.contains("intellij") { return "IntelliJ IDEA" }
+            }
+            return "IntelliJ IDEA"
+        }
+
+        return nil
     }
 
     private func currentTTY() -> String? {
