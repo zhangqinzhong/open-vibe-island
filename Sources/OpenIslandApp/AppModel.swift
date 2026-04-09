@@ -294,9 +294,12 @@ final class AppModel {
     }
 
     /// Measured by SwiftUI GeometryReader in notification mode. Used by panel controller for sizing.
+    /// Uses a tolerance of 2pt to avoid infinite layout loops caused by floating-point jitter
+    /// in GeometryReader measurements across consecutive layout passes.
     var measuredNotificationContentHeight: CGFloat = 0 {
         didSet {
-            if measuredNotificationContentHeight != oldValue, measuredNotificationContentHeight > 0 {
+            let delta = abs(measuredNotificationContentHeight - oldValue)
+            if delta >= 2, measuredNotificationContentHeight > 0 {
                 overlay.refreshOverlayPlacementIfVisible()
             }
         }
