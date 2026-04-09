@@ -557,6 +557,105 @@ struct SessionStateTests {
     }
 
     @Test
+    func cursorHookPreservesToolMetadataAcrossNonStopEvents() async throws {
+        let socketURL = BridgeSocketLocation.uniqueTestURL()
+        let server = BridgeServer(socketURL: socketURL)
+        try server.start()
+        defer { server.stop() }
+
+        let observer = LocalBridgeClient(socketURL: socketURL)
+        let stream = try observer.connect()
+        defer { observer.disconnect() }
+        try await observer.send(.registerClient(role: .observer))
+
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCursorHook(CursorHookPayload(
+            hookEventName: .beforeReadFile,
+            conversationId: "cursor-preserve-metadata",
+            generationId: "gen-read-1",
+            workspaceRoots: ["/tmp/cursor-preserve-metadata"],
+            toolName: "ReadFile",
+            toolInput: "{\"path\":\"README.md\"}",
+            filePath: "/tmp/cursor-preserve-metadata/README.md",
+            model: "gpt-5-codex",
+            transcriptPath: "/tmp/cursor-preserve-metadata/transcript.jsonl"
+        )))
+
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCursorHook(CursorHookPayload(
+            hookEventName: .beforeSubmitPrompt,
+            conversationId: "cursor-preserve-metadata",
+            generationId: "gen-prompt-2",
+            workspaceRoots: ["/tmp/cursor-preserve-metadata"],
+            prompt: "Please continue with test coverage."
+        )))
+
+        var iterator = stream.makeAsyncIterator()
+        let e1 = try await nextEvent(from: &iterator)
+        let e2 = try await nextEvent(from: &iterator)
+        let e3 = try await nextEvent(from: &iterator)
+        let e4 = try await nextEvent(from: &iterator)
+
+        #expect(e1.isSessionStarted)
+        #expect(e2.activityUpdate != nil)
+        let metadata = e3.cursorMetadataUpdate
+        #expect(metadata?.cursorMetadata.initialUserPrompt == "Please continue with test coverage.")
+        #expect(metadata?.cursorMetadata.currentTool == "ReadFile")
+        #expect(metadata?.cursorMetadata.model == "gpt-5-codex")
+        #expect(metadata?.cursorMetadata.transcriptPath == "/tmp/cursor-preserve-metadata/transcript.jsonl")
+        #expect(e4.activityUpdate != nil)
+    }
+
+    @Test
+    func cursorStopClearsCurrentToolMetadata() async throws {
+        let socketURL = BridgeSocketLocation.uniqueTestURL()
+        let server = BridgeServer(socketURL: socketURL)
+        try server.start()
+        defer { server.stop() }
+
+        let observer = LocalBridgeClient(socketURL: socketURL)
+        let stream = try observer.connect()
+        defer { observer.disconnect() }
+        try await observer.send(.registerClient(role: .observer))
+
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCursorHook(CursorHookPayload(
+            hookEventName: .beforeSubmitPrompt,
+            conversationId: "cursor-stop-clear",
+            generationId: "gen-shell-1",
+            workspaceRoots: ["/tmp/cursor-stop-clear"],
+            prompt: "Run lint and summarize warnings.",
+            command: "swift test",
+            toolName: "Bash",
+            toolInput: "swift test",
+            model: "gpt-5-codex",
+            transcriptPath: "/tmp/cursor-stop-clear/transcript.jsonl"
+        )))
+
+        _ = try BridgeCommandClient(socketURL: socketURL).send(.processCursorHook(CursorHookPayload(
+            hookEventName: .stop,
+            conversationId: "cursor-stop-clear",
+            generationId: "gen-stop-2",
+            workspaceRoots: ["/tmp/cursor-stop-clear"],
+            status: "completed"
+        )))
+
+        var iterator = stream.makeAsyncIterator()
+        let e1 = try await nextEvent(from: &iterator)
+        let e2 = try await nextEvent(from: &iterator)
+        let e3 = try await nextEvent(from: &iterator)
+        let e4 = try await nextEvent(from: &iterator)
+
+        #expect(e1.isSessionStarted)
+        #expect(e2.activityUpdate != nil)
+        let metadata = e3.cursorMetadataUpdate
+        #expect(metadata?.cursorMetadata.currentTool == nil)
+        #expect(metadata?.cursorMetadata.currentToolInputPreview == nil)
+        #expect(metadata?.cursorMetadata.currentCommandPreview == nil)
+        #expect(metadata?.cursorMetadata.lastUserPrompt == "Run lint and summarize warnings.")
+        #expect(metadata?.cursorMetadata.model == "gpt-5-codex")
+        #expect(e4.sessionCompleted?.sessionID == "cursor-stop-clear")
+        #expect(e4.sessionCompleted?.summary == "Cursor completed the turn.")
+    }
+
+    @Test
     func codexHookInstallerMergesManagedGroupsWithoutDroppingUnrelatedHooks() throws {
         let existing = """
         {
@@ -936,6 +1035,22 @@ private extension AgentEvent {
 
     var trackedMetadataUpdate: SessionMetadataUpdated? {
         if case let .sessionMetadataUpdated(payload) = self {
+            payload
+        } else {
+            nil
+        }
+    }
+
+    var cursorMetadataUpdate: CursorSessionMetadataUpdated? {
+        if case let .cursorSessionMetadataUpdated(payload) = self {
+            payload
+        } else {
+            nil
+        }
+    }
+
+    var sessionCompleted: SessionCompleted? {
+        if case let .sessionCompleted(payload) = self {
             payload
         } else {
             nil

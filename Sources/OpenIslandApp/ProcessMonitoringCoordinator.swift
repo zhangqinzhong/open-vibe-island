@@ -216,6 +216,8 @@ final class ProcessMonitoringCoordinator {
             payload.sessionID
         case let .openCodeSessionMetadataUpdated(payload):
             payload.sessionID
+        case let .cursorSessionMetadataUpdated(payload):
+            payload.sessionID
         case let .actionableStateResolved(payload):
             payload.sessionID
         }
@@ -728,6 +730,8 @@ final class ProcessMonitoringCoordinator {
             return "Factory \(session.id.prefix(8))"
         case .codebuddy:
             return "CodeBuddy \(session.id.prefix(8))"
+        case .cursor:
+            return "Cursor \(session.id.prefix(8))"
         }
     }
 }

@@ -87,11 +87,16 @@ final class AppModel {
     var openCodePluginStatusSummary: String { hooks.openCodePluginStatusSummary }
     var claudeHealthReport: HookHealthReport? { hooks.claudeHealthReport }
     var codexHealthReport: HookHealthReport? { hooks.codexHealthReport }
+    var cursorHooksInstalled: Bool { hooks.cursorHooksInstalled }
+    var isCursorHookSetupBusy: Bool { hooks.isCursorHookSetupBusy }
+    var cursorHookStatusTitle: String { hooks.cursorHookStatusTitle }
+    var cursorHookStatusSummary: String { hooks.cursorHookStatusSummary }
     var codexHookStatusTitle: String { hooks.codexHookStatusTitle }
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
     func refreshCodexHookStatus() { hooks.refreshCodexHookStatus() }
     func refreshClaudeHookStatus() { hooks.refreshClaudeHookStatus() }
     func refreshOpenCodePluginStatus() { hooks.refreshOpenCodePluginStatus() }
+    func refreshCursorHookStatus() { hooks.refreshCursorHookStatus() }
     func refreshClaudeUsageState() { hooks.refreshClaudeUsageState() }
     func refreshCodexUsageState() { hooks.refreshCodexUsageState() }
     func installCodexHooks() { hooks.installCodexHooks() }
@@ -107,6 +112,8 @@ final class AppModel {
     func refreshCCForkHookStatuses() { hooks.refreshCCForkHookStatuses() }
     func installOpenCodePlugin() { hooks.installOpenCodePlugin() }
     func uninstallOpenCodePlugin() { hooks.uninstallOpenCodePlugin() }
+    func installCursorHooks() { hooks.installCursorHooks() }
+    func uninstallCursorHooks() { hooks.uninstallCursorHooks() }
     func installClaudeUsageBridge() { hooks.installClaudeUsageBridge() }
     func uninstallClaudeUsageBridge() { hooks.uninstallClaudeUsageBridge() }
     func runHealthChecks() { hooks.runHealthChecks() }
@@ -271,6 +278,7 @@ final class AppModel {
         monitoring.onPersistenceNeeded = { [weak self] in
             self?.discovery.scheduleCodexSessionPersistence()
             self?.discovery.scheduleClaudeSessionPersistence()
+            self?.discovery.scheduleCursorSessionPersistence()
         }
 
         refreshOverlayDisplayConfiguration()
@@ -449,6 +457,7 @@ final class AppModel {
             hooks.refreshClaudeHookStatus()
             hooks.refreshCCForkHookStatuses()
             hooks.refreshOpenCodePluginStatus()
+            hooks.refreshCursorHookStatus()
             hooks.refreshClaudeUsageState()
             hooks.startClaudeUsageMonitoringIfNeeded()
             hooks.refreshCodexUsageState()
@@ -842,6 +851,7 @@ final class AppModel {
         refreshOverlayPlacementIfVisible()
         discovery.scheduleCodexSessionPersistence()
         discovery.scheduleClaudeSessionPersistence()
+        discovery.scheduleCursorSessionPersistence()
 
         if updateLastActionMessage {
             lastActionMessage = describe(event)
@@ -894,6 +904,7 @@ final class AppModel {
                 if !self.factoryHooksInstalled { self.installFactoryHooks() }
                 if !self.codebuddyHooksInstalled { self.installCodebuddyHooks() }
                 if !self.openCodePluginInstalled { self.installOpenCodePlugin() }
+                if !self.cursorHooksInstalled { self.installCursorHooks() }
                 if !self.claudeUsageInstalled { self.installClaudeUsageBridge() }
 
                 // Run health checks after install to detect stale paths, conflicts, etc.
@@ -1037,6 +1048,12 @@ final class AppModel {
             }
 
             return payload.openCodeMetadata.lastAssistantMessage ?? "OpenCode session metadata updated."
+        case let .cursorSessionMetadataUpdated(payload):
+            if let currentTool = payload.cursorMetadata.currentTool {
+                return "Cursor is running \(currentTool)."
+            }
+
+            return payload.cursorMetadata.lastAssistantMessage ?? "Cursor session metadata updated."
         case let .actionableStateResolved(payload):
             return "Actionable state resolved for session \(payload.sessionID)."
         }

@@ -11,6 +11,7 @@ final class HookInstallationCoordinator {
     var factoryHookStatus: ClaudeHookInstallationStatus?
     var codebuddyHookStatus: ClaudeHookInstallationStatus?
     var openCodePluginStatus: OpenCodePluginInstallationStatus?
+    var cursorHookStatus: CursorHookInstallationStatus?
     var claudeStatusLineStatus: ClaudeStatusLineInstallationStatus?
     var claudeUsageSnapshot: ClaudeUsageSnapshot?
     var codexUsageSnapshot: CodexUsageSnapshot?
@@ -21,6 +22,7 @@ final class HookInstallationCoordinator {
     var isFactoryHookSetupBusy = false
     var isCodebuddyHookSetupBusy = false
     var isOpenCodeSetupBusy = false
+    var isCursorHookSetupBusy = false
     var isClaudeUsageSetupBusy = false
 
     @ObservationIgnored
@@ -52,6 +54,9 @@ final class HookInstallationCoordinator {
 
     @ObservationIgnored
     private let openCodePluginInstallationManager = OpenCodePluginInstallationManager()
+
+    @ObservationIgnored
+    private let cursorHookInstallationManager = CursorHookInstallationManager()
 
     @ObservationIgnored
     private let claudeStatusLineInstallationManager = ClaudeStatusLineInstallationManager()
@@ -93,6 +98,10 @@ final class HookInstallationCoordinator {
 
     var openCodePluginInstalled: Bool {
         openCodePluginStatus?.isInstalled == true
+    }
+
+    var cursorHooksInstalled: Bool {
+        cursorHookStatus?.managedHooksPresent == true
     }
 
     var claudeUsageInstalled: Bool {
@@ -255,6 +264,34 @@ final class HookInstallationCoordinator {
         return "no managed OpenCode plugin"
     }
 
+    var cursorHookStatusTitle: String {
+        if cursorHooksInstalled {
+            return "Cursor hooks installed"
+        }
+
+        if hooksBinaryURL == nil {
+            return "Hook binary not found"
+        }
+
+        return "Cursor hooks not installed"
+    }
+
+    var cursorHookStatusSummary: String {
+        guard cursorHookStatus != nil else {
+            return "Reading ~/.cursor/hooks.json."
+        }
+
+        if cursorHooksInstalled {
+            return "managed hooks present"
+        }
+
+        if hooksBinaryURL == nil {
+            return "Build OpenIslandHooks before installing."
+        }
+
+        return "no managed Cursor hooks"
+    }
+
     var codexHookStatusTitle: String {
         if codexHooksInstalled {
             return "Codex hooks installed"
@@ -302,6 +339,7 @@ final class HookInstallationCoordinator {
                     self.onStatusMessage?("Hooks binary updated to match the current app version.")
                     self.refreshCodexHookStatus()
                     self.refreshClaudeHookStatus()
+                    self.refreshCursorHookStatus()
                 }
             } catch {
                 self.onStatusMessage?("Failed to update hooks binary: \(error.localizedDescription)")
@@ -517,6 +555,19 @@ final class HookInstallationCoordinator {
         }
     }
 
+    func refreshCursorHookStatus() {
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let status = try self.cursorHookInstallationManager.status(hooksBinaryURL: self.hooksBinaryURL)
+                self.cursorHookStatus = status
+            } catch {
+                self.onStatusMessage?("Failed to read Cursor hook status: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func refreshClaudeUsageState() {
         let manager = claudeStatusLineInstallationManager
         Task { [weak self] in
@@ -702,6 +753,23 @@ final class HookInstallationCoordinator {
         }
     }
 
+    func installCursorHooks() {
+        guard let hooksBinaryURL else {
+            onStatusMessage?("Could not find a local OpenIslandHooks binary. Build the package first.")
+            return
+        }
+
+        updateCursorHooks(userMessage: "Installing Cursor hooks.") { manager in
+            try manager.install(hooksBinaryURL: hooksBinaryURL)
+        }
+    }
+
+    func uninstallCursorHooks() {
+        updateCursorHooks(userMessage: "Removing Cursor hooks.") { manager in
+            try manager.uninstall()
+        }
+    }
+
     func installClaudeUsageBridge() {
         updateClaudeUsageBridge(userMessage: "Installing Claude usage bridge.") { manager in
             try manager.install()
@@ -815,6 +883,32 @@ final class HookInstallationCoordinator {
                 }
             } catch {
                 self.onStatusMessage?("Claude hook update failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func updateCursorHooks(
+        userMessage: String,
+        operation: @escaping (CursorHookInstallationManager) throws -> CursorHookInstallationStatus
+    ) {
+        isCursorHookSetupBusy = true
+        onStatusMessage?(userMessage)
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            defer { self.isCursorHookSetupBusy = false }
+
+            do {
+                let status = try operation(self.cursorHookInstallationManager)
+                self.cursorHookStatus = status
+                if status.managedHooksPresent {
+                    self.onStatusMessage?("Cursor hooks are installed and ready.")
+                } else {
+                    self.onStatusMessage?("Cursor hooks are not installed.")
+                }
+            } catch {
+                self.onStatusMessage?("Cursor hook update failed: \(error.localizedDescription)")
             }
         }
     }
