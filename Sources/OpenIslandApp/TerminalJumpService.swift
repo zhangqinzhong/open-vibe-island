@@ -56,6 +56,87 @@ struct TerminalJumpService {
             bundleIdentifier: "com.todesktop.230313mzl4w4u92",
             aliases: ["cursor"]
         ),
+        TerminalAppDescriptor(
+            displayName: "VS Code",
+            bundleIdentifier: "com.microsoft.VSCode",
+            aliases: ["vscode", "code", "visual studio code"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "VS Code Insiders",
+            bundleIdentifier: "com.microsoft.VSCodeInsiders",
+            aliases: ["vscode-insiders", "code-insiders"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "Windsurf",
+            bundleIdentifier: "com.exafunction.windsurf",
+            aliases: ["windsurf"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "Trae",
+            bundleIdentifier: "com.trae.app",
+            aliases: ["trae"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "IntelliJ IDEA",
+            bundleIdentifier: "com.jetbrains.intellij",
+            aliases: ["intellij", "idea"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "WebStorm",
+            bundleIdentifier: "com.jetbrains.WebStorm",
+            aliases: ["webstorm"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "PyCharm",
+            bundleIdentifier: "com.jetbrains.pycharm",
+            aliases: ["pycharm"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "GoLand",
+            bundleIdentifier: "com.jetbrains.goland",
+            aliases: ["goland"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "CLion",
+            bundleIdentifier: "com.jetbrains.CLion",
+            aliases: ["clion"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "RubyMine",
+            bundleIdentifier: "com.jetbrains.rubymine",
+            aliases: ["rubymine"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "PhpStorm",
+            bundleIdentifier: "com.jetbrains.PhpStorm",
+            aliases: ["phpstorm"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "Rider",
+            bundleIdentifier: "com.jetbrains.rider",
+            aliases: ["rider"]
+        ),
+        TerminalAppDescriptor(
+            displayName: "RustRover",
+            bundleIdentifier: "com.jetbrains.rustrover",
+            aliases: ["rustrover"]
+        ),
+    ]
+
+    /// Bundle identifiers of JetBrains IDEs.
+    private static let jetbrainsBundleIDs: Set<String> = Set(
+        knownApps
+            .filter { $0.bundleIdentifier.hasPrefix("com.jetbrains.") }
+            .map(\.bundleIdentifier)
+    )
+
+    /// Bundle identifiers of VS Code family editors (VS Code, Insiders, Cursor, Windsurf, Trae).
+    private static let vscodeFamilyBundleIDs: Set<String> = [
+        "com.microsoft.VSCode",
+        "com.microsoft.VSCodeInsiders",
+        "com.todesktop.230313mzl4w4u92",
+        "com.exafunction.windsurf",
+        "com.trae.app",
     ]
 
     /// Bundle identifiers of terminal emulators that commonly host Zellij,
@@ -138,16 +219,27 @@ struct TerminalJumpService {
                    jumpToWeztermFamilyTerminal(target, cliPath: cliPath, bundleIdentifier: descriptor.bundleIdentifier) {
                     return "Focused the matching \(descriptor.displayName) pane."
                 }
-            case "com.todesktop.230313mzl4w4u92":
+            case let id where Self.vscodeFamilyBundleIDs.contains(id):
                 if appIsRunning {
                     try openAction(["-b", descriptor.bundleIdentifier])
-                    return "Activated Cursor."
+                    return "Activated \(descriptor.displayName)."
                 }
                 if let workingDirectory = target.workingDirectory {
-                    let opened = jumpToCursorWorkspace(workingDirectory)
+                    let opened = jumpToVSCodeFamilyWorkspace(workingDirectory, bundleIdentifier: id)
                     return opened
-                        ? "Focused the matching Cursor workspace."
-                        : "Focused the matching Cursor workspace. The cursor CLI may not be available."
+                        ? "Focused the matching \(descriptor.displayName) workspace."
+                        : "Focused the matching \(descriptor.displayName) workspace. The CLI may not be available."
+                }
+            case let id where Self.jetbrainsBundleIDs.contains(id):
+                if appIsRunning {
+                    try openAction(["-b", descriptor.bundleIdentifier])
+                    return "Activated \(descriptor.displayName)."
+                }
+                if let workingDirectory = target.workingDirectory {
+                    let opened = jumpToJetBrainsProject(workingDirectory, bundleIdentifier: id)
+                    return opened
+                        ? "Focused the matching \(descriptor.displayName) project."
+                        : "Focused the matching \(descriptor.displayName) project. The CLI may not be available."
                 }
             default:
                 break
@@ -208,8 +300,45 @@ struct TerminalJumpService {
         return try runAppleScript(script) == "matched"
     }
 
-    private func jumpToCursorWorkspace(_ workspacePath: String) -> Bool {
-        processRunner("cursor", ["-r", workspacePath])
+    // MARK: - VS Code family (VS Code, Insiders, Cursor, Windsurf, Trae)
+
+    /// Maps bundle identifiers to the CLI command used to open a workspace.
+    private static let vscodeFamilyCLI: [String: String] = [
+        "com.microsoft.VSCode": "code",
+        "com.microsoft.VSCodeInsiders": "code-insiders",
+        "com.todesktop.230313mzl4w4u92": "cursor",
+        "com.exafunction.windsurf": "windsurf",
+        "com.trae.app": "trae",
+    ]
+
+    private func jumpToVSCodeFamilyWorkspace(_ workspacePath: String, bundleIdentifier: String) -> Bool {
+        guard let cli = Self.vscodeFamilyCLI[bundleIdentifier] else {
+            return false
+        }
+        return processRunner(cli, ["-r", workspacePath])
+    }
+
+    // MARK: - JetBrains IDE family
+
+    /// Maps bundle identifiers to the CLI launcher script name (typically in
+    /// `/usr/local/bin/` or `~/Library/Application Support/JetBrains/Toolbox/scripts/`).
+    private static let jetbrainsCLI: [String: String] = [
+        "com.jetbrains.intellij": "idea",
+        "com.jetbrains.WebStorm": "webstorm",
+        "com.jetbrains.pycharm": "pycharm",
+        "com.jetbrains.goland": "goland",
+        "com.jetbrains.CLion": "clion",
+        "com.jetbrains.rubymine": "rubymine",
+        "com.jetbrains.PhpStorm": "phpstorm",
+        "com.jetbrains.rider": "rider",
+        "com.jetbrains.rustrover": "rustrover",
+    ]
+
+    private func jumpToJetBrainsProject(_ projectPath: String, bundleIdentifier: String) -> Bool {
+        guard let cli = Self.jetbrainsCLI[bundleIdentifier] else {
+            return false
+        }
+        return processRunner(cli, [projectPath])
     }
 
     private func jumpToCmuxTerminal(_ target: JumpTarget) -> Bool {

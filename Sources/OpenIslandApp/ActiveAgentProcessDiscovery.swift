@@ -284,8 +284,58 @@ struct ActiveAgentProcessDiscovery {
             return "WezTerm"
         }
 
+        if lowered.contains("/warp.app/") || lowered.hasSuffix("/warp") {
+            return "Warp"
+        }
+
         if lowered.hasSuffix("/zellij") {
             return "Zellij"
+        }
+
+        // VS Code family
+        if lowered.contains("/visual studio code.app/") || lowered.contains("/code helper") {
+            return "VS Code"
+        }
+        if lowered.contains("/visual studio code - insiders.app/") {
+            return "VS Code Insiders"
+        }
+        if lowered.contains("/cursor.app/") {
+            return "Cursor"
+        }
+        if lowered.contains("/windsurf.app/") {
+            return "Windsurf"
+        }
+        if lowered.contains("/trae.app/") {
+            return "Trae"
+        }
+
+        // JetBrains IDEs
+        if lowered.contains("/intellij idea.app/") || lowered.contains("/idea.app/") {
+            return "IntelliJ IDEA"
+        }
+        if lowered.contains("/webstorm.app/") {
+            return "WebStorm"
+        }
+        if lowered.contains("/pycharm.app/") {
+            return "PyCharm"
+        }
+        if lowered.contains("/goland.app/") {
+            return "GoLand"
+        }
+        if lowered.contains("/clion.app/") {
+            return "CLion"
+        }
+        if lowered.contains("/rubymine.app/") {
+            return "RubyMine"
+        }
+        if lowered.contains("/phpstorm.app/") {
+            return "PhpStorm"
+        }
+        if lowered.contains("/rider.app/") {
+            return "Rider"
+        }
+        if lowered.contains("/rustrover.app/") {
+            return "RustRover"
         }
 
         return nil
