@@ -31,7 +31,7 @@ This section is written for humans.
 
 ### What This Is
 
-An open-source [Vibe Island](https://vibeisland.app/) alternative for heavy code-agent users on macOS. Currently supports **Claude Code**, **Codex**, **OpenCode**, **Qoder**, **Factory**, and **CodeBuddy**, with terminal integration for **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, and **iTerm2**, plus fallback detection for Warp.
+An open-source [Vibe Island](https://vibeisland.app/) alternative for heavy code-agent users on macOS. Currently supports **Claude Code**, **Codex**, **OpenCode**, **Qoder**, **Factory**, and **CodeBuddy**, with terminal integration for **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, **iTerm2**, and **Zellij**, plus fallback detection for Warp.
 
 This is a community project. We provide the basics: code agent communication, a mac island app shell, and some fundamental features. We welcome anyone to build on top of this and turn ideas into real features for everyone. Read the [Roadmap](docs/roadmap.md) and [Contributing](CONTRIBUTING.md) docs for more info.
 
@@ -87,6 +87,7 @@ This app may install hooks for Claude Code or Codex, so you may see hook-related
 | **Kaku** | Full Support | Jump-back via CLI pane targeting |
 | **WezTerm** | Full Support | Jump-back via CLI pane targeting |
 | **iTerm2** | Full Support | Jump-back with session ID / TTY matching |
+| **Zellij** | Full Support | Jump-back via CLI pane/tab targeting |
 | **Warp** | Planned | Fallback detection only |
 
 #### Other Features
@@ -192,7 +193,7 @@ Developers who already live in the terminal and want a better way to work with c
 
 ### Terminal Support
 
-- **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, and **iTerm2** — Full jump-back support with session attachment matching (cmux via Unix socket API, Kaku/WezTerm via CLI pane targeting, iTerm2 via AppleScript session/TTY probe)
+- **Terminal.app**, **Ghostty**, **cmux**, **Kaku**, **WezTerm**, **iTerm2**, and **Zellij** — Full jump-back support with session attachment matching (cmux via Unix socket API, Kaku/WezTerm/Zellij via CLI pane targeting, iTerm2 via AppleScript session/TTY probe)
 - **Warp** — Fallback detection and basic process discovery
 
 ### UI & Display
