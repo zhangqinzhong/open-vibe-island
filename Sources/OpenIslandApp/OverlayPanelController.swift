@@ -88,30 +88,6 @@ final class OverlayPanelController {
         }
     }
 
-    /// Fade the panel out, then call completion so the caller can snap state.
-    func fadeOutAndClose(
-        duration: TimeInterval,
-        completion: @escaping @MainActor () -> Void
-    ) {
-        guard let panel else {
-            completion()
-            return
-        }
-
-        NSAnimationContext.runAnimationGroup({ context in
-            context.duration = duration
-            context.timingFunction = CAMediaTimingFunction(name: .easeIn)
-            panel.animator().alphaValue = 0
-        }, completionHandler: {
-            Task { @MainActor in completion() }
-        })
-    }
-
-    /// Restore panel alpha after a fade-out close.
-    func restoreAlpha() {
-        panel?.alphaValue = 1
-    }
-
     func reposition(preferredScreenID: String?) -> OverlayPlacementDiagnostics? {
         guard let panel else {
             return placementDiagnostics(preferredScreenID: preferredScreenID)
@@ -331,7 +307,13 @@ final class OverlayPanelController {
             return false
         }
 
-        return panel.frame.contains(screenPoint)
+        // The window is always at opened size, but the visible content area
+        // is the inner content rect (excluding shadow insets).
+        guard let contentRect = contentRect(for: model, in: panel.frame) else {
+            return false
+        }
+
+        return contentRect.contains(screenPoint)
     }
 
     func openedPanelWidth(for screen: NSScreen?) -> CGFloat {
@@ -351,7 +333,7 @@ final class OverlayPanelController {
     }
 
     func contentRect(for model: AppModel, in bounds: NSRect) -> NSRect? {
-        let insets = panelShadowInsets(for: model)
+        let insets = panelShadowInsets
         return NSRect(
             x: bounds.minX + insets.horizontal,
             y: bounds.minY + insets.bottom,
@@ -361,25 +343,27 @@ final class OverlayPanelController {
     }
 
     nonisolated static func closedSurfaceRect(
-        for panelFrame: NSRect,
-        shadowInsets: (horizontal: CGFloat, bottom: CGFloat)
+        notchRect: NSRect,
+        closedWidth: CGFloat
     ) -> NSRect {
-        NSRect(
-            x: panelFrame.minX + shadowInsets.horizontal,
-            y: panelFrame.minY + shadowInsets.bottom,
-            width: max(0, panelFrame.width - (shadowInsets.horizontal * 2)),
-            height: max(0, panelFrame.height - shadowInsets.bottom)
+        let cx = notchRect.midX
+        return NSRect(
+            x: cx - closedWidth / 2,
+            y: notchRect.minY,
+            width: closedWidth,
+            height: notchRect.height
         )
     }
 
     private func closedSurfaceRect(for model: AppModel) -> NSRect? {
-        guard let panel else {
+        guard let screen = resolveTargetScreen() else {
             return nil
         }
 
+        let closedWidth = closedPanelWidth(for: model, on: screen)
         return Self.closedSurfaceRect(
-            for: panel.frame,
-            shadowInsets: panelShadowInsets(for: model)
+            notchRect: notchRect,
+            closedWidth: closedWidth
         )
     }
 
@@ -393,8 +377,11 @@ final class OverlayPanelController {
         )
     }
 
+    /// Always returns the maximum (opened) panel size so the window never
+    /// needs to resize.  All visual transitions are driven purely by SwiftUI
+    /// inside this fixed-size window.
     private func panelSize(for model: AppModel?, on screen: NSScreen) -> CGSize {
-        let insets = panelShadowInsets(for: model)
+        let insets = panelShadowInsets
 
         guard let model else {
             return CGSize(
@@ -403,36 +390,23 @@ final class OverlayPanelController {
             )
         }
 
-        switch model.notchStatus {
-        case .opened:
-            let panelWidth = model.showsNotificationCard
-                ? notificationPanelWidth(for: screen)
-                : openedPanelWidth(for: screen)
-            return CGSize(
-                width: panelWidth + Self.openedContentWidthPadding + (insets.horizontal * 2),
-                height: screen.notchSize.height + openedContentHeight(for: model) + Self.openedContentBottomPadding + insets.bottom
-            )
-        case .closed, .popping:
-            return CGSize(
-                width: closedPanelWidth(for: model, on: screen) + (insets.horizontal * 2),
-                height: screen.islandClosedHeight + insets.bottom
-            )
-        }
+        let panelWidth = openedPanelWidth(for: screen)
+        let contentHeight = openedContentHeight(for: model)
+        // Use at least the empty-state height so the window doesn't shrink
+        // when sessions come and go while opened.
+        let height = screen.notchSize.height + max(contentHeight, Self.openedEmptyStateHeight) + Self.openedContentBottomPadding + insets.bottom
+
+        return CGSize(
+            width: panelWidth + Self.openedContentWidthPadding + (insets.horizontal * 2),
+            height: height
+        )
     }
 
-    private func panelShadowInsets(for model: AppModel?) -> (horizontal: CGFloat, bottom: CGFloat) {
-        let usesOpenedInsets = model.map { $0.notchStatus == .opened || $0.isOverlayCloseTransitionPending } ?? true
-
-        if usesOpenedInsets {
-            return (
-                horizontal: IslandChromeMetrics.openedShadowHorizontalInset,
-                bottom: IslandChromeMetrics.openedShadowBottomInset
-            )
-        }
-
-        return (
-            horizontal: IslandChromeMetrics.closedShadowHorizontalInset,
-            bottom: IslandChromeMetrics.closedShadowBottomInset
+    /// Constant insets — always opened size since the window never shrinks.
+    private var panelShadowInsets: (horizontal: CGFloat, bottom: CGFloat) {
+        (
+            horizontal: IslandChromeMetrics.openedShadowHorizontalInset,
+            bottom: IslandChromeMetrics.openedShadowBottomInset
         )
     }
 
