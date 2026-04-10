@@ -217,7 +217,9 @@ Repository: Octane0411/open-vibe-island
 ## Contributors
 
 <a href="https://github.com/Octane0411/open-vibe-island/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island" />
+  <!-- CONTRIBUTORS-IMG:START -->
+  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island&t=0" />
+  <!-- CONTRIBUTORS-IMG:END -->
 </a>
 
 ---
