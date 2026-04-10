@@ -216,9 +216,14 @@ Hooks **fail open**——如果 Open Island 没在运行，你的 agents 不受�
 
 ## Contributors
 
-<a href="https://github.com/Octane0411/open-vibe-island/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Octane0411/open-vibe-island" />
-</a>
+感谢所有贡献者！
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## 路线图
 

@@ -1,0 +1,14 @@
+{
+  "projectName": "open-vibe-island",
+  "projectOwner": "Octane0411",
+  "repoType": "github",
+  "repoHost": "https://github.com",
+  "files": [
+    "README.md",
+    "README.zh-CN.md"
+  ],
+  "imageSize": 60,
+  "contributorsPerLine": 8,
+  "commit": true,
+  "contributors": []
+}
