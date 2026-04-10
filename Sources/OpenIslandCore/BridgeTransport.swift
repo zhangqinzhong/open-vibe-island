@@ -88,6 +88,7 @@ public enum BridgeCommand: Equatable, Codable, Sendable {
     case processClaudeHook(ClaudeHookPayload)
     case processOpenCodeHook(OpenCodeHookPayload)
     case processCursorHook(CursorHookPayload)
+    case processGeminiHook(GeminiHookPayload)
 
     private enum CodingKeys: String, CodingKey {
         case type
@@ -100,6 +101,7 @@ public enum BridgeCommand: Equatable, Codable, Sendable {
         case claudeHook
         case openCodeHook
         case cursorHook
+        case geminiHook
     }
 
     private enum CommandType: String, Codable {
@@ -111,6 +113,7 @@ public enum BridgeCommand: Equatable, Codable, Sendable {
         case processClaudeHook
         case processOpenCodeHook
         case processCursorHook
+        case processGeminiHook
     }
 
     public init(from decoder: any Decoder) throws {
@@ -143,6 +146,8 @@ public enum BridgeCommand: Equatable, Codable, Sendable {
             self = .processOpenCodeHook(try container.decode(OpenCodeHookPayload.self, forKey: .openCodeHook))
         case .processCursorHook:
             self = .processCursorHook(try container.decode(CursorHookPayload.self, forKey: .cursorHook))
+        case .processGeminiHook:
+            self = .processGeminiHook(try container.decode(GeminiHookPayload.self, forKey: .geminiHook))
         }
     }
 
@@ -177,6 +182,9 @@ public enum BridgeCommand: Equatable, Codable, Sendable {
         case let .processCursorHook(payload):
             try container.encode(CommandType.processCursorHook, forKey: .type)
             try container.encode(payload, forKey: .cursorHook)
+        case let .processGeminiHook(payload):
+            try container.encode(CommandType.processGeminiHook, forKey: .type)
+            try container.encode(payload, forKey: .geminiHook)
         }
     }
 }

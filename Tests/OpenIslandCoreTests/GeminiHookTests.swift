@@ -121,4 +121,18 @@ struct GeminiHookTests {
         )
         #expect(status == .geminiNotFound)
     }
+
+    @Test func bridgeCommandRoundTripsGeminiHook() throws {
+        let payload = GeminiHookPayload(
+            sessionID: "s1",
+            hookEventName: .preToolUse,
+            cwd: "/tmp",
+            model: "gemini-2.0-flash",
+            toolName: "bash"
+        )
+        let command = BridgeCommand.processGeminiHook(payload)
+        let data = try JSONEncoder().encode(command)
+        let decoded = try JSONDecoder().decode(BridgeCommand.self, from: data)
+        #expect(decoded == command)
+    }
 }

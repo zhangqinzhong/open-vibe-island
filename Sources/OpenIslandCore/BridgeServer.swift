@@ -431,6 +431,9 @@ public final class BridgeServer: @unchecked Sendable {
 
         case let .processCursorHook(payload):
             handleCursorHook(payload, from: clientID)
+
+        case let .processGeminiHook(payload):
+            handleGeminiHook(payload, from: clientID)
         }
     }
 
@@ -1207,6 +1210,103 @@ public final class BridgeServer: @unchecked Sendable {
             )
             send(.response(.acknowledged), to: clientID)
         }
+    }
+
+    private func handleGeminiHook(_ payload: GeminiHookPayload, from clientID: UUID) {
+        switch payload.hookEventName {
+        case .sessionStart:
+            emit(
+                .sessionStarted(
+                    SessionStarted(
+                        sessionID: payload.sessionID,
+                        title: payload.sessionTitle,
+                        tool: .geminiCLI,
+                        origin: .live,
+                        initialPhase: .running,
+                        summary: payload.implicitStartSummary,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+
+        case .userPromptSubmit:
+            ensureGeminiSessionExists(for: payload)
+            emit(
+                .activityUpdated(
+                    SessionActivityUpdated(
+                        sessionID: payload.sessionID,
+                        summary: payload.implicitStartSummary,
+                        phase: .running,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+
+        case .preToolUse:
+            ensureGeminiSessionExists(for: payload)
+            emit(
+                .activityUpdated(
+                    SessionActivityUpdated(
+                        sessionID: payload.sessionID,
+                        summary: payload.implicitStartSummary,
+                        phase: .running,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+
+        case .postToolUse:
+            ensureGeminiSessionExists(for: payload)
+            emit(
+                .activityUpdated(
+                    SessionActivityUpdated(
+                        sessionID: payload.sessionID,
+                        summary: payload.implicitStartSummary,
+                        phase: .running,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+
+        case .stop:
+            ensureGeminiSessionExists(for: payload)
+            let summary = payload.lastAssistantMessage.flatMap { $0.isEmpty ? nil : String($0.prefix(120)) }
+                ?? payload.implicitStartSummary
+            emit(
+                .sessionCompleted(
+                    SessionCompleted(
+                        sessionID: payload.sessionID,
+                        summary: summary,
+                        timestamp: .now
+                    )
+                )
+            )
+            send(.response(.acknowledged), to: clientID)
+        }
+    }
+
+    private func ensureGeminiSessionExists(for payload: GeminiHookPayload) {
+        guard !hasSession(id: payload.sessionID) else {
+            return
+        }
+
+        emit(
+            .sessionStarted(
+                SessionStarted(
+                    sessionID: payload.sessionID,
+                    title: payload.sessionTitle,
+                    tool: .geminiCLI,
+                    origin: .live,
+                    initialPhase: .running,
+                    summary: payload.implicitStartSummary,
+                    timestamp: .now
+                )
+            )
+        )
     }
 
     private func clearStaleCursorInteractionIfNeeded(for sessionID: String) {
