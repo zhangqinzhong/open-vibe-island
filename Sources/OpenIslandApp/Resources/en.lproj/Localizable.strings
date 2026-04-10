@@ -53,6 +53,11 @@
 /* Settings - Setup */
 "settings.tab.setup" = "Setup";
 "setup.section.binary" = "Hook Binary";
+"setup.claudeConfigDir.section" = "Claude Config Directory";
+"setup.claudeConfigDir.title" = "Config Directory";
+"setup.claudeConfigDir.choose" = "Choose…";
+"setup.claudeConfigDir.reset" = "Reset";
+"setup.claudeConfigDir.footer" = "For users who run Claude Code with CLAUDE_CONFIG_DIR. Leave default unless you use a custom config path.";
 "setup.section.hooks" = "CLI Hooks";
 "setup.section.usage" = "Usage Bridge";
 "setup.section.permissions" = "Permissions";

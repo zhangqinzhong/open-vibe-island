@@ -53,6 +53,11 @@
 /* Settings - Setup */
 "settings.tab.setup" = "安装引导";
 "setup.section.binary" = "Hook 二进制";
+"setup.claudeConfigDir.section" = "Claude 配置目录";
+"setup.claudeConfigDir.title" = "配置目录";
+"setup.claudeConfigDir.choose" = "选择…";
+"setup.claudeConfigDir.reset" = "重置";
+"setup.claudeConfigDir.footer" = "适用于通过 CLAUDE_CONFIG_DIR 使用自定义配置路径启动 Claude Code 的用户。如无需要请保持默认。";
 "setup.section.hooks" = "CLI Hooks";
 "setup.section.usage" = "用量桥接";
 "setup.section.permissions" = "权限";
