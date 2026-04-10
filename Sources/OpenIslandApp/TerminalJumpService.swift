@@ -1003,6 +1003,15 @@ struct TerminalJumpService {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
+        // "Unknown" is the hook-side sentinel meaning "we could not classify this
+        // terminal". Returning nil here lets jump() fall through to the Finder
+        // cwd fallback instead of silently activating the first installed
+        // known terminal — the historical behavior that caused Warp sessions to
+        // open Terminal.app (or worse, iTerm) windows.
+        if normalized == "unknown" {
+            return nil
+        }
+
         if let exact = Self.knownApps.first(where: { descriptor in
             descriptor.displayName.lowercased() == normalized || descriptor.aliases.contains(normalized)
         }) {
