@@ -9,6 +9,7 @@ import SwiftUI
 final class AppModel {
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let showDockIconDefaultsKey = "app.showDockIcon"
+    private static let hapticFeedbackEnabledDefaultsKey = "app.hapticFeedbackEnabled"
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(20)
@@ -166,6 +167,12 @@ final class AppModel {
             }
         }
     }
+    var hapticFeedbackEnabled: Bool = false {
+        didSet {
+            guard hasFinishedInit, hapticFeedbackEnabled != oldValue else { return }
+            UserDefaults.standard.set(hapticFeedbackEnabled, forKey: Self.hapticFeedbackEnabledDefaultsKey)
+        }
+    }
     var isSoundMuted = false {
         didSet {
             guard isSoundMuted != oldValue else {
@@ -229,10 +236,14 @@ final class AppModel {
         }
     ) {
         self.terminalJumpAction = terminalJumpAction
-        UserDefaults.standard.register(defaults: [Self.showDockIconDefaultsKey: true])
+        UserDefaults.standard.register(defaults: [
+            Self.showDockIconDefaultsKey: true,
+            Self.hapticFeedbackEnabledDefaultsKey: false,
+        ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
         showDockIcon = UserDefaults.standard.bool(forKey: Self.showDockIconDefaultsKey)
+        hapticFeedbackEnabled = UserDefaults.standard.bool(forKey: Self.hapticFeedbackEnabledDefaultsKey)
 
         overlay.appModel = self
         overlay.restoreDisplayPreference()
