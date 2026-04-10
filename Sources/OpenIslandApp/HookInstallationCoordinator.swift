@@ -33,8 +33,10 @@ final class HookInstallationCoordinator {
     @ObservationIgnored
     private let codexHookInstallationManager = CodexHookInstallationManager()
 
-    @ObservationIgnored
-    private let claudeHookInstallationManager = ClaudeHookInstallationManager()
+    /// Computed so it always reflects the latest `ClaudeConfigDirectory` setting.
+    private var claudeHookInstallationManager: ClaudeHookInstallationManager {
+        ClaudeHookInstallationManager()
+    }
 
     @ObservationIgnored
     private let qoderHookInstallationManager = ClaudeHookInstallationManager(
@@ -66,8 +68,10 @@ final class HookInstallationCoordinator {
     @ObservationIgnored
     private let cursorHookInstallationManager = CursorHookInstallationManager()
 
-    @ObservationIgnored
-    private let claudeStatusLineInstallationManager = ClaudeStatusLineInstallationManager()
+    /// Computed so it always reflects the latest `ClaudeConfigDirectory` setting.
+    private var claudeStatusLineInstallationManager: ClaudeStatusLineInstallationManager {
+        ClaudeStatusLineInstallationManager()
+    }
 
     @ObservationIgnored
     private var claudeUsageMonitorTask: Task<Void, Never>?
@@ -134,7 +138,7 @@ final class HookInstallationCoordinator {
 
     var claudeHookStatusSummary: String {
         guard let status = claudeHookStatus else {
-            return "Reading ~/.claude/settings.json."
+            return "Reading \(ClaudeConfigDirectory.resolved().appendingPathComponent("settings.json").path)."
         }
 
         if claudeHooksInstalled {
@@ -177,7 +181,7 @@ final class HookInstallationCoordinator {
 
     var claudeUsageStatusSummary: String {
         guard let status = claudeStatusLineStatus else {
-            return "Reading ~/.claude/settings.json."
+            return "Reading \(ClaudeConfigDirectory.resolved().appendingPathComponent("settings.json").path)."
         }
 
         if status.managedStatusLineInstalled {
@@ -331,6 +335,30 @@ final class HookInstallationCoordinator {
         }
 
         return status.featureFlagEnabled ? "feature on · no managed hooks" : "feature off · no managed hooks"
+    }
+
+    // MARK: - Claude config directory
+
+    /// Updates the custom Claude config directory, cleans up old hooks if present, and refreshes status.
+    func updateClaudeConfigDirectory(to newDirectory: URL?) {
+        let oldDirectory = ClaudeConfigDirectory.resolved()
+        let oldHadHooks = claudeHookStatus?.managedHooksPresent == true
+
+        ClaudeConfigDirectory.customDirectory = newDirectory
+
+        // Refresh status from the new directory
+        refreshClaudeHookStatus()
+        refreshClaudeUsageState()
+
+        let newPath = ClaudeConfigDirectory.resolved().path
+        if oldHadHooks {
+            let oldPath = oldDirectory.path
+            if oldPath != newPath {
+                onStatusMessage?("Claude config directory changed to \(newPath). Hooks in \(oldPath) were not removed — uninstall them manually if no longer needed.")
+            }
+        } else {
+            onStatusMessage?("Claude config directory set to \(newPath).")
+        }
     }
 
     // MARK: - Auto-update hooks binary
@@ -841,11 +869,12 @@ final class HookInstallationCoordinator {
         snapshot: ClaudeUsageSnapshot?,
         repairedManagedBridge: Bool
     ) {
-        var status = try claudeStatusLineInstallationManager.status()
+        let manager = ClaudeStatusLineInstallationManager()
+        var status = try manager.status()
         var repairedManagedBridge = false
 
         if repairManagedBridgeIfNeeded && status.managedStatusLineNeedsRepair {
-            status = try claudeStatusLineInstallationManager.install()
+            status = try manager.install()
             repairedManagedBridge = true
         }
 

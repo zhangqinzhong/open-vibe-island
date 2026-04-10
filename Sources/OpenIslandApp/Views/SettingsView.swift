@@ -393,6 +393,8 @@ struct SetupSettingsPane: View {
 
     var body: some View {
         Form {
+            claudeConfigDirectorySection
+
             Section(lang.t("setup.section.hooks")) {
                 hookRow(
                     name: "Claude Code",
@@ -590,6 +592,53 @@ struct SetupSettingsPane: View {
         }
         .formStyle(.grouped)
         .navigationTitle(lang.t("settings.tab.setup"))
+    }
+
+    @ViewBuilder
+    private var claudeConfigDirectorySection: some View {
+        Section {
+            HStack {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(lang.t("setup.claudeConfigDir.title"))
+                        Text(ClaudeConfigDirectory.resolved().path)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                } icon: {
+                    Image(systemName: "folder")
+                }
+                Spacer()
+                if ClaudeConfigDirectory.customDirectory != nil {
+                    Button(lang.t("setup.claudeConfigDir.reset")) {
+                        model.updateClaudeConfigDirectory(to: nil)
+                    }
+                    .font(.caption)
+                }
+                Button(lang.t("setup.claudeConfigDir.choose")) {
+                    let panel = NSOpenPanel()
+                    panel.canChooseDirectories = true
+                    panel.canChooseFiles = false
+                    panel.canCreateDirectories = true
+                    panel.prompt = lang.t("setup.claudeConfigDir.choose")
+                    if panel.runModal() == .OK, let url = panel.url {
+                        model.updateClaudeConfigDirectory(to: url)
+                    }
+                }
+            }
+        } header: {
+            HStack(spacing: 4) {
+                Text(lang.t("setup.claudeConfigDir.section"))
+                Text(lang.t("setup.optional"))
+                    .foregroundStyle(.tertiary)
+            }
+        } footer: {
+            Text(lang.t("setup.claudeConfigDir.footer"))
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
     }
 
     private var allReady: Bool {
