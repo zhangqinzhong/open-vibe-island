@@ -38,8 +38,8 @@ struct GeminiHookTests {
         #expect(payload.toolInput?["command"] == "ls -la")
     }
 
-    @Test func encoderReturnsNilForAcknowledged() throws {
-        let result = try GeminiHookOutputEncoder.standardOutput(for: .acknowledged)
+    @Test func encoderReturnsNilForAcknowledged() {
+        let result = GeminiHookOutputEncoder.standardOutput(for: .acknowledged)
         #expect(result == nil)
     }
 }

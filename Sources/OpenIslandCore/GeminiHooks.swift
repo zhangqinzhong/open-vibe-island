@@ -71,7 +71,7 @@ public extension GeminiHookPayload {
 }
 
 public enum GeminiHookOutputEncoder {
-    public static func standardOutput(for response: BridgeResponse) throws -> Data? {
+    public static func standardOutput(for response: BridgeResponse) -> Data? {
         // Gemini CLI hooks are fire-and-forget — no block/deny directive needed yet.
         return nil
     }
