@@ -782,6 +782,12 @@ final class AppModel {
         )
     }
 
+    func dismissSession(_ sessionID: String) {
+        state.dismissSession(id: sessionID)
+        dismissNotificationSurfaceIfPresent(for: sessionID)
+        synchronizeSelection()
+    }
+
     func answerQuestion(for sessionID: String, answer: QuestionPromptResponse) {
         guard let session = state.session(id: sessionID) else {
             return

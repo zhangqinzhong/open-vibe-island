@@ -553,7 +553,8 @@ struct IslandPanelView: View {
                         lang: model.lang,
                         onApprove: { model.approvePermission(for: session.id, action: $0) },
                         onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
-                        onJump: { model.jumpToSession(session) }
+                        onJump: { model.jumpToSession(session) },
+                        onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
                     )
                 }
             }
@@ -976,6 +977,7 @@ private struct IslandSessionRow: View {
     var onApprove: ((ApprovalAction) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
     let onJump: () -> Void
+    var onDismiss: (() -> Void)?
 
     @State private var isHighlighted = false
     @State private var isManuallyExpanded = false
@@ -1010,6 +1012,14 @@ private struct IslandSessionRow: View {
                                 compactBadge(terminalBadge, presence: presence)
                             }
                             compactBadge(session.spotlightAgeBadge, presence: presence)
+                            if let onDismiss {
+                                Button(action: onDismiss) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.white.opacity(0.4))
+                                }
+                                .buttonStyle(.plain)
+                            }
                         }
                     }
 
