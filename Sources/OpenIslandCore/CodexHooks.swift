@@ -84,6 +84,10 @@ public struct CodexHookPayload: Equatable, Codable, Sendable {
     public var terminalSessionID: String?
     public var terminalTTY: String?
     public var terminalTitle: String?
+    /// Warp-specific per-pane identifier discovered via Warp's SQLite state
+    /// at hook runtime. Not sent over the wire by the hook script — populated
+    /// in `withRuntimeContext` and serialized through the bridge.
+    public var warpPaneUUID: String?
     public var transcriptPath: String?
     public var source: String?
     public var turnID: String?
@@ -105,6 +109,7 @@ public struct CodexHookPayload: Equatable, Codable, Sendable {
         case terminalSessionID = "terminal_session_id"
         case terminalTTY = "terminal_tty"
         case terminalTitle = "terminal_title"
+        case warpPaneUUID = "warp_pane_uuid"
         case transcriptPath = "transcript_path"
         case source
         case turnID = "turn_id"
@@ -127,6 +132,7 @@ public struct CodexHookPayload: Equatable, Codable, Sendable {
         terminalSessionID: String? = nil,
         terminalTTY: String? = nil,
         terminalTitle: String? = nil,
+        warpPaneUUID: String? = nil,
         transcriptPath: String?,
         source: String? = nil,
         turnID: String? = nil,
@@ -147,6 +153,7 @@ public struct CodexHookPayload: Equatable, Codable, Sendable {
         self.terminalSessionID = terminalSessionID
         self.terminalTTY = terminalTTY
         self.terminalTitle = terminalTitle
+        self.warpPaneUUID = warpPaneUUID
         self.transcriptPath = transcriptPath
         self.source = source
         self.turnID = turnID
@@ -170,6 +177,7 @@ public struct CodexHookPayload: Equatable, Codable, Sendable {
         terminalSessionID = try container.decodeIfPresent(String.self, forKey: .terminalSessionID)
         terminalTTY = try container.decodeIfPresent(String.self, forKey: .terminalTTY)
         terminalTitle = try container.decodeIfPresent(String.self, forKey: .terminalTitle)
+        warpPaneUUID = try container.decodeIfPresent(String.self, forKey: .warpPaneUUID)
         transcriptPath = try container.decodeIfPresent(String.self, forKey: .transcriptPath)
         source = try container.decodeIfPresent(String.self, forKey: .source)
         turnID = try container.decodeIfPresent(String.self, forKey: .turnID)
@@ -270,7 +278,8 @@ public extension CodexHookPayload {
             paneTitle: terminalTitle ?? "Codex \(sessionID.prefix(8))",
             workingDirectory: cwd,
             terminalSessionID: terminalSessionID,
-            terminalTTY: terminalTTY
+            terminalTTY: terminalTTY,
+            warpPaneUUID: warpPaneUUID
         )
     }
 

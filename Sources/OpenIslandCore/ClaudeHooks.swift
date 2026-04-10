@@ -362,6 +362,10 @@ public struct ClaudeHookPayload: Equatable, Codable, Sendable {
     public var terminalSessionID: String?
     public var terminalTTY: String?
     public var terminalTitle: String?
+    /// Warp-specific per-pane identifier discovered via Warp's SQLite state
+    /// at hook runtime. Not sent over the wire by the hook script — populated
+    /// in `withRuntimeContext` and serialized through the bridge.
+    public var warpPaneUUID: String?
     /// Set to `true` by the Python hook client to indicate a remote (SSH) session.
     public var remote: Bool?
 
@@ -398,6 +402,7 @@ public struct ClaudeHookPayload: Equatable, Codable, Sendable {
         case terminalSessionID = "terminal_session_id"
         case terminalTTY = "terminal_tty"
         case terminalTitle = "terminal_title"
+        case warpPaneUUID = "warp_pane_uuid"
         case remote
     }
 
@@ -430,6 +435,7 @@ public struct ClaudeHookPayload: Equatable, Codable, Sendable {
         terminalSessionID: String? = nil,
         terminalTTY: String? = nil,
         terminalTitle: String? = nil,
+        warpPaneUUID: String? = nil,
         remote: Bool? = nil
     ) {
         self.cwd = cwd
@@ -460,6 +466,7 @@ public struct ClaudeHookPayload: Equatable, Codable, Sendable {
         self.terminalSessionID = terminalSessionID
         self.terminalTTY = terminalTTY
         self.terminalTitle = terminalTitle
+        self.warpPaneUUID = warpPaneUUID
         self.remote = remote
     }
 }
@@ -681,7 +688,8 @@ public extension ClaudeHookPayload {
             paneTitle: terminalTitle ?? "Claude \(sessionID.prefix(8))",
             workingDirectory: cwd,
             terminalSessionID: terminalSessionID,
-            terminalTTY: terminalTTY
+            terminalTTY: terminalTTY,
+            warpPaneUUID: warpPaneUUID
         )
     }
 
