@@ -1013,12 +1013,7 @@ private struct IslandSessionRow: View {
                             }
                             compactBadge(session.spotlightAgeBadge, presence: presence)
                             if let onDismiss {
-                                Button(action: onDismiss) {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.white.opacity(0.4))
-                                }
-                                .buttonStyle(.plain)
+                                DismissButton(action: onDismiss)
                             }
                         }
                     }
@@ -1923,4 +1918,19 @@ extension MarkdownUI.Theme {
                 .padding(.horizontal, 12)
                 .relativeLineSpacing(.em(0.25))
         }
+}
+
+private struct DismissButton: View {
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(isHovered ? 0.8 : 0.4))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+    }
 }
