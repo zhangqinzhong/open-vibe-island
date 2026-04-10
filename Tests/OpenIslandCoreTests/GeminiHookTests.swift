@@ -1,0 +1,45 @@
+// Tests/OpenIslandCoreTests/GeminiHookTests.swift
+import Testing
+import Foundation
+@testable import OpenIslandCore
+
+@Suite("GeminiHooks")
+struct GeminiHookTests {
+    @Test func decodesSessionStartPayload() throws {
+        let json = """
+        {
+          "session_id": "abc-123",
+          "hook_event_name": "SessionStart",
+          "cwd": "/Users/user/project",
+          "model": "gemini-2.0-flash"
+        }
+        """.data(using: .utf8)!
+        let payload = try JSONDecoder().decode(GeminiHookPayload.self, from: json)
+        #expect(payload.sessionID == "abc-123")
+        #expect(payload.hookEventName == .sessionStart)
+        #expect(payload.model == "gemini-2.0-flash")
+        #expect(payload.cwd == "/Users/user/project")
+    }
+
+    @Test func decodesPreToolUsePayload() throws {
+        let json = """
+        {
+          "session_id": "xyz",
+          "hook_event_name": "PreToolUse",
+          "cwd": "/tmp",
+          "model": "gemini-2.0-flash",
+          "tool_name": "bash",
+          "tool_input": {"command": "ls -la"}
+        }
+        """.data(using: .utf8)!
+        let payload = try JSONDecoder().decode(GeminiHookPayload.self, from: json)
+        #expect(payload.hookEventName == .preToolUse)
+        #expect(payload.toolName == "bash")
+        #expect(payload.toolInput?["command"] == "ls -la")
+    }
+
+    @Test func encoderReturnsNilForAcknowledged() throws {
+        let result = try GeminiHookOutputEncoder.standardOutput(for: .acknowledged)
+        #expect(result == nil)
+    }
+}
