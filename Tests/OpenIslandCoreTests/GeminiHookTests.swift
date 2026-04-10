@@ -72,4 +72,44 @@ struct GeminiHookTests {
         p = GeminiHookPayload(sessionID: "s", hookEventName: .userPromptSubmit, cwd: "/Users/user/myapp", model: "g")
         #expect(p.implicitStartSummary.contains("prompt"))
     }
+
+    @Test func installerAddsManagedHooksToEmptyFile() throws {
+        let mutation = try GeminiHookInstaller.installSettingsJSON(
+            existingData: nil,
+            hookCommand: "/usr/local/bin/open-island-hooks --source gemini"
+        )
+        #expect(mutation.changed == true)
+        #expect(mutation.managedHooksPresent == true)
+        let obj = try JSONSerialization.jsonObject(with: mutation.contents!) as! [String: Any]
+        let hooks = obj["hooks"] as! [String: Any]
+        let entries = hooks["PreToolUse"] as! [[String: String]]
+        #expect(entries.first?["command"]?.contains("--source gemini") == true)
+    }
+
+    @Test func installerUninstallRemovesManagedHooks() throws {
+        let installed = try GeminiHookInstaller.installSettingsJSON(
+            existingData: nil,
+            hookCommand: "/usr/local/bin/open-island-hooks --source gemini"
+        )
+        let uninstalled = try GeminiHookInstaller.uninstallSettingsJSON(
+            existingData: installed.contents,
+            hookCommand: "/usr/local/bin/open-island-hooks --source gemini"
+        )
+        #expect(uninstalled.changed == true)
+        #expect(uninstalled.managedHooksPresent == false)
+    }
+
+    @Test func installerPreservesExistingUserHooks() throws {
+        let existing = """
+        {"hooks":{"PreToolUse":[{"command":"echo user-hook"}]}}
+        """.data(using: .utf8)!
+        let mutation = try GeminiHookInstaller.installSettingsJSON(
+            existingData: existing,
+            hookCommand: "/usr/local/bin/open-island-hooks --source gemini"
+        )
+        let obj = try JSONSerialization.jsonObject(with: mutation.contents!) as! [String: Any]
+        let hooks = obj["hooks"] as! [String: Any]
+        let entries = hooks["PreToolUse"] as! [[String: String]]
+        #expect(entries.count == 2)
+    }
 }
