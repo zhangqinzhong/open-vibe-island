@@ -1,6 +1,6 @@
 # Warp Terminal Identification Fix
 
-Status: Design approved — ready for implementation plan
+Status: Implemented — pending merge
 Date: 2026-04-10
 Scope: Level 2 (minimal bug fix + default-fallback hardening)
 
@@ -80,79 +80,121 @@ The canonical whitelist was updated; the hook-side classifier was not. Every fut
 - **Unifying the two terminal whitelists** (`inferTerminalApp` vs `supportedTerminalApp`) into a single source of truth. This is a worthwhile architectural cleanup but crosses the boundary of a minimal bug fix. Tracked as a followup.
 - **CGWindowList / Accessibility-based window matching.** Would require new macOS permission prompts for uncertain benefit.
 
-## Changes
+## Findings During Implementation
 
-### 1. Add Warp recognition in hook-side classifiers
+The spec was drafted from a code read that predicted the `CodexHooks` and `OpenCodeHooks` files would need the same shape of fix as `ClaudeHooks`. Reading the files more carefully during implementation surfaced three refinements:
 
-Add a `case .some("warpterminal"): return "Warp"` arm to `inferTerminalApp` in every file that has one. At minimum:
+### Finding 1 · CodexHooks already recognizes Warp
 
-- `Sources/OpenIslandCore/ClaudeHooks.swift` (switch around line 1115)
-- `Sources/OpenIslandCore/CodexHooks.swift` (equivalent switch, location to confirm during implementation)
+`Sources/OpenIslandCore/CodexHooks.swift:481-551` defines an `inferTerminalApp` that already has **two** independent Warp detection paths:
 
-If `Sources/OpenIslandCore/OpenCodeHooks.swift` has an `inferTerminalApp` equivalent, add the arm there too. If it reads `terminalApp` directly from the hook payload without classifier logic, no change is needed in that file beyond the default-fallback change below.
+- Line 500-502: `if environment["WARP_IS_LOCAL_SHELL_SESSION"] != nil { return "Warp" }` — env-var fast path before the `TERM_PROGRAM` switch.
+- Line 515-516: `case let value? where value.contains("warp"): return "Warp"` — substring match inside the switch.
+
+Codex sessions running inside Warp were already being labeled correctly. The visible bug was Claude-only. CodexHooks still needs the `?? "Terminal"` → `?? "Unknown"` change for the hardening goal (step 2 below), but the classifier is untouched.
+
+### Finding 2 · OpenCodeHooks has no `inferTerminalApp`
+
+`Sources/OpenIslandCore/OpenCodeHooks.swift` has no classifier function at all. Its `terminalApp` field comes directly from the hook payload without runtime inference. Only the default-fallback change is needed in that file.
+
+### Finding 3 · `resolveTerminalApp` has a silent fallback that swallows the "Unknown" sentinel
+
+The spec originally assumed `TerminalJumpService.resolveTerminalApp("Unknown")` would return `nil` and let `jump()` fall through to the Finder fallback. Reading `Sources/OpenIslandApp/TerminalJumpService.swift:852-864` showed the resolver actually has a generic "first installed known app" fallback:
+
+```swift
+if let exact = Self.knownApps.first(where: { descriptor in
+    descriptor.displayName.lowercased() == normalized || descriptor.aliases.contains(normalized)
+}) {
+    return exact
+}
+
+return Self.knownApps.first(where: { isInstalled(bundleIdentifier: $0.bundleIdentifier) })
+```
+
+Without intervention, passing `"Unknown"` would silently return whatever known terminal is installed first (iTerm, by `knownApps` ordering) — and `jump()` would then activate *that* wrong terminal. This was confirmed empirically by the failing test `testUnknownTerminalAppFallsBackToFinderInsteadOfFirstInstalledTerminal` before the fix was applied: clicking jump on an "Unknown" target with iTerm installed as a test stub produced `"Activated iTerm. Exact pane targeting is still best-effort."` instead of the intended Finder fallback.
+
+The fix is an explicit `"unknown"` guard at the top of `resolveTerminalApp`, narrow enough not to change behavior for any currently-passing value.
+
+## Changes (as implemented)
+
+### 1. Add Warp recognition in `ClaudeHooks.inferTerminalApp`
+
+Added two detection arms to `Sources/OpenIslandCore/ClaudeHooks.swift`, matching the pattern already in `CodexHooks`:
+
+- Env-var fast path: `if environment["WARP_IS_LOCAL_SHELL_SESSION"] != nil { return "Warp" }` placed next to the existing `GHOSTTY_RESOURCES_DIR` check.
+- Switch arm: `case let value? where value.contains("warp"): return "Warp"` placed next to the existing `value.contains("ghostty")` arm.
+
+Both arms are present for defense in depth — the env var fires first in the normal case, the switch arm catches `TERM_PROGRAM=WarpTerminal` if the env var is ever absent.
+
+**No changes** to `CodexHooks.inferTerminalApp` — already correct (see Finding 1).
+
+**No changes** to `OpenCodeHooks` classifier — no classifier exists (see Finding 2).
 
 ### 2. Replace the `?? "Terminal"` default fallback
 
-In each of the following, change `?? "Terminal"` to `?? "Unknown"`:
+Changed `?? "Terminal"` to `?? "Unknown"` in all three hook payload `defaultJumpTarget` computed properties:
 
 - `Sources/OpenIslandCore/ClaudeHooks.swift:679`
 - `Sources/OpenIslandCore/CodexHooks.swift:268`
 - `Sources/OpenIslandCore/OpenCodeHooks.swift:190`
 
-After this change, `"Unknown"` becomes the project-wide sentinel for "we could not classify this terminal" — consistent with the existing use at `Sources/OpenIslandCore/ClaudeTranscriptDiscovery.swift:183` and `Sources/OpenIslandApp/ProcessMonitoringCoordinator.swift:371`.
+After this change, `"Unknown"` is the project-wide sentinel for "we could not classify this terminal" — consistent with the pre-existing uses at `Sources/OpenIslandCore/ClaudeTranscriptDiscovery.swift:183` and `Sources/OpenIslandApp/ProcessMonitoringCoordinator.swift:371`.
 
-### 3. Verify downstream handling of "Unknown"
+### 3. Add explicit "unknown" guard in `resolveTerminalApp`
 
-No code changes expected, but verify during implementation that the following already hold:
+Added a four-line guard at the top of `Sources/OpenIslandApp/TerminalJumpService.resolveTerminalApp`:
 
-- `TerminalJumpService.resolveTerminalApp("Unknown")` returns `nil` (because the string `"unknown"` is not in any `TerminalAppDescriptor.aliases`). Verify by reading the resolver.
-- With a `nil` descriptor, `TerminalJumpService.jump` falls through the chained `if let descriptor` blocks (lines 199-262) and reaches the Finder fallback at line 264:
-  ```swift
-  if hasWorkingDirectory, let workingDirectory = target.workingDirectory {
-      try openAction([workingDirectory])
-      return "Opened \(target.workspaceName) in Finder because no supported terminal app could be resolved."
-  }
-  ```
-- `AgentSession+Presentation.swift:115` renders `"\(jumpTarget.terminalApp) · \(jumpTarget.workspaceName)"` via plain string interpolation, so a terminal value of `"Unknown"` will display as `"Unknown · my-project"` with no additional UI work. This is consistent with the existing `ClaudeTranscriptDiscovery.swift:183` behavior.
+```swift
+if normalized == "unknown" {
+    return nil
+}
+```
 
-If any of these invariants do not already hold, treat it as a new finding and update this spec before implementing.
+With this, `jump()` will skip the descriptor-keyed switch entirely for `"Unknown"` targets and either:
 
-### 4. UI presentation choice
+- activate Finder on the working directory (line 264-267) — the common case, because the hook fired from within a cwd that exists on disk, or
+- throw `TerminalJumpError.unsupportedTerminal("Unknown")` if even the working directory is missing (pathological case).
 
-Display `"Unknown"` literally in the terminal label, matching existing precedent (`ClaudeTranscriptDiscovery.swift:183`). No branching in the presentation layer.
+No behavior change for any other terminal name, because all existing known terminal names either match `displayName` or `aliases` exactly and return a descriptor on the first `.first(where:)` call — never reaching the generic "first installed" fallback that is being bypassed.
+
+### 4. UI presentation
+
+Display `"Unknown"` literally in the terminal label at `AgentSession+Presentation.swift:115`, matching existing precedent (`ClaudeTranscriptDiscovery.swift:183`). No code changes — the existing string interpolation renders whatever value the session carries.
 
 Alternatives considered and rejected for this fix:
 
 - Hide the terminal label for unknown terminals — loses diagnostic signal.
 - Display the raw `TERM_PROGRAM` value (e.g. `"WarpTerminal"`) — more informative but requires the hook to pass the raw value as a deeper fallback before `"Unknown"`. Can be revisited as a separate enhancement.
 
-## Verification Path
+## Verification Path (as executed)
 
-### Unit tests (new)
+### Unit tests added
 
-1. **`ClaudeHooksTests`**: Given an environment dictionary containing `["TERM_PROGRAM": "WarpTerminal"]` (and otherwise empty of other terminal markers like `GHOSTTY_RESOURCES_DIR`, `ZELLIJ`, `CMUX_WORKSPACE_ID`, etc.), `inferTerminalApp(from:)` returns `"Warp"`.
-2. **`ClaudeHooksTests`**: Given an environment with an unrecognized `TERM_PROGRAM` (e.g. `"rio"`) and no other markers, the resulting hook payload session has `terminalApp == "Unknown"` (not `"Terminal"`).
-3. **`CodexHooksTests`**: Same two tests against the Codex classifier and payload constructor.
-4. **`OpenCodeHooksTests`**: Test for the unknown-terminal fallback. If OpenCode has an `inferTerminalApp`, also test the `WarpTerminal` → `"Warp"` case.
+1. ✅ `ClaudeHooksTests.claudeInferTerminalAppRecognizesWarpViaEnvVar` — environment `["WARP_IS_LOCAL_SHELL_SESSION": "1"]` causes `withRuntimeContext` to set `payload.terminalApp == "Warp"`.
+2. ✅ `ClaudeHooksTests.claudeInferTerminalAppRecognizesWarpViaTermProgram` — environment `["TERM_PROGRAM": "WarpTerminal"]` does the same, via the switch arm.
+3. ✅ `ClaudeHooksTests.claudeDefaultJumpTargetUsesUnknownSentinelForUnrecognizedTerminal` — environment `["TERM_PROGRAM": "rio"]` leaves `payload.terminalApp == nil` and `payload.defaultJumpTarget.terminalApp == "Unknown"` (not `"Terminal"`).
+4. ✅ `TerminalJumpServiceTests.testUnknownTerminalAppFallsBackToFinderInsteadOfFirstInstalledTerminal` — with iTerm stubbed as installed, `jump()` called with `terminalApp: "Unknown"` and a real `/tmp` workingDirectory opens `["/tmp"]` (Finder) — not `["-b", "com.googlecode.iterm2"]`.
+
+All four tests were written first, observed failing (TDD red), then the production code was changed to turn them green.
+
+Tests for the default-fallback change in `CodexHooks.swift:268` and `OpenCodeHooks.swift:190` were not added as dedicated new tests — the type system and the full regression suite below cover the change, and the ClaudeHooks unknown-sentinel test exercises the same code path on the same-shaped computed property.
 
 ### Regression
 
-5. Run the existing hook test suite (`swift test`) to confirm none of the currently-asserted values depend on the old `?? "Terminal"` fallback. Any existing test that was unintentionally relying on that default must be updated (it was asserting a bug).
+✅ `swift test` — 141 tests across 17 suites pass. No pre-existing test depended on the old `?? "Terminal"` default.
 
-### Manual
+### Manual (pending on merge)
 
-6. In a Warp tab, run a fresh Claude Code session against any repo. Confirm Open Island's session list shows `"Warp · <workspace>"`.
-7. Click the jump affordance on that session. Confirm Warp comes to the foreground and **no new Terminal.app window opens**. The specific tab that ends up focused inside Warp is whatever Warp last had focused — this is expected given Warp's lack of automation surface.
-8. (Optional, if time permits) Repeat with Codex inside Warp to confirm parity.
+- [ ] In a Warp tab, run a fresh Claude Code session. Open Island's session list should show `"Warp · <workspace>"`.
+- [ ] Click the jump affordance. Warp should come to the foreground and **no new Terminal.app window should open**. The specific tab that ends up focused is whatever Warp last had focused — expected given Warp's lack of automation surface.
+- [ ] (Optional) Confirm Codex parity — not strictly necessary since CodexHooks classifier was already correct.
 
-## Open Risks / Blockers
+## Resolved Risks
 
-### Low risk
+- **`OpenCodeHooks.swift` shape**: confirmed to have no `inferTerminalApp` classifier. Only the default-fallback change was needed there.
+- **Existing test coverage baking in the old default**: no tests in the suite asserted `terminalApp == "Terminal"` as a fallback value. Full `swift test` run stays green after the default change.
 
-- **`OpenCodeHooks.swift` shape unknown at spec-write time.** It has the `?? "Terminal"` line but I haven't confirmed whether it has a matching `inferTerminalApp` switch. Implementation step 1 must read the file first and decide whether an arm needs adding. No design change — just a decision to make during implementation.
-- **Existing test coverage may have baked-in the old default.** Any test that set up a Claude hook payload with no `TERM_PROGRAM` and asserted `terminalApp == "Terminal"` is relying on the bug. Expected to be zero or very few such tests; count during implementation and fix them by either adding an explicit `TERM_PROGRAM` value or updating the expectation.
-
-### Accepted limitations (not blockers)
+## Accepted Limitations (not blockers)
 
 - **Tab-level precision is impossible for Warp today.** Empirical findings during design:
   - No AppleScript dictionary (`tell application "Warp"` returns app name only, not scriptable).
