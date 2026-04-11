@@ -10,6 +10,17 @@ final class AppModel {
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let showDockIconDefaultsKey = "app.showDockIcon"
     private static let hapticFeedbackEnabledDefaultsKey = "app.hapticFeedbackEnabled"
+    private static let islandAppearanceModeDefaultsKey = "appearance.island.mode"
+    private static let islandClosedDisplayStyleDefaultsKey = "appearance.island.closedDisplayStyle"
+    private static let islandPixelShapeStyleDefaultsKey = "appearance.island.pixelShapeStyle"
+    private static let islandStatusColorsDefaultsKey = "appearance.island.statusColors"
+
+    static let defaultStatusColors: [SessionPhase: String] = [
+        .running: "#6E9FFF",
+        .waitingForApproval: "#FFB547",
+        .waitingForAnswer: "#FFD95A",
+        .completed: "#42E86B",
+    ]
     private static let syntheticClaudeSessionPrefix = "claude-process:"
     private static let liveSessionStalenessWindow: TimeInterval = 15 * 60
     private static let jumpOverlayDismissLeadTime: Duration = .milliseconds(20)
@@ -195,6 +206,55 @@ final class AppModel {
         get { overlay.overlayDisplaySelectionID }
         set { overlay.overlayDisplaySelectionID = newValue }
     }
+
+    // MARK: - Appearance
+
+    var islandAppearanceMode: IslandAppearanceMode = .default {
+        didSet {
+            guard islandAppearanceMode != oldValue else { return }
+            UserDefaults.standard.set(islandAppearanceMode.rawValue, forKey: Self.islandAppearanceModeDefaultsKey)
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+
+    var isCustomAppearance: Bool { islandAppearanceMode == .custom }
+
+    var islandClosedDisplayStyle: IslandClosedDisplayStyle = .detailed {
+        didSet {
+            guard islandClosedDisplayStyle != oldValue else { return }
+            UserDefaults.standard.set(islandClosedDisplayStyle.rawValue, forKey: Self.islandClosedDisplayStyleDefaultsKey)
+            refreshOverlayPlacementIfVisible()
+        }
+    }
+    var islandPixelShapeStyle: IslandPixelShapeStyle = .bars {
+        didSet {
+            guard islandPixelShapeStyle != oldValue else { return }
+            UserDefaults.standard.set(islandPixelShapeStyle.rawValue, forKey: Self.islandPixelShapeStyleDefaultsKey)
+        }
+    }
+    var statusColorHexes: [SessionPhase: String] = AppModel.defaultStatusColors {
+        didSet {
+            guard statusColorHexes != oldValue else { return }
+            let encoded = statusColorHexes.reduce(into: [String: String]()) { $0[$1.key.rawValue] = $1.value }
+            UserDefaults.standard.set(encoded, forKey: Self.islandStatusColorsDefaultsKey)
+            _cachedStatusColors = [:]
+        }
+    }
+    private var _cachedStatusColors: [SessionPhase: Color] = [:]
+
+    func statusColor(for phase: SessionPhase) -> Color {
+        if let cached = _cachedStatusColors[phase] { return cached }
+        let hex = statusColorHexes[phase] ?? Self.defaultStatusColors[phase] ?? "#6E9FFF"
+        let color = Color(hex: hex) ?? .white
+        _cachedStatusColors[phase] = color
+        return color
+    }
+
+    func setStatusColor(_ color: Color, for phase: SessionPhase) {
+        guard let hex = color.opaqueHexString else { return }
+        statusColorHexes[phase] = hex
+    }
+
     @ObservationIgnored
     var openSettingsWindow: (() -> Void)?
 
@@ -244,6 +304,24 @@ final class AppModel {
         selectedSoundName = NotificationSoundService.selectedSoundName
         showDockIcon = UserDefaults.standard.bool(forKey: Self.showDockIconDefaultsKey)
         hapticFeedbackEnabled = UserDefaults.standard.bool(forKey: Self.hapticFeedbackEnabledDefaultsKey)
+        islandAppearanceMode = IslandAppearanceMode(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
+        ) ?? .default
+        islandClosedDisplayStyle = IslandClosedDisplayStyle(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandClosedDisplayStyleDefaultsKey) ?? ""
+        ) ?? .detailed
+        islandPixelShapeStyle = IslandPixelShapeStyle(
+            rawValue: UserDefaults.standard.string(forKey: Self.islandPixelShapeStyleDefaultsKey) ?? ""
+        ) ?? .bars
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.islandStatusColorsDefaultsKey) as? [String: String] {
+            var colors = Self.defaultStatusColors
+            for (key, value) in saved {
+                if let phase = SessionPhase(rawValue: key) {
+                    colors[phase] = value.normalizedHexColorString
+                }
+            }
+            statusColorHexes = colors
+        }
 
         overlay.appModel = self
         overlay.restoreDisplayPreference()
@@ -1090,4 +1168,34 @@ final class AppModel {
         NSApplication.shared.terminate(nil)
     }
 
+}
+
+// MARK: - Hex color helpers
+
+extension String {
+    var normalizedHexColorString: String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+        guard raw.count == 6, raw.allSatisfy(\.isHexDigit) else { return "#6E9FFF" }
+        return "#\(raw.uppercased())"
+    }
+}
+
+extension Color {
+    init?(hex: String) {
+        let raw = String(hex.normalizedHexColorString.dropFirst())
+        guard let value = Int(raw, radix: 16) else { return nil }
+        let red = Double((value >> 16) & 0xFF) / 255
+        let green = Double((value >> 8) & 0xFF) / 255
+        let blue = Double(value & 0xFF) / 255
+        self = Color(red: red, green: green, blue: blue)
+    }
+
+    var opaqueHexString: String? {
+        guard let nsColor = NSColor(self).usingColorSpace(.deviceRGB) else { return nil }
+        let r = Int(round(nsColor.redComponent * 255))
+        let g = Int(round(nsColor.greenComponent * 255))
+        let b = Int(round(nsColor.blueComponent * 255))
+        return String(format: "#%02X%02X%02X", r, g, b)
+    }
 }

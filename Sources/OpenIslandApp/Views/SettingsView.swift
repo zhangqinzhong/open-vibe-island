@@ -9,6 +9,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
     case setup
     case display
     case sound
+    case appearance
     case shortcuts
     case lab
     case about
@@ -17,45 +18,48 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     func label(_ lang: LanguageManager) -> String {
         switch self {
-        case .general:   lang.t("settings.tab.general")
-        case .setup:     lang.t("settings.tab.setup")
-        case .display:   lang.t("settings.tab.display")
-        case .sound:     lang.t("settings.tab.sound")
-        case .shortcuts: lang.t("settings.tab.shortcuts")
-        case .lab:       lang.t("settings.tab.lab")
-        case .about:     lang.t("settings.tab.about")
+        case .general:    lang.t("settings.tab.general")
+        case .setup:      lang.t("settings.tab.setup")
+        case .appearance: lang.t("settings.tab.appearance")
+        case .display:    lang.t("settings.tab.display")
+        case .sound:      lang.t("settings.tab.sound")
+        case .shortcuts:  lang.t("settings.tab.shortcuts")
+        case .lab:        lang.t("settings.tab.lab")
+        case .about:      lang.t("settings.tab.about")
         }
     }
 
     var icon: String {
         switch self {
-        case .general:   "gearshape.fill"
-        case .setup:     "arrow.down.circle.fill"
-        case .display:   "textformat.size"
-        case .sound:     "speaker.wave.2.fill"
-        case .shortcuts: "keyboard.fill"
-        case .lab:       "flask.fill"
-        case .about:     "info.circle.fill"
+        case .general:    "gearshape.fill"
+        case .setup:      "arrow.down.circle.fill"
+        case .appearance: "paintbrush.fill"
+        case .display:    "textformat.size"
+        case .sound:      "speaker.wave.2.fill"
+        case .shortcuts:  "keyboard.fill"
+        case .lab:        "flask.fill"
+        case .about:      "info.circle.fill"
         }
     }
 
     var iconColor: Color {
         switch self {
-        case .general:   .gray
-        case .setup:     .orange
-        case .display:   .blue
-        case .sound:     .green
-        case .shortcuts: .gray
-        case .lab:       .pink
-        case .about:     .blue
+        case .general:    .gray
+        case .setup:      .orange
+        case .appearance: .purple
+        case .display:    .blue
+        case .sound:      .green
+        case .shortcuts:  .gray
+        case .lab:        .pink
+        case .about:      .blue
         }
     }
 
     var section: SettingsSection {
         switch self {
-        case .general, .setup, .display, .sound: .system
-        case .shortcuts, .lab:                   .advanced
-        case .about:                             .app
+        case .general, .setup, .display, .sound, .appearance: .system
+        case .shortcuts, .lab:                                 .advanced
+        case .about:                                           .app
         }
     }
 }
@@ -130,6 +134,8 @@ struct SettingsView: View {
                 GeneralSettingsPane(model: model)
             case .setup:
                 SetupSettingsPane(model: model)
+            case .appearance:
+                AppearanceSettingsPane(model: model)
             case .display:
                 DisplaySettingsPane(model: model)
             case .sound:

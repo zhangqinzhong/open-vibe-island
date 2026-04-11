@@ -82,7 +82,7 @@ public enum SessionAttachmentState: String, Codable, Sendable {
     }
 }
 
-public enum SessionPhase: String, Codable, Sendable {
+public enum SessionPhase: String, Codable, Sendable, CaseIterable {
     case running
     case waitingForApproval
     case waitingForAnswer

@@ -1,3 +1,5 @@
+import AppKit
+import CoreGraphics
 import Foundation
 
 enum NotchStatus: Equatable {
@@ -16,4 +18,28 @@ enum NotchOpenReason: Equatable {
 enum TrackedEventIngress {
     case bridge
     case rollout
+}
+
+// MARK: - Island appearance
+
+enum IslandAppearanceMode: String, CaseIterable, Identifiable {
+    case `default`
+    case custom
+
+    var id: String { rawValue }
+}
+
+enum IslandClosedDisplayStyle: String, CaseIterable, Identifiable {
+    case minimal
+    case detailed
+
+    var id: String { rawValue }
+}
+
+enum IslandPixelShapeStyle: String, CaseIterable, Identifiable {
+    case bars
+    case steps
+    case blocks
+
+    var id: String { rawValue }
 }
