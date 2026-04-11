@@ -275,6 +275,7 @@ final class OverlayPanelController {
         hoverCancelGrace?.cancel()
         hoverCancelGrace = nil
 
+        guard let model else { return }
         guard hoverTimer == nil else { return }
 
         let item = DispatchWorkItem { [weak self] in
