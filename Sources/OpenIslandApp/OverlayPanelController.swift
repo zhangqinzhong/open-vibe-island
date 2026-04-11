@@ -28,6 +28,7 @@ final class OverlayPanelController {
     private static let completionCardChromeHeight: CGFloat = 187
     private static let completionCardMinHeight: CGFloat = 210
     private static let completionCardMaxHeight: CGFloat = 400
+    private static let hiddenIdleEdgeHoverHitHeight: CGFloat = 8
 
     private var panel: NotchPanel?
     private var eventMonitors = NotchEventMonitors()
@@ -275,24 +276,36 @@ final class OverlayPanelController {
         hoverCancelGrace?.cancel()
         hoverCancelGrace = nil
 
+        guard let model else { return }
+
+        if model.showsIdleEdgeWhenCollapsed {
+            performHoverOpen(model)
+            return
+        }
+
         guard hoverTimer == nil else { return }
 
         let item = DispatchWorkItem { [weak self] in
             guard let self, let model = self.model else { return }
-            if model.notchStatus == .closed {
-                if model.hapticFeedbackEnabled {
-                    NSHapticFeedbackManager.defaultPerformer.perform(
-                        NSHapticFeedbackManager.FeedbackPattern.alignment,
-                        performanceTime: .now
-                    )
-                }
-                model.notchOpen(reason: .hover)
-            }
+            self.performHoverOpen(model)
             self.hoverTimer = nil
         }
 
         hoverTimer = item
         DispatchQueue.main.asyncAfter(deadline: .now() + AppModel.hoverOpenDelay, execute: item)
+    }
+
+    private func performHoverOpen(_ model: AppModel) {
+        guard model.notchStatus == .closed else { return }
+
+        if model.hapticFeedbackEnabled {
+            NSHapticFeedbackManager.defaultPerformer.perform(
+                NSHapticFeedbackManager.FeedbackPattern.alignment,
+                performanceTime: .now
+            )
+        }
+
+        model.notchOpen(reason: .hover)
     }
 
     private func cancelHoverOpen() {
@@ -394,12 +407,62 @@ final class OverlayPanelController {
         )
     }
 
+    nonisolated static func hiddenIdleEdgeHoverRect(
+        notchRect: NSRect,
+        closedWidth: CGFloat,
+        hoverHitHeight: CGFloat
+    ) -> NSRect {
+        let cx = notchRect.midX
+        let effectiveHeight = min(notchRect.height, max(1, hoverHitHeight))
+        return NSRect(
+            x: cx - closedWidth / 2,
+            y: notchRect.maxY - effectiveHeight,
+            width: closedWidth,
+            height: effectiveHeight
+        )
+    }
+
+    nonisolated static func closedPanelWidth(
+        notchWidth: CGFloat,
+        notchHeight: CGFloat,
+        liveSessionCount: Int,
+        hasAttention: Bool,
+        notchStatus: NotchStatus,
+        showsIdleEdgeWhenCollapsed: Bool
+    ) -> CGFloat {
+        let popWidth = notchStatus == .popping ? 18 : 0
+
+        guard !showsIdleEdgeWhenCollapsed else {
+            return notchWidth + CGFloat(popWidth)
+        }
+
+        guard liveSessionCount > 0 else {
+            return notchWidth
+        }
+
+        let sideWidth = max(0, notchHeight - 12) + 10
+        let digits = max(1, "\(liveSessionCount)".count)
+        let countBadgeWidth = CGFloat(26 + max(0, digits - 1) * 8)
+        let leftWidth = sideWidth + 8 + (hasAttention ? 18 : 0)
+        let rightWidth = max(sideWidth, countBadgeWidth)
+        let expansionWidth = leftWidth + rightWidth + 16 + (hasAttention ? 6 : 0)
+        return notchWidth + expansionWidth + CGFloat(popWidth)
+    }
+
     private func closedSurfaceRect(for model: AppModel) -> NSRect? {
         guard let screen = resolveTargetScreen() else {
             return nil
         }
 
         let closedWidth = closedPanelWidth(for: model, on: screen)
+        if model.showsIdleEdgeWhenCollapsed {
+            return Self.hiddenIdleEdgeHoverRect(
+                notchRect: notchRect,
+                closedWidth: closedWidth,
+                hoverHitHeight: Self.hiddenIdleEdgeHoverHitHeight
+            )
+        }
+
         return Self.closedSurfaceRect(
             notchRect: notchRect,
             closedWidth: closedWidth
@@ -455,21 +518,15 @@ final class OverlayPanelController {
         let spotlightSession = model.surfacedSessions.first(where: { $0.phase.requiresAttention })
             ?? model.surfacedSessions.first(where: { $0.phase == .running })
             ?? model.surfacedSessions.first
-        let hasClosedPresence = model.liveSessionCount > 0
 
-        guard hasClosedPresence else {
-            return notchWidth
-        }
-
-        let sideWidth = max(0, notchHeight - 12) + 10
-        let digits = max(1, "\(model.liveSessionCount)".count)
-        let countBadgeWidth = CGFloat(26 + max(0, digits - 1) * 8)
-        let hasAttention = spotlightSession?.phase.requiresAttention == true
-        let leftWidth = sideWidth + 8 + (hasAttention ? 18 : 0)
-        let rightWidth = max(sideWidth, countBadgeWidth)
-        let expansionWidth = leftWidth + rightWidth + 16 + (hasAttention ? 6 : 0)
-        let popWidth = model.notchStatus == .popping ? 18 : 0
-        return notchWidth + expansionWidth + CGFloat(popWidth)
+        return Self.closedPanelWidth(
+            notchWidth: notchWidth,
+            notchHeight: notchHeight,
+            liveSessionCount: model.liveSessionCount,
+            hasAttention: spotlightSession?.phase.requiresAttention == true,
+            notchStatus: model.notchStatus,
+            showsIdleEdgeWhenCollapsed: model.showsIdleEdgeWhenCollapsed
+        )
     }
 
     private func openedContentHeight(for model: AppModel) -> CGFloat {
