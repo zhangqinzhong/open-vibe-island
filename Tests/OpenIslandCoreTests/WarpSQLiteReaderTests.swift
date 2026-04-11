@@ -47,6 +47,102 @@ struct WarpSQLiteReaderTests {
     }
 
     @Test
+    func lookupPaneUUIDFallsBackToCommandHistoryWhenTerminalPanesCwdIsStale() throws {
+        // Regression for the compound-command flow: user opens a new Warp
+        // tab and pastes `mkdir -p /tmp/compound-test && cd /tmp/compound-test
+        // && claude` as one line. Warp's shell integration wrote a
+        // precmd-<session>-1 block at the very first prompt render (before
+        // the compound command ran), linking the shell session to the pane
+        // uuid — but terminal_panes.cwd was never updated past the initial
+        // /Users/u because the second prompt never rendered. The primary
+        // cwd lookup returns nil; the fallback must inspect the commands
+        // history, match the `cd /tmp/compound-test` pattern, follow
+        // commands.session_id → blocks.precmd-<session_id>-* →
+        // pane_leaf_uuid.
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .compoundCommandFlow)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        let uuid = reader.lookupPaneUUID(forCwd: "/tmp/compound-test")
+        #expect(uuid == "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
+    }
+
+    @Test
+    func lookupPaneUUIDFallbackAcceptsFirmlinkFlippedInput() throws {
+        // Hook payloads arrive with /private/tmp/compound-test because
+        // Claude Code captures cwd via getcwd() which resolves the
+        // firmlink. The original command was typed as `cd
+        // /tmp/compound-test`. The fallback must try both forms so the
+        // cross-match succeeds.
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .compoundCommandFlow)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        let uuid = reader.lookupPaneUUID(forCwd: "/private/tmp/compound-test")
+        #expect(uuid == "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD")
+    }
+
+    @Test
+    func lookupPaneUUIDFallbackSkipsOrphanBlocksFromClosedTabs() throws {
+        // When the user closes a Warp tab, Warp prunes the
+        // `terminal_panes` row for that tab but leaves the historical
+        // `commands` and `blocks` entries in place — this is visible on
+        // the real database, which routinely has ~1000+ blocks against
+        // a handful of live terminal_panes rows. The fallback must
+        // reject matches whose resolved pane_leaf_uuid is no longer
+        // present in terminal_panes, otherwise a stale hit would pass
+        // a ghost uuid to the precision jump cycle loop, which would
+        // spin its entire cap never seeing that uuid in the focused
+        // pane read. Graceful degradation is "activate Warp, no
+        // precise target" — not "cycle for a second then give up".
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .compoundCommandFlow)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        // The fixture has an orphan command+block pair pointing at pane
+        // uuid FFFF... — no matching terminal_panes row.
+        let uuid = reader.lookupPaneUUID(forCwd: "/tmp/closed-tab-cwd")
+        #expect(uuid == nil)
+    }
+
+    @Test
+    func lookupPaneUUIDFallbackDoesNotFalsePositiveOnSubstringCwd() throws {
+        // The fallback uses LIKE '%cd <target>%' which is vulnerable to
+        // substring collision: a query for `/tmp/foo` must not match a
+        // command like `cd /tmp/foo-extended`. Pin the boundary behavior.
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .compoundCommandFlow)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        // The fixture has a `cd /tmp/compound-test-extended && claude`
+        // command pointed at a different pane uuid. A lookup for the
+        // shorter path must NOT match it.
+        let uuid = reader.lookupPaneUUID(forCwd: "/tmp/compound")
+        #expect(uuid == nil)
+    }
+
+    @Test
+    func lookupPaneUUIDPrimaryStillWinsWhenTerminalPanesCwdIsPopulated() throws {
+        // When terminal_panes.cwd IS populated (normal case where the
+        // user ran a non-TUI command between `cd` and `claude`), the
+        // primary cwd query should still win and we should not fall
+        // through to the slower commands-table fallback. This is pinned
+        // by reusing the threeTabsTwoClaudes scenario which has populated
+        // terminal_panes.cwd for /Users/u/open-vibe-island.
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .threeTabsTwoClaudes)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        let uuid = reader.lookupPaneUUID(forCwd: "/Users/u/open-vibe-island")
+        #expect(uuid == "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+    }
+
+    @Test
     func currentFocusedPaneUUIDReturnsActiveTabsUUID() throws {
         let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
         try WarpSQLiteFixture.write(to: tmp, scenario: .threeTabsTwoClaudes)
@@ -116,6 +212,42 @@ enum WarpSQLiteFixture {
 
     struct Scenario {
         var rows: [String]
+
+        /// Models the "compound command" flow where Warp's shell
+        /// integration never updates `terminal_panes.cwd` past the
+        /// initial shell cwd because the user ran `cd <target> && claude`
+        /// as a single pasted line and claude's TUI took over before a
+        /// second prompt could render.
+        ///
+        /// Pane D had one prompt render at shell startup (cwd /Users/u),
+        /// wrote precmd-9001-1, then executed the compound command — so
+        /// terminal_panes.cwd stays /Users/u but the commands table
+        /// records the full text with `cd /tmp/compound-test`.
+        ///
+        /// Pane E is a separate shell that ran a NEAR-miss command
+        /// (`cd /tmp/compound-test-extended`) so we can pin that the
+        /// fallback doesn't false-positive on substring collisions.
+        static let compoundCommandFlow = Scenario(rows: [
+            "INSERT INTO app (id, active_window_id) VALUES (1, 1);",
+            "INSERT INTO windows (id, active_tab_index) VALUES (1, 0);",
+            "INSERT INTO tabs (id, window_id) VALUES (1, 1), (2, 1);",
+            "INSERT INTO pane_nodes (id, tab_id, is_leaf) VALUES (1, 1, 1), (2, 2, 1);",
+            "INSERT INTO terminal_panes (id, uuid, cwd) VALUES " +
+                "(1, x'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', '/Users/u')," +
+                "(2, x'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE', '/Users/u');",
+            "INSERT INTO commands (id, session_id, command, pwd) VALUES " +
+                "(300, 9001, 'mkdir -p /tmp/compound-test && cd /tmp/compound-test && claude', '/Users/u')," +
+                "(301, 9002, 'mkdir -p /tmp/compound-test-extended && cd /tmp/compound-test-extended && claude', '/Users/u')," +
+                // Orphan row: represents a shell session whose tab was
+                // closed. commands + blocks linger but terminal_panes is
+                // pruned. The fallback must not return FFFF... because
+                // no such pane exists anymore.
+                "(302, 9003, 'cd /tmp/closed-tab-cwd && claude', '/Users/u');",
+            "INSERT INTO blocks (id, pane_leaf_uuid, block_id) VALUES " +
+                "(1, x'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', 'precmd-9001-1')," +
+                "(2, x'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE', 'precmd-9002-1')," +
+                "(3, x'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 'precmd-9003-1');",
+        ])
 
         /// Three tabs in one window. Tab 1 cwd=giftcard (pane uuid AAAA...),
         /// tab 2 cwd=open-vibe-island (pane uuid BBBB...), tab 3 cwd=/tmp (pane uuid CCCC...).
