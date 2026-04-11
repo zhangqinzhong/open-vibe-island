@@ -60,6 +60,7 @@
 "settings.appearance.status.approval" = "等待审批";
 "settings.appearance.status.answer" = "等待回答";
 "settings.appearance.status.completed" = "已完成";
+"settings.appearance.communityNote" = "这里的大部分内容来自社区贡献。\n欢迎随时提交你自己 vibe 的版本。";
 
 /* Settings - Display */
 "settings.display.monitor" = "显示器";

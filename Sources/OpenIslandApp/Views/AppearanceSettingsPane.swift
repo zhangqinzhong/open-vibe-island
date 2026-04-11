@@ -59,6 +59,14 @@ struct AppearanceSettingsPane: View {
                     }
                 }
             }
+
+            Section {
+                Text(lang.t("settings.appearance.communityNote"))
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .multilineTextAlignment(.center)
+            }
         }
         .formStyle(.grouped)
         .navigationTitle(lang.t("settings.tab.appearance"))
