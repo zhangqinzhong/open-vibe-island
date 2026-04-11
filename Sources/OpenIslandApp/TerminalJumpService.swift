@@ -259,26 +259,26 @@ struct TerminalJumpService {
                     return "Focused the matching \(descriptor.displayName) pane."
                 }
             case let id where Self.vscodeFamilyBundleIDs.contains(id):
-                if appIsRunning {
-                    try openAction(["-b", descriptor.bundleIdentifier])
-                    return "Activated \(descriptor.displayName)."
-                }
                 if let workingDirectory = target.workingDirectory {
                     let opened = jumpToVSCodeFamilyWorkspace(workingDirectory, bundleIdentifier: id)
-                    return opened
-                        ? "Focused the matching \(descriptor.displayName) workspace."
-                        : "Focused the matching \(descriptor.displayName) workspace. The CLI may not be available."
+                    if opened {
+                        return "Focused the matching \(descriptor.displayName) workspace."
+                    }
                 }
-            case let id where Self.jetbrainsBundleIDs.contains(id):
                 if appIsRunning {
                     try openAction(["-b", descriptor.bundleIdentifier])
                     return "Activated \(descriptor.displayName)."
                 }
+            case let id where Self.jetbrainsBundleIDs.contains(id):
                 if let workingDirectory = target.workingDirectory {
                     let opened = jumpToJetBrainsProject(workingDirectory, bundleIdentifier: id)
-                    return opened
-                        ? "Focused the matching \(descriptor.displayName) project."
-                        : "Focused the matching \(descriptor.displayName) project. The CLI may not be available."
+                    if opened {
+                        return "Focused the matching \(descriptor.displayName) project."
+                    }
+                }
+                if appIsRunning {
+                    try openAction(["-b", descriptor.bundleIdentifier])
+                    return "Activated \(descriptor.displayName)."
                 }
             default:
                 break
