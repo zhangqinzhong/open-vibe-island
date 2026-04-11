@@ -10,7 +10,11 @@ struct TerminalJumpService {
     typealias ProcessRunner = @Sendable (String, [String]) -> Bool
     typealias WarpFocusedPaneReader = @Sendable () -> String?
     typealias WarpTabCountReader = @Sendable () -> Int
-    typealias AccessibilityTrustChecker = @Sendable () -> Bool
+    /// Returns true when Warp is the system's frontmost app and ready to
+    /// receive the next tab-advance command. Production asks
+    /// `NSWorkspace.shared.frontmostApplication`; tests inject `{ true }`
+    /// to skip the polling loop entirely.
+    typealias WarpFrontmostChecker = @Sendable () -> Bool
 
     private struct TerminalAppDescriptor {
         let displayName: String
@@ -150,6 +154,25 @@ struct TerminalJumpService {
     private static let ghosttyWindowActivationDelay = 0.04
     private static let ghosttyFocusAttempts = 3
 
+    /// Maximum time to wait for Warp to become the system frontmost app after
+    /// an activation request. macOS app activation is async at the WindowServer
+    /// level. Without waiting for `frontmostApplication` to actually be Warp,
+    /// the first few Cmd+Shift+] keystrokes can land on whatever app was
+    /// focused before activation, producing system beeps and never cycling
+    /// Warp tabs. The poll loop exits as soon as Warp becomes frontmost (often
+    /// 50-200ms on Apple Silicon); this constant is the cap. 1.5s tolerates
+    /// machines under load where activation takes longer.
+    private static let warpFrontmostMaxWait = 1.5
+    /// Poll interval inside the frontmost-wait loop. Smaller = lower latency
+    /// once Warp arrives but more SyscallChurn.
+    private static let warpFrontmostPollInterval = 0.025
+    /// How long to wait after each Cmd+Shift+] keystroke before re-reading
+    /// `windows.active_tab_index` from Warp's SQLite. Warp persists the new
+    /// active tab index a few tens of milliseconds after processing the
+    /// keystroke; reading too soon can return stale state and cause the
+    /// cycling loop to terminate at the wrong tab.
+    private static let warpTabCycleSettleDelay = 0.1
+
     private let applicationResolver: ApplicationResolver
     private let appRunningChecker: AppRunningChecker
     private let openAction: OpenAction
@@ -158,7 +181,7 @@ struct TerminalJumpService {
     private let warpFocusedPaneReader: WarpFocusedPaneReader
     private let warpTabCountReader: WarpTabCountReader
     private let warpKeystroker: KeystrokeInjector
-    private let accessibilityTrustChecker: AccessibilityTrustChecker
+    private let warpFrontmostChecker: WarpFrontmostChecker
 
     init(
         applicationResolver: @escaping ApplicationResolver = { bundleIdentifier in
@@ -173,7 +196,13 @@ struct TerminalJumpService {
         warpFocusedPaneReader: @escaping WarpFocusedPaneReader = { WarpSQLiteReader().currentFocusedPaneUUID() },
         warpTabCountReader: @escaping WarpTabCountReader = { WarpSQLiteReader().tabCountInActiveWindow() },
         warpKeystroker: KeystrokeInjector = DefaultKeystrokeInjector(),
-        accessibilityTrustChecker: @escaping AccessibilityTrustChecker = { DefaultAccessibilityPermissionChecker().isTrusted() }
+        warpFrontmostChecker: @escaping WarpFrontmostChecker = {
+            // Use NSWorkspace.frontmostApplication (live workspace state)
+            // rather than NSRunningApplication.isActive (a cached property
+            // updated via KVO that can lag the real frontmost transition).
+            NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+                == "dev.warp.Warp-Stable"
+        }
     ) {
         self.applicationResolver = applicationResolver
         self.appRunningChecker = appRunningChecker
@@ -183,7 +212,7 @@ struct TerminalJumpService {
         self.warpFocusedPaneReader = warpFocusedPaneReader
         self.warpTabCountReader = warpTabCountReader
         self.warpKeystroker = warpKeystroker
-        self.accessibilityTrustChecker = accessibilityTrustChecker
+        self.warpFrontmostChecker = warpFrontmostChecker
     }
 
     func jump(to target: JumpTarget) throws -> String {
@@ -1017,37 +1046,56 @@ struct TerminalJumpService {
 
     private func jumpToWarpPane(_ target: JumpTarget) throws -> String {
         // 1. Always activate Warp first — this is the baseline behavior.
+        //    `warpKeystroker.sendCmdShiftRightBracket()` also activates via
+        //    AppleScript, but running `open -b` here ensures Warp is foreground
+        //    even in the early-return branch below where no AppleScript ever
+        //    fires.
         try openAction(["-b", "dev.warp.Warp-Stable"])
 
-        // 2. If we don't have a mapped pane UUID, we're done.
+        // 2. If we don't have a mapped pane UUID, we're done. This happens
+        //    when WarpSQLiteReader couldn't resolve the agent's cwd to a
+        //    pane — usually because the user launched the agent through a
+        //    compound command (e.g. `cd /tmp/foo && claude`) that bypassed
+        //    Warp's shell-integration prompt render, so terminal_panes.cwd
+        //    was never updated for that pane. See the "known limitation"
+        //    note in WarpSQLiteReader.lookupPaneUUID for the full story.
         guard let targetPaneUUID = target.warpPaneUUID else {
             return "Activated Warp. No precise pane mapping available."
         }
 
-        // 3. Quick check: are we already on the target pane?
+        // 3. Wait for Warp to actually become the foreground app. `open -b`
+        //    exits immediately but the WindowServer activation is async and
+        //    can take 50-300ms depending on machine load. We poll
+        //    `frontmostApplication` until Warp is really frontmost or we
+        //    hit the cap.
+        let frontmostStart = Date()
+        while !warpFrontmostChecker() {
+            if Date().timeIntervalSince(frontmostStart) >= Self.warpFrontmostMaxWait {
+                break
+            }
+            Thread.sleep(forTimeInterval: Self.warpFrontmostPollInterval)
+        }
+
+        // 4. Fast path: if Warp is already showing the target pane we're
+        //    done — no tab-advance needed.
         if warpFocusedPaneReader() == targetPaneUUID {
             return "Focused the matching Warp tab."
         }
 
-        // 4. We need to cycle. CGEventPost requires Accessibility permission;
-        //    if it's missing, keystrokes silently get dropped and the loop
-        //    is useless. Tell the user instead of pretending to try.
-        guard accessibilityTrustChecker() else {
-            return "Activated Warp. Grant Accessibility permission to enable precision jump."
-        }
-
-        // 5. Cycle with a cap. The cap is `tabCount + 2` — we only need at
-        //    most tabCount-1 cycles to reach any tab, but +2 is safety margin
-        //    for counting quirks and the rare case where active_tab_index is
-        //    briefly stale between read and next keystroke.
+        // 5. Cycle via repeated "Switch to Next Tab" clicks with a cap. We
+        //    only need at most tabCount-1 cycles to reach any tab from any
+        //    starting point, but +2 is safety margin for counting quirks
+        //    and the rare case where active_tab_index is briefly stale
+        //    between a click and the next SQLite read. The `KeystrokeInjector`
+        //    protocol name is historical; the production implementation
+        //    clicks the `Tab ▸ Switch to Next Tab` menu item via AX —
+        //    see `DefaultKeystrokeInjector` for the rationale.
         let tabCount = max(1, warpTabCountReader())
         let maxAttempts = tabCount + 2
 
         for _ in 0..<maxAttempts {
             warpKeystroker.sendCmdShiftRightBracket()
-            // Small delay to let Warp update its SQLite state after tab switch.
-            // Empirically 50ms is stable; can be tuned down if benchmarking allows.
-            Thread.sleep(forTimeInterval: 0.05)
+            Thread.sleep(forTimeInterval: Self.warpTabCycleSettleDelay)
             if warpFocusedPaneReader() == targetPaneUUID {
                 return "Focused the matching Warp tab."
             }

@@ -189,7 +189,7 @@ final class TerminalJumpServiceTests: XCTestCase {
             warpFocusedPaneReader: { targetUUID },  // already at target
             warpTabCountReader: { 3 },
             warpKeystroker: keystroker,
-            accessibilityTrustChecker: { true }
+            warpFrontmostChecker: { true }
         )
 
         let result = try service.jump(
@@ -229,7 +229,7 @@ final class TerminalJumpServiceTests: XCTestCase {
             warpFocusedPaneReader: { readSequence.next() },
             warpTabCountReader: { 4 },
             warpKeystroker: keystroker,
-            accessibilityTrustChecker: { true }
+            warpFrontmostChecker: { true }
         )
 
         let result = try service.jump(
@@ -259,7 +259,7 @@ final class TerminalJumpServiceTests: XCTestCase {
             warpFocusedPaneReader: { "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" },  // never matches
             warpTabCountReader: { 3 },
             warpKeystroker: keystroker,
-            accessibilityTrustChecker: { true }
+            warpFrontmostChecker: { true }
         )
 
         let result = try service.jump(
@@ -289,7 +289,7 @@ final class TerminalJumpServiceTests: XCTestCase {
             warpFocusedPaneReader: { "SHOULD-NOT-BE-READ" },
             warpTabCountReader: { 3 },
             warpKeystroker: keystroker,
-            accessibilityTrustChecker: { true }
+            warpFrontmostChecker: { true }
         )
 
         let result = try service.jump(
@@ -303,37 +303,6 @@ final class TerminalJumpServiceTests: XCTestCase {
         )
 
         XCTAssertEqual(result, "Activated Warp. No precise pane mapping available.")
-        XCTAssertEqual(keystroker.callCount, 0)
-        XCTAssertEqual(openedArguments.values, [["-b", "dev.warp.Warp-Stable"]])
-    }
-
-    func testWarpJumpWithoutAccessibilityPermissionFallsBackToAppActivation() throws {
-        let keystroker = KeystrokeInjectorSpy()
-        let openedArguments = OpenedArgumentsBox()
-        let service = TerminalJumpService(
-            applicationResolver: { id in
-                id == "dev.warp.Warp-Stable" ? URL(fileURLWithPath: "/Applications/Warp.app") : nil
-            },
-            appRunningChecker: { id in id == "dev.warp.Warp-Stable" },
-            openAction: { arguments in openedArguments.values.append(arguments) },
-            appleScriptRunner: { _ in "" },
-            warpFocusedPaneReader: { "SOMETHING-ELSE" },
-            warpTabCountReader: { 3 },
-            warpKeystroker: keystroker,
-            accessibilityTrustChecker: { false }   // <-- permission denied
-        )
-
-        let result = try service.jump(
-            to: JumpTarget(
-                terminalApp: "Warp",
-                workspaceName: "demo",
-                paneTitle: "Claude demo",
-                workingDirectory: "/Users/u/demo",
-                warpPaneUUID: "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"
-            )
-        )
-
-        XCTAssertEqual(result, "Activated Warp. Grant Accessibility permission to enable precision jump.")
         XCTAssertEqual(keystroker.callCount, 0)
         XCTAssertEqual(openedArguments.values, [["-b", "dev.warp.Warp-Stable"]])
     }
