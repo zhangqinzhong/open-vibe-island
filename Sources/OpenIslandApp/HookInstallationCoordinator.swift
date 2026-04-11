@@ -13,6 +13,7 @@ final class HookInstallationCoordinator {
     var codebuddyHookStatus: ClaudeHookInstallationStatus?
     var openCodePluginStatus: OpenCodePluginInstallationStatus?
     var cursorHookStatus: CursorHookInstallationStatus?
+    var geminiHookStatus: GeminiHookInstallationStatus?
     var claudeStatusLineStatus: ClaudeStatusLineInstallationStatus?
     var claudeUsageSnapshot: ClaudeUsageSnapshot?
     var codexUsageSnapshot: CodexUsageSnapshot?
@@ -25,6 +26,7 @@ final class HookInstallationCoordinator {
     var isCodebuddyHookSetupBusy = false
     var isOpenCodeSetupBusy = false
     var isCursorHookSetupBusy = false
+    var isGeminiHookSetupBusy = false
     var isClaudeUsageSetupBusy = false
 
     @ObservationIgnored
@@ -67,6 +69,9 @@ final class HookInstallationCoordinator {
 
     @ObservationIgnored
     private let cursorHookInstallationManager = CursorHookInstallationManager()
+
+    @ObservationIgnored
+    private let geminiHookInstallationManager = GeminiHookInstallationManager()
 
     /// Computed so it always reflects the latest `ClaudeConfigDirectory` setting.
     private var claudeStatusLineInstallationManager: ClaudeStatusLineInstallationManager {
@@ -118,6 +123,11 @@ final class HookInstallationCoordinator {
 
     var cursorHooksInstalled: Bool {
         cursorHookStatus?.managedHooksPresent == true
+    }
+
+    var geminiHooksInstalled: Bool {
+        if case .installed = geminiHookStatus { return true }
+        return false
     }
 
     var claudeUsageInstalled: Bool {
@@ -306,6 +316,35 @@ final class HookInstallationCoordinator {
         }
 
         return "no managed Cursor hooks"
+    }
+
+    var geminiHookStatusTitle: String {
+        switch geminiHookStatus {
+        case nil:
+            return "Gemini hooks loading"
+        case .geminiNotFound:
+            return "Gemini CLI not found"
+        case .notInstalled:
+            return "Gemini hooks not installed"
+        case .installed:
+            return "Gemini hooks installed"
+        }
+    }
+
+    var geminiHookStatusSummary: String {
+        switch geminiHookStatus {
+        case nil:
+            return "Reading ~/.gemini/settings.json."
+        case .geminiNotFound:
+            return "Install Gemini CLI to enable hooks."
+        case .notInstalled:
+            if hooksBinaryURL == nil {
+                return "Build OpenIslandHooks before installing."
+            }
+            return "no managed Gemini hooks"
+        case .installed:
+            return "managed hooks present"
+        }
     }
 
     var codexHookStatusTitle: String {
@@ -581,6 +620,16 @@ final class HookInstallationCoordinator {
                     }
                 }
             }
+
+            group.addTask { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    let status = try self.geminiHookInstallationManager.status(hooksBinaryURL: self.hooksBinaryURL)
+                    self.geminiHookStatus = status
+                } catch {
+                    self.onStatusMessage?("Failed to read Gemini hook status: \(error.localizedDescription)")
+                }
+            }
         }
     }
 
@@ -606,6 +655,19 @@ final class HookInstallationCoordinator {
                 self.cursorHookStatus = status
             } catch {
                 self.onStatusMessage?("Failed to read Cursor hook status: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func refreshGeminiHookStatus() {
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let status = try self.geminiHookInstallationManager.status(hooksBinaryURL: self.hooksBinaryURL)
+                self.geminiHookStatus = status
+            } catch {
+                self.onStatusMessage?("Failed to read Gemini hook status: \(error.localizedDescription)")
             }
         }
     }
@@ -820,6 +882,28 @@ final class HookInstallationCoordinator {
         }
     }
 
+    func installGeminiHooks() {
+        guard let hooksBinaryURL else {
+            onStatusMessage?("Could not find a local OpenIslandHooks binary. Build the package first.")
+            return
+        }
+
+        updateGeminiHooks(userMessage: "Installing Gemini hooks.") { manager in
+            try manager.install(hooksBinaryURL: hooksBinaryURL)
+        }
+    }
+
+    func uninstallGeminiHooks() {
+        guard let hooksBinaryURL else {
+            onStatusMessage?("Could not find a local OpenIslandHooks binary. Build the package first.")
+            return
+        }
+
+        updateGeminiHooks(userMessage: "Removing Gemini hooks.") { manager in
+            try manager.uninstall(hooksBinaryURL: hooksBinaryURL)
+        }
+    }
+
     func installClaudeUsageBridge() {
         updateClaudeUsageBridge(userMessage: "Installing Claude usage bridge.") { manager in
             try manager.install()
@@ -960,6 +1044,32 @@ final class HookInstallationCoordinator {
                 }
             } catch {
                 self.onStatusMessage?("Cursor hook update failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    private func updateGeminiHooks(
+        userMessage: String,
+        operation: @escaping (GeminiHookInstallationManager) throws -> GeminiHookInstallationStatus
+    ) {
+        isGeminiHookSetupBusy = true
+        onStatusMessage?(userMessage)
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            defer { self.isGeminiHookSetupBusy = false }
+
+            do {
+                let status = try operation(self.geminiHookInstallationManager)
+                self.geminiHookStatus = status
+                if case .installed = status {
+                    self.onStatusMessage?("Gemini hooks are installed and ready.")
+                } else {
+                    self.onStatusMessage?("Gemini hooks are not installed.")
+                }
+            } catch {
+                self.onStatusMessage?("Gemini hook update failed: \(error.localizedDescription)")
             }
         }
     }

@@ -106,6 +106,11 @@ final class AppModel {
     var isCursorHookSetupBusy: Bool { hooks.isCursorHookSetupBusy }
     var cursorHookStatusTitle: String { hooks.cursorHookStatusTitle }
     var cursorHookStatusSummary: String { hooks.cursorHookStatusSummary }
+    var geminiHooksInstalled: Bool { hooks.geminiHooksInstalled }
+    var isGeminiHookSetupBusy: Bool { hooks.isGeminiHookSetupBusy }
+    var geminiHookStatus: GeminiHookInstallationStatus? { hooks.geminiHookStatus }
+    var geminiHookStatusTitle: String { hooks.geminiHookStatusTitle }
+    var geminiHookStatusSummary: String { hooks.geminiHookStatusSummary }
     var codexHookStatusTitle: String { hooks.codexHookStatusTitle }
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
     func refreshCodexHookStatus() { hooks.refreshCodexHookStatus() }
@@ -131,6 +136,9 @@ final class AppModel {
     func uninstallOpenCodePlugin() { hooks.uninstallOpenCodePlugin() }
     func installCursorHooks() { hooks.installCursorHooks() }
     func uninstallCursorHooks() { hooks.uninstallCursorHooks() }
+    func refreshGeminiHookStatus() { hooks.refreshGeminiHookStatus() }
+    func installGeminiHooks() { hooks.installGeminiHooks() }
+    func uninstallGeminiHooks() { hooks.uninstallGeminiHooks() }
     func installClaudeUsageBridge() { hooks.installClaudeUsageBridge() }
     func uninstallClaudeUsageBridge() { hooks.uninstallClaudeUsageBridge() }
     func updateClaudeConfigDirectory(to newDirectory: URL?) { hooks.updateClaudeConfigDirectory(to: newDirectory) }
