@@ -328,7 +328,8 @@ struct IslandPanelView: View {
                             IslandPixelGlyph(
                                 tint: scoutTint,
                                 style: model.islandPixelShapeStyle,
-                                isAnimating: hasClosedActivity
+                                isAnimating: hasClosedActivity,
+                                customAvatarImage: model.customAvatarImage
                             )
                             .matchedGeometryEffect(id: "island-icon", in: notchNamespace, isSource: true)
                         } else {

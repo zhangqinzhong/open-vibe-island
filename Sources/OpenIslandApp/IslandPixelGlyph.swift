@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 
 struct IslandPixelGlyph: View {
     var tint: Color
@@ -6,9 +7,18 @@ struct IslandPixelGlyph: View {
     var isAnimating: Bool
     var width: CGFloat = 26
     var height: CGFloat = 14
+    var customAvatarImage: NSImage? = nil
 
     var body: some View {
-        if style == .bars {
+        if style == .custom, let avatar = customAvatarImage {
+            Image(nsImage: avatar)
+                .resizable()
+                .interpolation(.high)
+                .antialiased(true)
+                .scaledToFill()
+                .frame(width: min(width, height), height: min(width, height))
+                .clipShape(Circle())
+        } else if style == .bars || style == .custom {
             OpenIslandBrandMark(
                 size: min(width, height),
                 tint: tint,
@@ -54,6 +64,8 @@ extension IslandPixelShapeStyle {
              ([3, 4, 3, 2], [3, 4, 2]),
              ([2, 3, 4, 3], [2, 4, 3]),
              ([2, 4, 3, 2], [3, 4, 2])]
+        case .custom:
+            [([1, 3, 2, 1], [2, 3, 1])]
         }
     }
 }

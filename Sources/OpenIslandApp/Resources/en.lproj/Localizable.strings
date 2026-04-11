@@ -55,6 +55,10 @@
 "settings.appearance.pixelShape.bars" = "Cat";
 "settings.appearance.pixelShape.steps" = "Steps";
 "settings.appearance.pixelShape.blocks" = "Blocks";
+"settings.appearance.pixelShape.custom" = "Custom";
+"settings.appearance.avatar.upload" = "Upload Image";
+"settings.appearance.avatar.remove" = "Remove";
+"settings.appearance.avatar.help" = "Supports PNG, JPEG, HEIC, TIFF. Max 10 MB.";
 "settings.appearance.statusColors" = "Status Colors";
 "settings.appearance.status.running" = "Running";
 "settings.appearance.status.approval" = "Approval";

@@ -240,6 +240,7 @@ final class AppModel {
             _cachedStatusColors = [:]
         }
     }
+    var customAvatarImage: NSImage? = nil
     private var _cachedStatusColors: [SessionPhase: Color] = [:]
 
     func statusColor(for phase: SessionPhase) -> Color {
@@ -253,6 +254,33 @@ final class AppModel {
     func setStatusColor(_ color: Color, for phase: SessionPhase) {
         guard let hex = color.opaqueHexString else { return }
         statusColorHexes[phase] = hex
+    }
+
+    func importCustomAvatar() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.png, .jpeg, .heic, .tiff]
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            customAvatarImage = try AvatarImageStore.importImage(from: url)
+            islandPixelShapeStyle = .custom
+        } catch {
+            lastActionMessage = error.localizedDescription
+        }
+    }
+
+    func removeCustomAvatar() {
+        do {
+            try AvatarImageStore.removeCurrentImage()
+            customAvatarImage = nil
+            if islandPixelShapeStyle == .custom {
+                islandPixelShapeStyle = .bars
+            }
+        } catch {
+            lastActionMessage = error.localizedDescription
+        }
     }
 
     @ObservationIgnored
@@ -313,6 +341,7 @@ final class AppModel {
         islandPixelShapeStyle = IslandPixelShapeStyle(
             rawValue: UserDefaults.standard.string(forKey: Self.islandPixelShapeStyleDefaultsKey) ?? ""
         ) ?? .bars
+        customAvatarImage = AvatarImageStore.currentImage()
         if let saved = UserDefaults.standard.dictionary(forKey: Self.islandStatusColorsDefaultsKey) as? [String: String] {
             var colors = Self.defaultStatusColors
             for (key, value) in saved {

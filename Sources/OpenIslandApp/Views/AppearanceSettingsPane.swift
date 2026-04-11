@@ -51,6 +51,24 @@ struct AppearanceSettingsPane: View {
                             pixelShapeCard(style)
                         }
                     }
+
+                    if model.islandPixelShapeStyle == .custom {
+                        HStack(spacing: 12) {
+                            Button(lang.t("settings.appearance.avatar.upload")) {
+                                model.importCustomAvatar()
+                            }
+                            if model.customAvatarImage != nil {
+                                Button(lang.t("settings.appearance.avatar.remove")) {
+                                    model.removeCustomAvatar()
+                                }
+                                .foregroundStyle(.red)
+                            }
+                        }
+
+                        Text(lang.t("settings.appearance.avatar.help"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section(lang.t("settings.appearance.statusColors")) {
@@ -97,7 +115,8 @@ struct AppearanceSettingsPane: View {
             IslandPixelGlyph(
                 tint: tint,
                 style: model.islandPixelShapeStyle,
-                isAnimating: previewPhase != .completed
+                isAnimating: previewPhase != .completed,
+                customAvatarImage: model.customAvatarImage
             )
 
             if previewPhase.requiresAttention {
@@ -187,20 +206,39 @@ struct AppearanceSettingsPane: View {
     private func pixelShapeCard(_ style: IslandPixelShapeStyle) -> some View {
         let selected = model.islandPixelShapeStyle == style
         return Button {
-            model.islandPixelShapeStyle = style
+            if style == .custom && model.customAvatarImage == nil {
+                model.importCustomAvatar()
+            } else {
+                model.islandPixelShapeStyle = style
+            }
         } label: {
             VStack(spacing: 8) {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(Color.white.opacity(0.05))
                     .frame(height: 48)
                     .overlay {
-                        IslandPixelGlyph(
-                            tint: model.statusColor(for: previewPhase),
-                            style: style,
-                            isAnimating: previewPhase != .completed,
-                            width: 30,
-                            height: 18
-                        )
+                        if style == .custom {
+                            if let avatar = model.customAvatarImage {
+                                Image(nsImage: avatar)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .scaledToFill()
+                                    .frame(width: 28, height: 28)
+                                    .clipShape(Circle())
+                            } else {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(.secondary)
+                            }
+                        } else {
+                            IslandPixelGlyph(
+                                tint: model.statusColor(for: previewPhase),
+                                style: style,
+                                isAnimating: previewPhase != .completed,
+                                width: 30,
+                                height: 18
+                            )
+                        }
                     }
 
                 Text(pixelShapeTitle(style))
@@ -240,6 +278,7 @@ struct AppearanceSettingsPane: View {
         case .bars:   lang.t("settings.appearance.pixelShape.bars")
         case .steps:  lang.t("settings.appearance.pixelShape.steps")
         case .blocks: lang.t("settings.appearance.pixelShape.blocks")
+        case .custom: lang.t("settings.appearance.pixelShape.custom")
         }
     }
 }

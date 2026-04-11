@@ -40,6 +40,7 @@ enum IslandPixelShapeStyle: String, CaseIterable, Identifiable {
     case bars
     case steps
     case blocks
+    case custom
 
     var id: String { rawValue }
 }
