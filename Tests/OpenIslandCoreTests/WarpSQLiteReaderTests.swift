@@ -85,6 +85,44 @@ struct WarpSQLiteReaderTests {
     }
 
     @Test
+    func lookupPaneUUIDFallbackFindsPaneEvenWithoutAnyPrecmdBlocks() throws {
+        // Discovered against a real Warp SQLite during local E2E
+        // testing: Warp does NOT always write `precmd-<session>-1`
+        // for a shell session. Specifically, when the user opens a
+        // new tab and immediately pastes a compound command like
+        // `mkdir -p /tmp/foo && cd /tmp/foo && claude`, claude grabs
+        // the TTY before Warp's shell integration has a chance to
+        // record even the first prompt. The commands row exists but
+        // the blocks table has ZERO precmd entries for that
+        // session_id.
+        //
+        // This breaks any fallback that depends on a precmd block
+        // linking session → pane uuid. We instead correlate via
+        // `commands.pwd = terminal_panes.cwd` (both reflect the
+        // pane's inherited initial cwd), with the NOT EXISTS filter
+        // excluding panes already "owned" by a different session via
+        // their own precmd blocks. In this fixture there's a sibling
+        // pane with blocks tying it to a different session — the
+        // orphan pane (no blocks) is the only valid match.
+        let tmp = NSTemporaryDirectory() + "warp-fixture-\(UUID().uuidString).sqlite"
+        try WarpSQLiteFixture.write(to: tmp, scenario: .compoundCommandInSiblingTabFlow)
+        defer { try? FileManager.default.removeItem(atPath: tmp) }
+
+        let reader = WarpSQLiteReader(databasePath: tmp)
+        // Scenario: two sibling tabs both with inherited cwd
+        // /tmp/sibling. Tab X (uuid AAAA) has precmd blocks tied to
+        // its own shell session 10001. Tab Y (uuid CCCC) has NO
+        // precmd blocks at all — the compound-command-hijacks-TTY
+        // flow. The `cd /tmp/target && claude` command for tab Y's
+        // session 10002 lives in commands but is not linked to any
+        // pane via blocks. The fallback must correlate
+        // commands.pwd with terminal_panes.cwd AND exclude tab X
+        // (owned by another session) to land on tab Y.
+        let uuid = reader.lookupPaneUUID(forCwd: "/tmp/target")
+        #expect(uuid == "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC")
+    }
+
+    @Test
     func lookupPaneUUIDFallbackSkipsOrphanBlocksFromClosedTabs() throws {
         // When the user closes a Warp tab, Warp prunes the
         // `terminal_panes` row for that tab but leaves the historical
@@ -247,6 +285,58 @@ enum WarpSQLiteFixture {
                 "(1, x'DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD', 'precmd-9001-1')," +
                 "(2, x'EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE', 'precmd-9002-1')," +
                 "(3, x'FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF', 'precmd-9003-1');",
+        ])
+
+        /// Models the "compound command in a sibling tab" flow where
+        /// Warp did not write ANY precmd block for the new shell. The
+        /// user has two tabs, both with inherited initial cwd
+        /// /tmp/sibling:
+        ///
+        /// - Tab A (pane uuid AAAA): an older shell session 10001
+        ///   that ran a `pwd` (or similar non-TUI command) before
+        ///   starting claude, so Warp did write precmd-10001-1 and
+        ///   precmd-10001-2 blocks tying the pane to session 10001.
+        ///   This is the "test-b" equivalent — the already-running
+        ///   tab the user is NOT targeting.
+        ///
+        /// - Tab C (pane uuid CCCC): a newer shell session 10002
+        ///   that was opened as a new tab (inheriting cwd from Tab
+        ///   A's focus) and IMMEDIATELY pasted a compound command.
+        ///   claude took the TTY before Warp's shell integration
+        ///   could render a first prompt, so there are ZERO precmd
+        ///   blocks for session 10002. This is the "test-c"
+        ///   equivalent — the target the user IS trying to jump to.
+        ///
+        /// The fallback must correlate:
+        ///   commands.pwd (/tmp/sibling) → terminal_panes.cwd (/tmp/sibling)
+        /// and exclude Tab A via the NOT EXISTS foreign-block check,
+        /// leaving Tab C as the only valid match even though Tab C
+        /// has zero blocks of its own.
+        static let compoundCommandInSiblingTabFlow = Scenario(rows: [
+            "INSERT INTO app (id, active_window_id) VALUES (1, 1);",
+            "INSERT INTO windows (id, active_tab_index) VALUES (1, 0);",
+            "INSERT INTO tabs (id, window_id) VALUES (1, 1), (2, 1);",
+            "INSERT INTO pane_nodes (id, tab_id, is_leaf) VALUES (1, 1, 1), (2, 2, 1);",
+            // Both panes inherited the same initial cwd because the
+            // new tab opened as a sibling to the first.
+            "INSERT INTO terminal_panes (id, uuid, cwd) VALUES " +
+                "(1, x'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', '/tmp/sibling')," +
+                "(2, x'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC', '/tmp/sibling');",
+            // Both shell sessions ran commands with pwd=/tmp/sibling.
+            // Session 10001 has non-compound command history (a plain
+            // `pwd` before claude). Session 10002 has ONLY the
+            // compound cd+claude.
+            "INSERT INTO commands (id, session_id, command, pwd) VALUES " +
+                "(400, 10001, 'pwd', '/tmp/sibling')," +
+                "(401, 10001, 'claude', '/tmp/sibling')," +
+                "(402, 10002, 'mkdir -p /tmp/target && cd /tmp/target && claude', '/tmp/sibling');",
+            // Session 10001 has two precmd blocks (one at first
+            // prompt, one after `pwd` completed). Session 10002 has
+            // no blocks at all — the compound command ran before the
+            // first prompt.
+            "INSERT INTO blocks (id, pane_leaf_uuid, block_id) VALUES " +
+                "(1, x'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 'precmd-10001-1')," +
+                "(2, x'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', 'precmd-10001-2');",
         ])
 
         /// Three tabs in one window. Tab 1 cwd=giftcard (pane uuid AAAA...),

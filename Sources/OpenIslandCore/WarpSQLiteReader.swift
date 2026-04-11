@@ -134,25 +134,66 @@ public struct WarpSQLiteReader: Sendable {
         let whereClause = Array(repeating: "c.command GLOB ?", count: globPatterns.count)
             .joined(separator: " OR ")
 
-        // The inner JOIN against `terminal_panes` is load-bearing: Warp
-        // prunes terminal_panes rows when the user closes a tab, but
-        // leaves the historical commands + blocks entries in place. On
-        // a real database the ratio is routinely ~1000 orphan blocks
-        // per live pane. Without this filter the fallback would happily
-        // return a stale "pane uuid that used to exist", which the
-        // precision jump cycle loop would then chase around the tab
-        // list for its entire cap before timing out with a "could not
-        // confirm precision focus" message — terrible UX. Joining
-        // against terminal_panes keeps the result set constrained to
-        // currently-live panes, so a miss immediately cleanly degrades
-        // to "no precise pane mapping available" at the caller.
+        // The join chain matches a Warp pane via command-history
+        // correlation, structured to handle the case where the shell
+        // never rendered a prompt before claude took over the TTY and
+        // so Warp never wrote ANY `precmd-<session>-*` block for the
+        // shell. Block-based linking alone fails in that case. The
+        // trick is to correlate via `commands.pwd` (the shell's cwd at
+        // command execution time, which for a compound command in a
+        // freshly opened tab equals the pane's inherited initial cwd)
+        // to `terminal_panes.cwd` (which stays at the inherited value
+        // when the shell never OSC'd a new cwd).
+        //
+        // Three ordering signals disambiguate when multiple panes
+        // share the same initial cwd (common: Warp opens new tabs
+        // inheriting cwd from the previously-focused tab, so two sibling
+        // tabs both started at /tmp/foo will both show cwd='/tmp/foo'
+        // in terminal_panes):
+        //
+        // 1. `has_matching_block DESC` — prefer a pane that is
+        //    already linked via a precmd block to the command's own
+        //    shell session. When a block exists, the pane assignment
+        //    is definitive and we should always take it.
+        //
+        // 2. `NOT EXISTS (... foreign block ...)` in WHERE — exclude
+        //    panes that are already "owned" by a different shell
+        //    session via a precmd block. Without this filter, a query
+        //    for test-c would return the test-b pane (because they
+        //    share the same stale cwd in terminal_panes, and test-b's
+        //    pane is higher-id). test-b is visibly wrong — it has a
+        //    block linked to test-b's session_id, not test-c's.
+        //
+        // 3. `c.id DESC, tp.id DESC` — most recent command, most
+        //    recent pane wins. This is the tiebreaker when neither
+        //    the positive block-link nor the negative foreign-block
+        //    exclusion disambiguates.
+        //
+        // The outer JOIN on `terminal_panes` is also load-bearing:
+        // Warp prunes terminal_panes rows when the user closes a tab
+        // but leaves `commands` and `blocks` history in place. On a
+        // real database the ratio is routinely ~1000 orphan blocks
+        // per live pane. Joining against terminal_panes keeps the
+        // result constrained to currently-live panes so a miss
+        // degrades cleanly to "no precise pane mapping available"
+        // rather than chasing ghost uuids.
         let sql = """
         SELECT hex(tp.uuid)
         FROM commands c
-        JOIN blocks b ON b.block_id LIKE 'precmd-' || c.session_id || '-%'
-        JOIN terminal_panes tp ON tp.uuid = b.pane_leaf_uuid
-        WHERE \(whereClause)
-        ORDER BY c.id DESC
+        JOIN terminal_panes tp ON tp.cwd = c.pwd
+        LEFT JOIN blocks b_match
+            ON b_match.pane_leaf_uuid = tp.uuid
+            AND b_match.block_id GLOB 'precmd-' || c.session_id || '-*'
+        WHERE (\(whereClause))
+          AND NOT EXISTS (
+              SELECT 1 FROM blocks b_foreign
+              WHERE b_foreign.pane_leaf_uuid = tp.uuid
+                AND b_foreign.block_id GLOB 'precmd-*-*'
+                AND b_foreign.block_id NOT GLOB 'precmd-' || c.session_id || '-*'
+          )
+        ORDER BY (b_match.id IS NOT NULL) DESC,
+                 c.id DESC,
+                 tp.id DESC
         LIMIT 1;
         """
 
