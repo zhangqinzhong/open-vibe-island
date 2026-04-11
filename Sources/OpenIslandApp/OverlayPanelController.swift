@@ -292,7 +292,7 @@ final class OverlayPanelController {
         }
 
         hoverTimer = item
-        DispatchQueue.main.asyncAfter(deadline: .now() + AppModel.hoverOpenDelay, execute: item)
+        DispatchQueue.main.asyncAfter(deadline: .now() + model.currentHoverOpenDelay, execute: item)
     }
 
     private func cancelHoverOpen() {

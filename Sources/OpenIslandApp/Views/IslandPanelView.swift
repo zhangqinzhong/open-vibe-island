@@ -294,7 +294,7 @@ struct IslandPanelView: View {
                     surfaceShape
                         .stroke(Color.white.opacity(hidesClosedSurfaceChrome ? 0 : (usesOpenedVisualState ? 0.07 : 0.04)), lineWidth: 1)
                 }
-                .overlay(alignment: .bottom) {
+                .overlay(alignment: .top) {
                     Capsule()
                         .fill(Color.black)
                         .frame(width: idleEdgeWidth, height: Self.closedIdleEdgeHeight)
