@@ -24,25 +24,47 @@ public struct WarpSQLiteReader: Sendable {
 
     /// Resolves the Warp pane UUID hosting a Claude/Codex agent running in `cwd`.
     ///
-    /// The query joins `commands` → `blocks` via the `precmd-<session_id>-<n>`
-    /// block_id format (Warp records one block per shell prompt), filters to
-    /// commands starting with "claude" or "codex" in the given pwd, and takes
-    /// the most recent match.
+    /// Queries `terminal_panes` directly for a pane whose stored cwd matches
+    /// the requested cwd, ordered by `id DESC` so the most recently created
+    /// pane wins. This handles the common case where the user opens a new
+    /// Warp tab and runs `claude` directly: Warp does not write a
+    /// `precmd-<session>-<n>` block for that shell session (because claude
+    /// takes over the TUI before any shell prompt is rendered), so a join
+    /// through the blocks table would silently miss the new tab and return
+    /// the pane uuid of an OLDER claude session in the same cwd. Querying
+    /// `terminal_panes.cwd` directly avoids the dependency on precmd blocks.
+    ///
+    /// Known limitation: if two Warp tabs both have the same cwd recorded in
+    /// `terminal_panes`, both will resolve to the most recently created one
+    /// (highest `id`). Disambiguating same-cwd panes from external state
+    /// alone is not possible because Warp does not expose a per-pane PID
+    /// or TTY in its SQLite schema. Workaround: launch each agent in a
+    /// distinct cwd.
     ///
     /// Returns uppercase hex string (32 chars, no separators) suitable for
     /// comparison against the result of `currentFocusedPaneUUID`. Returns nil
-    /// on any error.
+    /// on any error or when no pane is found for the requested cwd.
+    ///
+    /// Both forms of the cwd are tried, because Claude Code captures cwd via
+    /// `getcwd()` which resolves the macOS firmlink (`/tmp` →
+    /// `/private/tmp`, `/var` → `/private/var`), while Warp records whatever
+    /// path the shell sent through its OSC integration — typically the
+    /// unresolved form because zsh's `pwd` returns the user-facing path. So
+    /// hook payloads commonly carry `/private/tmp/foo` while
+    /// `terminal_panes.cwd` stores `/tmp/foo`. Equality matching against one
+    /// form alone misses the row. We query both candidates in a single
+    /// statement and return the most recently created (`id DESC`) match.
     public func lookupPaneUUID(forCwd cwd: String) -> String? {
         guard let db = openReadOnly() else { return nil }
         defer { sqlite3_close(db) }
 
+        let candidates = Self.cwdLookupCandidates(for: cwd)
+
         let sql = """
-        SELECT hex(b.pane_leaf_uuid)
-        FROM commands c
-        JOIN blocks b ON b.block_id LIKE 'precmd-' || c.session_id || '-%'
-        WHERE (c.command LIKE 'claude%' OR c.command LIKE 'codex%')
-          AND c.pwd = ?
-        ORDER BY c.id DESC
+        SELECT hex(uuid)
+        FROM terminal_panes
+        WHERE cwd IN (\(Array(repeating: "?", count: candidates.count).joined(separator: ", ")))
+        ORDER BY id DESC
         LIMIT 1;
         """
 
@@ -50,13 +72,37 @@ public struct WarpSQLiteReader: Sendable {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(stmt) }
 
-        let cwdCString = cwd.withCString { strdup($0) }
-        defer { free(cwdCString) }
-        sqlite3_bind_text(stmt, 1, cwdCString, -1, nil)
+        var heldCStrings: [UnsafeMutablePointer<CChar>?] = []
+        defer { heldCStrings.forEach { free($0) } }
+
+        for (index, candidate) in candidates.enumerated() {
+            let cString = candidate.withCString { strdup($0) }
+            heldCStrings.append(cString)
+            sqlite3_bind_text(stmt, Int32(index + 1), cString, -1, nil)
+        }
 
         guard sqlite3_step(stmt) == SQLITE_ROW else { return nil }
         guard let cString = sqlite3_column_text(stmt, 0) else { return nil }
         return String(cString: cString)
+    }
+
+    /// Generates the set of equivalent cwd strings to query Warp's SQLite
+    /// against. macOS firmlinks `/tmp` → `/private/tmp` (and `/var` →
+    /// `/private/var`), so a single conceptual directory has two valid
+    /// string forms. Always returns the input as-is plus, when applicable,
+    /// the firmlink-flipped sibling.
+    static func cwdLookupCandidates(for cwd: String) -> [String] {
+        var result: [String] = [cwd]
+        if cwd.hasPrefix("/private/tmp/") || cwd == "/private/tmp" {
+            result.append(String(cwd.dropFirst("/private".count)))
+        } else if cwd.hasPrefix("/tmp/") || cwd == "/tmp" {
+            result.append("/private" + cwd)
+        } else if cwd.hasPrefix("/private/var/") || cwd == "/private/var" {
+            result.append(String(cwd.dropFirst("/private".count)))
+        } else if cwd.hasPrefix("/var/") || cwd == "/var" {
+            result.append("/private" + cwd)
+        }
+        return result
     }
 
     /// Resolves the pane UUID of the currently focused pane in the currently
