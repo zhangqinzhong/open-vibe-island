@@ -101,8 +101,7 @@ struct SettingsView: View {
         } detail: {
             detailView
         }
-        .frame(minWidth: 680, minHeight: 480)
-        .frame(width: 780, height: 560)
+        .frame(minWidth: 680, idealWidth: 780, minHeight: 480, idealHeight: 560)
         .preferredColorScheme(.dark)
     }
 
