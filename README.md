@@ -45,12 +45,12 @@ Think of it as an open-source [Vibe Island](https://vibeisland.app/) — **free,
 - **Open source** — GPL v3, fork it, mod it, ship your own version
 - **Local-first** — No server, no telemetry, no account. Everything runs on your Mac
 - **Native macOS** — SwiftUI + AppKit, not an Electron wrapper
-- **Multi-agent** — One surface for Claude Code, Codex, Cursor, OpenCode, and more
+- **Multi-agent** — One surface for Claude Code, Codex, Cursor, Gemini CLI, OpenCode, and more
 - **Multi-terminal** — Jump back to the exact terminal/IDE session in one click
 
 ## Supported Agents & Terminals
 
-**8 agents**: Claude Code, Codex, Cursor, OpenCode, Qoder, Qwen Code, Factory, CodeBuddy
+**9 agents**: Claude Code, Codex, Cursor, Gemini CLI, OpenCode, Qoder, Qwen Code, Factory, CodeBuddy
 
 **15+ terminals & IDEs**: Terminal.app, Ghostty, iTerm2, WezTerm, Zellij, tmux, cmux, Kaku, VS Code, Cursor, Windsurf, Trae, JetBrains IDEs (IDEA, WebStorm, PyCharm, GoLand, CLion, RubyMine, PhpStorm, Rider, RustRover)
 
@@ -69,7 +69,7 @@ Think of it as an open-source [Vibe Island](https://vibeisland.app/) — **free,
 | **Factory** | Supported | Claude Code fork — same hook format, config at `~/.factory/settings.json` |
 | **CodeBuddy** | Supported | Claude Code fork — same hook format, config at `~/.codebuddy/settings.json` |
 | **Cursor** | Supported | Hook integration via `~/.cursor/hooks.json`, session tracking, workspace jump-back |
-| **Gemini CLI** | Planned | — |
+| **Gemini CLI** | Supported | Hook integration via `~/.gemini/settings.json`, session tracking, fire-and-forget events |
 
 ### Terminals & IDEs
 
@@ -257,6 +257,7 @@ Developers who already live in the terminal and want a better way to work with c
 - **Factory** — Claude Code fork. Same hook format and events via `~/.factory/settings.json`. Use `--source factory` with the hooks binary.
 - **CodeBuddy** — Claude Code fork. Same hook format and events via `~/.codebuddy/settings.json`. Use `--source codebuddy` with the hooks binary.
 - **Cursor** — Hook-based integration via `~/.cursor/hooks.json`. Receives `beforeSubmitPrompt`, `beforeShellExecution`, `beforeMCPExecution`, `beforeReadFile`, `afterFileEdit`, and `stop` events. Session persistence across app launches. Workspace jump-back via `cursor -r`. Use `--source cursor` with the hooks binary.
+- **Gemini CLI** — Hook-based integration via `~/.gemini/settings.json`. Receives `SessionStart`, `PreToolUse`, `PostToolUse`, `Stop`, and `UserPromptSubmit` events. Fire-and-forget (no block/deny). Use `--source gemini` with the hooks binary.
 
 ### Terminal Support
 
