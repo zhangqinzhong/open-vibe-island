@@ -404,6 +404,7 @@ struct SetupSettingsPane: View {
     @State private var confirmingUninstallFactory = false
     @State private var confirmingUninstallCodebuddy = false
     @State private var confirmingUninstallCursor = false
+    @State private var confirmingUninstallGemini = false
 
     private var lang: LanguageManager { model.lang }
 
@@ -541,6 +542,22 @@ struct SetupSettingsPane: View {
                 } message: {
                     Text("This will remove the Open Island hooks from ~/.cursor/hooks.json.")
                 }
+
+                hookRow(
+                    name: "Gemini CLI",
+                    installed: model.geminiHooksInstalled,
+                    busy: model.isGeminiHookSetupBusy,
+                    installAction: { model.installGeminiHooks() },
+                    uninstallAction: { confirmingUninstallGemini = true }
+                )
+                .alert(lang.t("settings.general.uninstallConfirmTitle"), isPresented: $confirmingUninstallGemini) {
+                    Button(lang.t("settings.general.uninstallConfirmAction"), role: .destructive) {
+                        model.uninstallGeminiHooks()
+                    }
+                    Button(lang.t("settings.general.cancel"), role: .cancel) {}
+                } message: {
+                    Text("This will remove Open Island hooks from ~/.gemini/settings.json.")
+                }
             }
 
             Section {
@@ -600,6 +617,7 @@ struct SetupSettingsPane: View {
                     if !model.factoryHooksInstalled { model.installFactoryHooks() }
                     if !model.codebuddyHooksInstalled { model.installCodebuddyHooks() }
                     if !model.cursorHooksInstalled { model.installCursorHooks() }
+                    if !model.geminiHooksInstalled { model.installGeminiHooks() }
                     if !model.claudeUsageInstalled { model.installClaudeUsageBridge() }
                 }
                 .disabled(model.hooksBinaryURL == nil || allReady)
@@ -660,7 +678,7 @@ struct SetupSettingsPane: View {
     private var allReady: Bool {
         model.claudeHooksInstalled && model.codexHooksInstalled && model.openCodePluginInstalled
             && model.qoderHooksInstalled && model.qwenCodeHooksInstalled && model.factoryHooksInstalled && model.codebuddyHooksInstalled
-            && model.cursorHooksInstalled && model.claudeUsageInstalled
+            && model.cursorHooksInstalled && model.geminiHooksInstalled && model.claudeUsageInstalled
     }
 
     private var hasErrors: Bool {
