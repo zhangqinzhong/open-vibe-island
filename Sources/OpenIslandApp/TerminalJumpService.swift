@@ -20,6 +20,26 @@ struct TerminalJumpService {
         let displayName: String
         let bundleIdentifier: String
         let aliases: [String]
+        let alternateBundleIdentifiers: [String]
+        let preferredBundleIdentifiersByAlias: [String: String]
+
+        init(
+            displayName: String,
+            bundleIdentifier: String,
+            aliases: [String],
+            alternateBundleIdentifiers: [String] = [],
+            preferredBundleIdentifiersByAlias: [String: String] = [:]
+        ) {
+            self.displayName = displayName
+            self.bundleIdentifier = bundleIdentifier
+            self.aliases = aliases
+            self.alternateBundleIdentifiers = alternateBundleIdentifiers
+            self.preferredBundleIdentifiersByAlias = preferredBundleIdentifiersByAlias
+        }
+
+        var allBundleIdentifiers: [String] {
+            [bundleIdentifier] + alternateBundleIdentifiers
+        }
     }
 
     private static let knownApps: [TerminalAppDescriptor] = [
@@ -81,7 +101,14 @@ struct TerminalJumpService {
         TerminalAppDescriptor(
             displayName: "Trae",
             bundleIdentifier: "com.trae.app",
-            aliases: ["trae"]
+            aliases: ["trae", "trae cn", "trae-cn", "traecn"],
+            alternateBundleIdentifiers: ["cn.trae.app"],
+            preferredBundleIdentifiersByAlias: [
+                "trae": "com.trae.app",
+                "trae cn": "cn.trae.app",
+                "trae-cn": "cn.trae.app",
+                "traecn": "cn.trae.app",
+            ]
         ),
         TerminalAppDescriptor(
             displayName: "IntelliJ IDEA",
@@ -144,6 +171,7 @@ struct TerminalJumpService {
         "com.todesktop.230313mzl4w4u92",
         "com.exafunction.windsurf",
         "com.trae.app",
+        "cn.trae.app",
     ]
 
     /// Bundle identifiers of terminal emulators that commonly host Zellij,
@@ -255,6 +283,7 @@ struct TerminalJumpService {
             }
         }
 
+        let normalizedPreferredName = normalizeTerminalAppName(target.terminalApp)
         let descriptor = resolveTerminalApp(preferredName: target.terminalApp)
         let hasWorkingDirectory = target.workingDirectory.map { FileManager.default.fileExists(atPath: $0) } ?? false
         let hasPreciseLocator = [target.terminalSessionID, target.terminalTTY].contains {
@@ -263,7 +292,26 @@ struct TerminalJumpService {
             }
             return !value.isEmpty
         }
-        let appIsRunning = descriptor.map { appRunningChecker($0.bundleIdentifier) } ?? false
+        let preferredBundleIdentifier: String?
+        if let descriptor {
+            preferredBundleIdentifier = preferredBundleIdentifierForAlias(
+                for: descriptor,
+                normalizedPreferredName: normalizedPreferredName
+            )
+        } else {
+            preferredBundleIdentifier = nil
+        }
+
+        let resolvedBundleIdentifier: String?
+        if let descriptor {
+            resolvedBundleIdentifier = resolveBundleIdentifier(
+                for: descriptor,
+                preferredBundleIdentifier: preferredBundleIdentifier
+            )
+        } else {
+            resolvedBundleIdentifier = nil
+        }
+        let appIsRunning = resolvedBundleIdentifier.map(appRunningChecker) ?? false
 
         // Zellij is a terminal multiplexer, not a macOS .app. Handle it
         // before the descriptor-based dispatch since it won't have one.
@@ -280,7 +328,7 @@ struct TerminalJumpService {
         }
 
         if let descriptor {
-            switch descriptor.bundleIdentifier {
+            switch resolvedBundleIdentifier ?? descriptor.bundleIdentifier {
             case "com.googlecode.iterm2":
                 if try jumpToITermSession(target) {
                     return "Focused the matching iTerm session."
@@ -312,7 +360,7 @@ struct TerminalJumpService {
                     }
                 }
                 if appIsRunning {
-                    try openAction(["-b", descriptor.bundleIdentifier])
+                    try openAction(["-b", id])
                     return "Activated \(descriptor.displayName)."
                 }
             case let id where Self.jetbrainsBundleIDs.contains(id):
@@ -323,7 +371,7 @@ struct TerminalJumpService {
                     }
                 }
                 if appIsRunning {
-                    try openAction(["-b", descriptor.bundleIdentifier])
+                    try openAction(["-b", id])
                     return "Activated \(descriptor.displayName)."
                 }
             default:
@@ -332,17 +380,17 @@ struct TerminalJumpService {
         }
 
         if let descriptor, hasPreciseLocator, appIsRunning {
-            try openAction(["-b", descriptor.bundleIdentifier])
+            try openAction(["-b", resolvedBundleIdentifier ?? descriptor.bundleIdentifier])
             return "Activated \(descriptor.displayName). Exact pane targeting could not find the live terminal."
         }
 
         if let descriptor, hasWorkingDirectory, let workingDirectory = target.workingDirectory {
-            try openAction(["-b", descriptor.bundleIdentifier, workingDirectory])
+            try openAction(["-b", resolvedBundleIdentifier ?? descriptor.bundleIdentifier, workingDirectory])
             return "Opened \(target.workspaceName) in \(descriptor.displayName). Exact pane targeting is still best-effort."
         }
 
         if let descriptor {
-            try openAction(["-b", descriptor.bundleIdentifier])
+            try openAction(["-b", resolvedBundleIdentifier ?? descriptor.bundleIdentifier])
             return "Activated \(descriptor.displayName). Exact pane targeting is still best-effort."
         }
 
@@ -394,6 +442,7 @@ struct TerminalJumpService {
         "com.todesktop.230313mzl4w4u92": "cursor",
         "com.exafunction.windsurf": "windsurf",
         "com.trae.app": "trae",
+        "cn.trae.app": "trae",
     ]
 
     private func jumpToVSCodeFamilyWorkspace(_ workspacePath: String, bundleIdentifier: String) -> Bool {
@@ -1105,9 +1154,7 @@ struct TerminalJumpService {
     }
 
     private func resolveTerminalApp(preferredName: String) -> TerminalAppDescriptor? {
-        let normalized = preferredName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
+        let normalized = normalizeTerminalAppName(preferredName)
 
         // "Unknown" is the hook-side sentinel meaning "we could not classify this
         // terminal". Returning nil here lets jump() fall through to the Finder
@@ -1124,11 +1171,49 @@ struct TerminalJumpService {
             return exact
         }
 
-        return Self.knownApps.first(where: { isInstalled(bundleIdentifier: $0.bundleIdentifier) })
+        return Self.knownApps.first(where: isInstalled(descriptor:))
     }
 
-    private func isInstalled(bundleIdentifier: String) -> Bool {
-        applicationResolver(bundleIdentifier) != nil
+    private func normalizeTerminalAppName(_ preferredName: String) -> String {
+        preferredName
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+    }
+
+    private func isInstalled(descriptor: TerminalAppDescriptor) -> Bool {
+        descriptor.allBundleIdentifiers.contains { applicationResolver($0) != nil }
+    }
+
+    private func preferredBundleIdentifierForAlias(
+        for descriptor: TerminalAppDescriptor,
+        normalizedPreferredName: String
+    ) -> String? {
+        if let aliasSpecific = descriptor.preferredBundleIdentifiersByAlias[normalizedPreferredName] {
+            return aliasSpecific
+        }
+        if descriptor.displayName.lowercased() == normalizedPreferredName {
+            return descriptor.bundleIdentifier
+        }
+        return nil
+    }
+
+    private func resolveBundleIdentifier(
+        for descriptor: TerminalAppDescriptor,
+        preferredBundleIdentifier: String?
+    ) -> String {
+        if let preferredBundleIdentifier, appRunningChecker(preferredBundleIdentifier) {
+            return preferredBundleIdentifier
+        }
+        if let preferredBundleIdentifier, applicationResolver(preferredBundleIdentifier) != nil {
+            return preferredBundleIdentifier
+        }
+        if let running = descriptor.allBundleIdentifiers.first(where: appRunningChecker) {
+            return running
+        }
+        if let installed = descriptor.allBundleIdentifiers.first(where: { applicationResolver($0) != nil }) {
+            return installed
+        }
+        return preferredBundleIdentifier ?? descriptor.bundleIdentifier
     }
 
     private func runAppleScript(_ script: String) throws -> String {

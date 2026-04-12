@@ -8,6 +8,10 @@ final class TerminalJumpServiceTests: XCTestCase {
         var values: [[String]] = []
     }
 
+    private final class ProcessInvocationBox: @unchecked Sendable {
+        var values: [(String, [String])] = []
+    }
+
     func testGhosttyJumpScriptActivatesWindowAndRetriesFocusUntilItSticks() {
         let target = JumpTarget(
             terminalApp: "Ghostty",
@@ -131,7 +135,8 @@ final class TerminalJumpServiceTests: XCTestCase {
             openAction: { arguments in
                 openedArguments.values.append(arguments)
             },
-            appleScriptRunner: { _ in "" }
+            appleScriptRunner: { _ in "" },
+            processRunner: { _, _ in false }
         )
 
         let result = try service.jump(
@@ -338,6 +343,102 @@ final class TerminalJumpServiceTests: XCTestCase {
             result.contains("Finder"),
             "Expected Finder fallback, got: \(result)"
         )
+    }
+
+    func testTraeJumpActivatesRunningTraeCNApp() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                bundleIdentifier == "cn.trae.app" ? URL(fileURLWithPath: "/Applications/Trae CN.app") : nil
+            },
+            appRunningChecker: { bundleIdentifier in
+                bundleIdentifier == "cn.trae.app"
+            },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Trae",
+                workspaceName: "open-vibe-island",
+                paneTitle: "Trae abc123",
+                workingDirectory: "/Users/test/open-vibe-island"
+            )
+        )
+
+        XCTAssertEqual(result, "Activated Trae.")
+        XCTAssertEqual(openedArguments.values, [["-b", "cn.trae.app"]])
+    }
+
+    func testTraeCNJumpPrefersCNBundleWhenBothTraeVariantsExist() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                switch bundleIdentifier {
+                case "com.trae.app":
+                    return URL(fileURLWithPath: "/Applications/Trae.app")
+                case "cn.trae.app":
+                    return URL(fileURLWithPath: "/Applications/Trae CN.app")
+                default:
+                    return nil
+                }
+            },
+            appRunningChecker: { bundleIdentifier in
+                bundleIdentifier == "com.trae.app"
+            },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Trae CN",
+                workspaceName: "open-vibe-island",
+                paneTitle: "Trae abc123"
+            )
+        )
+
+        XCTAssertEqual(result, "Activated Trae. Exact pane targeting is still best-effort.")
+        XCTAssertEqual(openedArguments.values, [["-b", "cn.trae.app"]])
+    }
+
+    func testTraeCNJumpFallsBackToWorkspaceViaTraeCLI() throws {
+        let openedArguments = OpenedArgumentsBox()
+        let processInvocations = ProcessInvocationBox()
+        let service = TerminalJumpService(
+            applicationResolver: { bundleIdentifier in
+                bundleIdentifier == "cn.trae.app" ? URL(fileURLWithPath: "/Applications/Trae CN.app") : nil
+            },
+            appRunningChecker: { _ in false },
+            openAction: { arguments in
+                openedArguments.values.append(arguments)
+            },
+            appleScriptRunner: { _ in "" },
+            processRunner: { executable, arguments in
+                processInvocations.values.append((executable, arguments))
+                return true
+            }
+        )
+
+        let result = try service.jump(
+            to: JumpTarget(
+                terminalApp: "Trae CN",
+                workspaceName: "open-vibe-island",
+                paneTitle: "Trae abc123",
+                workingDirectory: "/Users/test/open-vibe-island"
+            )
+        )
+
+        XCTAssertEqual(result, "Focused the matching Trae workspace.")
+        XCTAssertTrue(openedArguments.values.isEmpty)
+        XCTAssertEqual(processInvocations.values.count, 1)
+        XCTAssertEqual(processInvocations.values.first?.0, "trae")
+        XCTAssertEqual(processInvocations.values.first?.1, ["-r", "/Users/test/open-vibe-island"])
     }
 }
 
