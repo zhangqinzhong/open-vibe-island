@@ -1154,6 +1154,7 @@ final class AppModel {
                 if !self.codebuddyHooksInstalled { self.installCodebuddyHooks() }
                 if !self.openCodePluginInstalled { self.installOpenCodePlugin() }
                 if !self.cursorHooksInstalled { self.installCursorHooks() }
+                if !self.geminiHooksInstalled { self.installGeminiHooks() }
                 if !self.claudeUsageInstalled { self.installClaudeUsageBridge() }
 
                 // Run health checks after install to detect stale paths, conflicts, etc.
