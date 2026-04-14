@@ -103,6 +103,7 @@
 "setup.permissionsTitle" = "輔助使用";
 "setup.permissionsDesc" = "Open Island 可能需要輔助使用權限來偵測終端機視窗。請在「系統設定 → 隱私權與安全性 → 輔助使用」中授權。";
 "setup.installAll" = "全部安裝";
+"setup.revealConfigLocation" = "在 Finder 中顯示設定";
 "setup.section.diagnostics" = "Hooks 診斷";
 "setup.diagnostics.notRun" = "尚未執行健康檢查。";
 "setup.diagnostics.runCheck" = "執行檢查";

@@ -417,6 +417,7 @@ struct SetupSettingsPane: View {
                     name: "Claude Code",
                     installed: model.claudeHooksInstalled,
                     busy: model.isClaudeHookSetupBusy,
+                    configLocationURL: model.claudeHookStatus?.settingsURL,
                     installAction: { model.installClaudeHooks() },
                     uninstallAction: { confirmingUninstallClaude = true }
                 )
@@ -433,6 +434,7 @@ struct SetupSettingsPane: View {
                     name: "Codex",
                     installed: model.codexHooksInstalled,
                     busy: model.isCodexSetupBusy,
+                    configLocationURL: codexHookConfigURL,
                     installAction: { model.installCodexHooks() },
                     uninstallAction: { confirmingUninstallCodex = true }
                 )
@@ -450,6 +452,7 @@ struct SetupSettingsPane: View {
                     installed: model.openCodePluginInstalled,
                     busy: model.isOpenCodeSetupBusy,
                     requiresBinary: false,
+                    configLocationURL: model.openCodePluginStatus?.configURL,
                     installAction: { model.installOpenCodePlugin() },
                     uninstallAction: { confirmingUninstallOpenCode = true }
                 )
@@ -466,6 +469,7 @@ struct SetupSettingsPane: View {
                     name: "Qoder",
                     installed: model.qoderHooksInstalled,
                     busy: model.isQoderHookSetupBusy,
+                    configLocationURL: model.qoderHookStatus?.settingsURL,
                     installAction: { model.installQoderHooks() },
                     uninstallAction: { confirmingUninstallQoder = true }
                 )
@@ -482,6 +486,7 @@ struct SetupSettingsPane: View {
                     name: "Qwen Code",
                     installed: model.qwenCodeHooksInstalled,
                     busy: model.isQwenCodeHookSetupBusy,
+                    configLocationURL: model.qwenCodeHookStatus?.settingsURL,
                     installAction: { model.installQwenCodeHooks() },
                     uninstallAction: { confirmingUninstallQwenCode = true }
                 )
@@ -498,6 +503,7 @@ struct SetupSettingsPane: View {
                     name: "Factory",
                     installed: model.factoryHooksInstalled,
                     busy: model.isFactoryHookSetupBusy,
+                    configLocationURL: model.factoryHookStatus?.settingsURL,
                     installAction: { model.installFactoryHooks() },
                     uninstallAction: { confirmingUninstallFactory = true }
                 )
@@ -514,6 +520,7 @@ struct SetupSettingsPane: View {
                     name: "CodeBuddy",
                     installed: model.codebuddyHooksInstalled,
                     busy: model.isCodebuddyHookSetupBusy,
+                    configLocationURL: model.codebuddyHookStatus?.settingsURL,
                     installAction: { model.installCodebuddyHooks() },
                     uninstallAction: { confirmingUninstallCodebuddy = true }
                 )
@@ -531,6 +538,7 @@ struct SetupSettingsPane: View {
                     installed: model.cursorHooksInstalled,
                     busy: model.isCursorHookSetupBusy,
                     requiresBinary: true,
+                    configLocationURL: model.cursorHookStatus?.hooksURL,
                     installAction: { model.installCursorHooks() },
                     uninstallAction: { confirmingUninstallCursor = true }
                 )
@@ -547,6 +555,7 @@ struct SetupSettingsPane: View {
                     name: "Gemini CLI",
                     installed: model.geminiHooksInstalled,
                     busy: model.isGeminiHookSetupBusy,
+                    configLocationURL: geminiHookConfigURL,
                     installAction: { model.installGeminiHooks() },
                     uninstallAction: { confirmingUninstallGemini = true }
                 )
@@ -681,6 +690,18 @@ struct SetupSettingsPane: View {
             && model.cursorHooksInstalled && model.geminiHooksInstalled && model.claudeUsageInstalled
     }
 
+    private var codexHookConfigURL: URL? {
+        if let hooksURL = model.codexHookStatus?.hooksURL, FileManager.default.fileExists(atPath: hooksURL.path) {
+            return hooksURL
+        }
+        return model.codexHookStatus?.configURL ?? model.codexHookStatus?.hooksURL
+    }
+
+    private var geminiHookConfigURL: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".gemini/settings.json")
+    }
+
     private var hasErrors: Bool {
         let claudeErrors = model.claudeHealthReport?.errors.count ?? 0
         let codexErrors = model.codexHealthReport?.errors.count ?? 0
@@ -805,6 +826,7 @@ struct SetupSettingsPane: View {
         installed: Bool,
         busy: Bool,
         requiresBinary: Bool = true,
+        configLocationURL: URL? = nil,
         installAction: @escaping () -> Void,
         uninstallAction: @escaping () -> Void
     ) -> some View {
@@ -813,6 +835,16 @@ struct SetupSettingsPane: View {
             Spacer()
             if installed {
                 HStack(spacing: 8) {
+                    if let configLocationURL {
+                        Button {
+                            revealInFinder(configLocationURL)
+                        } label: {
+                            Image(systemName: "arrow.up.forward.square")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help(lang.t("setup.revealConfigLocation"))
+                    }
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -833,6 +865,21 @@ struct SetupSettingsPane: View {
                 }
                 .disabled(requiresBinary && model.hooksBinaryURL == nil)
             }
+        }
+    }
+
+    private func revealInFinder(_ url: URL) {
+        let fileManager = FileManager.default
+        let standardizedURL = url.standardizedFileURL
+
+        if fileManager.fileExists(atPath: standardizedURL.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([standardizedURL])
+            return
+        }
+
+        let directoryURL = standardizedURL.deletingLastPathComponent()
+        if fileManager.fileExists(atPath: directoryURL.path) {
+            NSWorkspace.shared.open(directoryURL)
         }
     }
 }

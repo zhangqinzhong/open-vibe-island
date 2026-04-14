@@ -105,6 +105,7 @@ final class AppModel {
     var codexHealthReport: HookHealthReport? { hooks.codexHealthReport }
     var cursorHooksInstalled: Bool { hooks.cursorHooksInstalled }
     var isCursorHookSetupBusy: Bool { hooks.isCursorHookSetupBusy }
+    var cursorHookStatus: CursorHookInstallationStatus? { hooks.cursorHookStatus }
     var cursorHookStatusTitle: String { hooks.cursorHookStatusTitle }
     var cursorHookStatusSummary: String { hooks.cursorHookStatusSummary }
     var geminiHooksInstalled: Bool { hooks.geminiHooksInstalled }
