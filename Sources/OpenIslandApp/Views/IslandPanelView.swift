@@ -23,30 +23,27 @@ private struct AutoHeightScrollView<Content: View>: View {
     @ViewBuilder let content: () -> Content
     @State private var contentHeight: CGFloat = 0
 
-    var body: some View {
-        if contentHeight > maxHeight {
-            // Exceeds max → fixed height, scrollable
-            ScrollView(.vertical) {
-                measuredContent
-            }
-            .scrollIndicators(.hidden)
-            .frame(height: maxHeight)
-        } else {
-            // Fits within max → direct render, auto-height
-            measuredContent
-        }
-    }
+    private var isScrollable: Bool { contentHeight > maxHeight }
 
-    private var measuredContent: some View {
-        content()
-            .background(
-                GeometryReader { geo in
-                    Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+    var body: some View {
+        // Always use ScrollView so the content gets unconstrained vertical
+        // space for measurement.  Without this, a tight parent window can
+        // cap the GeometryReader measurement, making long content appear
+        // truncated instead of scrollable.
+        ScrollView(.vertical) {
+            content()
+                .background(
+                    GeometryReader { geo in
+                        Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+                    }
+                )
+                .onPreferenceChange(ContentHeightKey.self) { height in
+                    if height > 0 { contentHeight = height }
                 }
-            )
-            .onPreferenceChange(ContentHeightKey.self) { height in
-                if height > 0 { contentHeight = height }
-            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollIndicators(isScrollable ? .automatic : .hidden)
+        .frame(height: contentHeight > 0 ? min(contentHeight, maxHeight) : nil)
     }
 }
 
