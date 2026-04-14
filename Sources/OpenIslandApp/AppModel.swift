@@ -1093,6 +1093,7 @@ final class AppModel {
                 case let .jumpTargetUpdated(p): return p.sessionID
                 case let .sessionMetadataUpdated(p): return p.sessionID
                 case let .claudeSessionMetadataUpdated(p): return p.sessionID
+                case let .geminiSessionMetadataUpdated(p): return p.sessionID
                 case let .openCodeSessionMetadataUpdated(p): return p.sessionID
                 case let .cursorSessionMetadataUpdated(p): return p.sessionID
                 case let .actionableStateResolved(p): return p.sessionID
@@ -1293,6 +1294,8 @@ final class AppModel {
             }
 
             return payload.claudeMetadata.lastAssistantMessage ?? "Claude session metadata updated."
+        case let .geminiSessionMetadataUpdated(payload):
+            return payload.geminiMetadata.lastAssistantMessage ?? "Gemini session metadata updated."
         case let .openCodeSessionMetadataUpdated(payload):
             if let currentTool = payload.openCodeMetadata.currentTool {
                 return "OpenCode is running \(currentTool)."

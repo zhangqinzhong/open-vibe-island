@@ -606,7 +606,7 @@ final class OverlayPanelController {
     private func completionBodyHeight(for session: AgentSession) -> CGFloat {
         let headerHeight: CGFloat = 44
 
-        let text = (session.lastAssistantMessageText ?? session.summary)
+        let text = (session.completionAssistantMessageText ?? session.summary)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !text.isEmpty else {
@@ -633,7 +633,7 @@ final class OverlayPanelController {
             return Self.completionCardMinHeight
         }
 
-        let text = (session.lastAssistantMessageText ?? session.summary)
+        let text = (session.completionAssistantMessageText ?? session.summary)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Estimate text height using NSString measurement with the actual font.

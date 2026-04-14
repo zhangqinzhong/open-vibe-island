@@ -8,7 +8,6 @@ typealias ActiveProcessSnapshot = ActiveAgentProcessDiscovery.ProcessSnapshot
 @MainActor
 @Observable
 final class ProcessMonitoringCoordinator {
-
     var isResolvingInitialLiveSessions = false
 
     @ObservationIgnored
@@ -225,6 +224,8 @@ final class ProcessMonitoringCoordinator {
             payload.sessionID
         case let .claudeSessionMetadataUpdated(payload):
             payload.sessionID
+        case let .geminiSessionMetadataUpdated(payload):
+            payload.sessionID
         case let .openCodeSessionMetadataUpdated(payload):
             payload.sessionID
         case let .cursorSessionMetadataUpdated(payload):
@@ -301,6 +302,26 @@ final class ProcessMonitoringCoordinator {
             }
         }
 
+        // Gemini sessions are hook-managed, but Gemini does not expose a stable
+        // session ID through process discovery. Match each active Gemini process
+        // to at most one tracked session, preferring the freshest transcript in
+        // the same workspace while still keeping idle transcripts alive as long
+        // as the Gemini CLI process remains running.
+        let geminiProcesses = activeProcesses.filter { $0.tool == .geminiCLI }
+        let trackedGeminiSessions = sessions.filter { $0.tool == .geminiCLI && !$0.isDemoSession }
+        var claimedGeminiSessionIDs: Set<String> = []
+        for process in geminiProcesses {
+            guard let matched = uniqueTrackedGeminiSession(
+                for: process,
+                sessions: trackedGeminiSessions,
+                claimedSessionIDs: claimedGeminiSessionIDs
+            ) else {
+                continue
+            }
+            aliveIDs.insert(matched.id)
+            claimedGeminiSessionIDs.insert(matched.id)
+        }
+
         // Cursor sessions: Cursor is an Electron IDE — we cannot match
         // individual session IDs from ps/lsof.  Keep all Cursor sessions
         // alive as long as Cursor.app is running.
@@ -320,6 +341,54 @@ final class ProcessMonitoringCoordinator {
         }
 
         return aliveIDs
+    }
+
+    private func uniqueTrackedGeminiSession(
+        for process: ActiveProcessSnapshot,
+        sessions: [AgentSession],
+        claimedSessionIDs: Set<String>
+    ) -> AgentSession? {
+        let unclaimedSessions = sessions.filter { !claimedSessionIDs.contains($0.id) }
+        guard !unclaimedSessions.isEmpty else {
+            return nil
+        }
+
+        if let transcriptPath = process.transcriptPath,
+           let transcriptMatched = unclaimedSessions.first(where: { $0.geminiMetadata?.transcriptPath == transcriptPath }) {
+            return transcriptMatched
+        }
+
+        if let processWorkingDirectory = process.workingDirectory {
+            let workspaceMatches = unclaimedSessions.filter {
+                $0.jumpTarget?.workingDirectory == processWorkingDirectory
+            }
+            if !workspaceMatches.isEmpty {
+                return preferredGeminiSession(from: workspaceMatches)
+            }
+            return nil
+        }
+
+        return unclaimedSessions.count == 1 ? unclaimedSessions[0] : nil
+    }
+
+    private func preferredGeminiSession(from sessions: [AgentSession]) -> AgentSession? {
+        sessions.max { lhs, rhs in
+            let lhsDate = modificationDate(atPath: lhs.geminiMetadata?.transcriptPath) ?? .distantPast
+            let rhsDate = modificationDate(atPath: rhs.geminiMetadata?.transcriptPath) ?? .distantPast
+            if lhsDate == rhsDate {
+                return lhs.updatedAt < rhs.updatedAt
+            }
+            return lhsDate < rhsDate
+        }
+    }
+
+    private func modificationDate(atPath path: String?) -> Date? {
+        guard let path, !path.isEmpty else {
+            return nil
+        }
+
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        return attributes?[.modificationDate] as? Date
     }
 
     // MARK: - Synthetic Claude sessions

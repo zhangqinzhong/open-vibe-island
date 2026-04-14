@@ -275,7 +275,7 @@ struct ControlCenterView: View {
                     }
                 }
                 .buttonStyle(DebugActionButtonStyle(kind: .primary))
-                .disabled(model.isGeminiHookSetupBusy || model.hooksBinaryURL == nil || model.geminiHookStatus == .geminiNotFound)
+                .disabled(model.isGeminiHookSetupBusy || model.hooksBinaryURL == nil)
             }
         }
     }

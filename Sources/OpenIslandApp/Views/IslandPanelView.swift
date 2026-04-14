@@ -1345,7 +1345,7 @@ private struct IslandSessionRow: View {
     }
 
     private var completionMessageText: String {
-        if let text = session.lastAssistantMessageText?.trimmedForNotificationCard, !text.isEmpty {
+        if let text = session.completionAssistantMessageText?.trimmedForNotificationCard, !text.isEmpty {
             return text
         }
         return session.summary
