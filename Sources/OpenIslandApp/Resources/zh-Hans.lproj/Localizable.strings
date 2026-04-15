@@ -26,6 +26,7 @@
 "settings.general.showDockIcon" = "在 Dock 中显示图标";
 "settings.general.hapticFeedback" = "悬停时震动反馈";
 "settings.general.showCodexUsage" = "显示 Codex 用量";
+"settings.general.completionReply" = "在完成卡片中回复";
 "settings.general.cliHooks" = "CLI Hooks";
 "settings.general.activated" = "已激活";
 "settings.general.install" = "安装";
@@ -149,6 +150,7 @@
 
 /* Island Panel - Completion */
 "completion.done" = "完成";
+"completion.replyPlaceholder" = "回复 Claude…";
 
 /* Menu Bar */
 "menu.status" = "%lld 活跃 · %lld 待处理";

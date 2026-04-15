@@ -16,6 +16,7 @@ final class AppModel {
     private static let islandPixelShapeStyleDefaultsKey = "appearance.island.pixelShapeStyle"
     private static let islandStatusColorsDefaultsKey = "appearance.island.statusColors"
     private static let showCodexUsageDefaultsKey = "app.showCodexUsage"
+    private static let completionReplyEnabledDefaultsKey = "feature.completionReply.enabled"
 
     static let defaultStatusColors: [SessionPhase: String] = [
         .running: "#6E9FFF",
@@ -199,6 +200,13 @@ final class AppModel {
         didSet {
             guard hasFinishedInit, showCodexUsage != oldValue else { return }
             UserDefaults.standard.set(showCodexUsage, forKey: Self.showCodexUsageDefaultsKey)
+        }
+    }
+    var completionReplyEnabled: Bool = false {
+        didSet {
+            guard hasFinishedInit, completionReplyEnabled != oldValue else { return }
+            UserDefaults.standard.set(completionReplyEnabled, forKey: Self.completionReplyEnabledDefaultsKey)
+            refreshOverlayPlacementIfVisible()
         }
     }
     var isSoundMuted = false {
@@ -424,6 +432,7 @@ final class AppModel {
         UserDefaults.standard.register(defaults: [
             Self.showDockIconDefaultsKey: true,
             Self.hapticFeedbackEnabledDefaultsKey: false,
+            Self.completionReplyEnabledDefaultsKey: false,
         ])
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
@@ -436,6 +445,7 @@ final class AppModel {
                 atPath: CodexRolloutDiscovery.defaultRootURL.path
             )
         }
+        completionReplyEnabled = UserDefaults.standard.bool(forKey: Self.completionReplyEnabledDefaultsKey)
         islandAppearanceMode = IslandAppearanceMode(
             rawValue: UserDefaults.standard.string(forKey: Self.islandAppearanceModeDefaultsKey) ?? ""
         ) ?? .default
@@ -1032,6 +1042,24 @@ final class AppModel {
             .answerQuestion(sessionID: session.id, response: answer),
             userMessage: "Sending answer for \(session.title)."
         )
+    }
+
+    func replyToSession(_ session: AgentSession, text: String) {
+        dismissNotificationSurfaceIfPresent(for: session.id)
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
+
+        lastActionMessage = "Sending reply to \(session.title)…"
+
+        Task { [weak self] in
+            let success = await Task.detached(priority: .userInitiated) {
+                TerminalTextSender.send(text, to: session)
+            }.value
+
+            self?.lastActionMessage = success
+                ? "Sent reply to \(session.title)."
+                : "Failed to send reply to \(session.title)."
+        }
     }
 
 

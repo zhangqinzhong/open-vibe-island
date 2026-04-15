@@ -596,14 +596,14 @@ final class OverlayPanelController {
         case .waitingForAnswer:
             return questionCardHeight(for: session.questionPrompt) - 44
         case .completed:
-            return completionBodyHeight(for: session)
+            return completionBodyHeight(for: session, model: model)
         case .running:
             return 0
         }
     }
 
     /// Height of the inline completion expansion area (not the old full-card height).
-    private func completionBodyHeight(for session: AgentSession) -> CGFloat {
+    private func completionBodyHeight(for session: AgentSession, model: AppModel) -> CGFloat {
         let headerHeight: CGFloat = 44
 
         let text = (session.completionAssistantMessageText ?? session.summary)
@@ -621,7 +621,9 @@ final class OverlayPanelController {
             attributes: [.font: font]
         )
         let markdownHeight = min(260, ceil(textSize.height) + 20)
-        return headerHeight + 1 + markdownHeight
+        // Reply input: divider (1) + input bar padding+content (~52)
+        let replyInputHeight: CGFloat = TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled) ? 53 : 0
+        return headerHeight + 1 + markdownHeight + replyInputHeight
     }
 
     private func questionCardHeight(for prompt: QuestionPrompt?) -> CGFloat {

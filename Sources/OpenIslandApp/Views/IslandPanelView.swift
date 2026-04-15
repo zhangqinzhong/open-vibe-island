@@ -563,6 +563,8 @@ struct IslandPanelView: View {
                     lang: model.lang,
                     onApprove: { model.approvePermission(for: session.id, action: $0) },
                     onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
+                    onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
+                        ? { model.replyToSession(session, text: $0) } : nil,
                     onJump: { model.jumpToSession(session) }
                 )
 
@@ -590,6 +592,8 @@ struct IslandPanelView: View {
                         lang: model.lang,
                         onApprove: { model.approvePermission(for: session.id, action: $0) },
                         onAnswer: { model.answerQuestion(for: session.id, answer: $0) },
+                        onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
+                            ? { model.replyToSession(session, text: $0) } : nil,
                         onJump: { model.jumpToSession(session) },
                         onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
                     )
@@ -1017,11 +1021,13 @@ private struct IslandSessionRow: View {
     var lang: LanguageManager = .shared
     var onApprove: ((ApprovalAction) -> Void)?
     var onAnswer: ((QuestionPromptResponse) -> Void)?
+    var onReply: ((String) -> Void)?
     let onJump: () -> Void
     var onDismiss: (() -> Void)?
 
     @State private var isHighlighted = false
     @State private var isManuallyExpanded = false
+    @State private var replyText: String = ""
 
     var body: some View {
         rowBody(referenceDate: referenceDate)
@@ -1322,6 +1328,14 @@ private struct IslandSessionRow: View {
                     .padding(.horizontal, 14)
                     .padding(.vertical, 10)
             }
+
+            if onReply != nil {
+                Rectangle()
+                    .fill(.white.opacity(0.04))
+                    .frame(height: 1)
+
+                completionReplyInput
+            }
         }
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1331,6 +1345,38 @@ private struct IslandSessionRow: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .strokeBorder(.white.opacity(0.08))
         )
+    }
+
+    @ViewBuilder
+    private var completionReplyInput: some View {
+        HStack(spacing: 8) {
+            ReplyTextField(
+                placeholder: lang.t("completion.replyPlaceholder"),
+                text: $replyText,
+                onSubmit: { submitReply() }
+            )
+            .frame(height: 32)
+
+            Button {
+                submitReply()
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 24))
+                    .foregroundColor(replyText.trimmingCharacters(in: .whitespaces).isEmpty
+                        ? .white.opacity(0.2) : .white.opacity(0.9))
+            }
+            .buttonStyle(.plain)
+            .disabled(replyText.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+    }
+
+    private func submitReply() {
+        let text = replyText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        replyText = ""
+        onReply?(text)
     }
 
     // MARK: - Actionable helpers
@@ -1632,6 +1678,74 @@ private struct StructuredQuestionPromptView: View {
         }
 
         selections[question.question] = selected
+    }
+}
+
+// MARK: - Reply TextField (NSTextField wrapper for IME-safe Enter handling)
+
+/// NSTextField wrapper that fires `onSubmit` only when the IME composition
+/// is finished — pressing Enter during Chinese/Japanese IME composition
+/// confirms the candidate instead of submitting.
+private struct ReplyTextField: NSViewRepresentable {
+    var placeholder: String
+    @Binding var text: String
+    var onSubmit: () -> Void
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField()
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.font = .systemFont(ofSize: 13)
+        field.textColor = .white
+        field.placeholderAttributedString = NSAttributedString(
+            string: placeholder,
+            attributes: [
+                .foregroundColor: NSColor.white.withAlphaComponent(0.35),
+                .font: NSFont.systemFont(ofSize: 13),
+            ]
+        )
+        field.delegate = context.coordinator
+        field.cell?.lineBreakMode = .byTruncatingTail
+        field.cell?.usesSingleLineMode = true
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+        context.coordinator.onSubmit = onSubmit
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, onSubmit: onSubmit)
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var text: Binding<String>
+        var onSubmit: () -> Void
+
+        init(text: Binding<String>, onSubmit: @escaping () -> Void) {
+            self.text = text
+            self.onSubmit = onSubmit
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            text.wrappedValue = field.stringValue
+        }
+
+        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
+                // Let AppKit handle Enter during IME composition (e.g. confirming
+                // a Chinese/Japanese candidate). Only submit when no marked text.
+                guard !textView.hasMarkedText() else { return false }
+                onSubmit()
+                return true
+            }
+            return false
+        }
     }
 }
 
