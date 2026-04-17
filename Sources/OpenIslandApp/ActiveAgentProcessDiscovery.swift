@@ -534,17 +534,21 @@ struct ActiveAgentProcessDiscovery {
             || lowered.contains("/@google/gemini-cli")
     }
 
+    /// Returns `true` when the given `ps` command string belongs to a Claude Code process.
+    /// Matches the official `~/.local/bin/claude` path as well as any absolute path whose
+    /// last component is `claude` (e.g. `~/.codefuse/.../claude`).
     private func isClaudeProcess(command: String) -> Bool {
         let lowered = command.lowercased()
         if lowered.contains("/.local/bin/claude") {
             return true
         }
 
-        guard let firstToken = lowered.split(separator: " ").first else {
+        guard let firstToken = lowered.split(separator: " ").first.map(String.init) else {
             return false
         }
 
         return firstToken == "claude"
+            || firstToken.hasSuffix("/claude")
     }
 
     private static func commandOutput(executablePath: String, arguments: [String]) -> String? {
