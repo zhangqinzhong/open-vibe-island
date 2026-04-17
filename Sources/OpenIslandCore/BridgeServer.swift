@@ -438,6 +438,15 @@ public final class BridgeServer: @unchecked Sendable {
     }
 
     private func handleCodexHook(_ payload: CodexHookPayload, from clientID: UUID) {
+        // Filter out Codex.app internal invocations (e.g. conversation title
+        // generation).  These fire hooks but have no transcript file — they're
+        // ephemeral API calls, not user-facing sessions.
+        if payload.terminalApp == "Codex.app",
+           (payload.transcriptPath ?? "").isEmpty {
+            send(.response(.acknowledged), to: clientID)
+            return
+        }
+
         switch payload.hookEventName {
         case .sessionStart:
             let event = AgentEvent.sessionStarted(

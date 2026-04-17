@@ -121,6 +121,10 @@ public struct JumpTarget: Equatable, Codable, Sendable {
     public var tmuxTarget: String?
     public var tmuxSocketPath: String?
     public var warpPaneUUID: String?
+    /// Codex.app thread/conversation ID.  When set and `terminalApp` is
+    /// `"Codex.app"`, the jump uses the `codex://threads/<id>` URL scheme
+    /// to open the conversation directly rather than just activating the app.
+    public var codexThreadID: String?
 
     public init(
         terminalApp: String,
@@ -131,7 +135,8 @@ public struct JumpTarget: Equatable, Codable, Sendable {
         terminalTTY: String? = nil,
         tmuxTarget: String? = nil,
         tmuxSocketPath: String? = nil,
-        warpPaneUUID: String? = nil
+        warpPaneUUID: String? = nil,
+        codexThreadID: String? = nil
     ) {
         self.terminalApp = terminalApp
         self.workspaceName = workspaceName
@@ -142,6 +147,7 @@ public struct JumpTarget: Equatable, Codable, Sendable {
         self.tmuxTarget = tmuxTarget
         self.tmuxSocketPath = tmuxSocketPath
         self.warpPaneUUID = warpPaneUUID
+        self.codexThreadID = codexThreadID
     }
 }
 
@@ -337,6 +343,12 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
     /// (`SessionStart` / `SessionEnd`) instead of `ps`/`lsof` process discovery.
     public var isHookManaged: Bool = false
 
+    /// Whether this Codex session originates from the Codex desktop app
+    /// rather than the Codex CLI.  When `true`, liveness is determined by
+    /// whether Codex.app is running (`NSRunningApplication`), not by
+    /// matching individual CLI subprocess PIDs.
+    public var isCodexAppSession: Bool = false
+
     /// Whether the agent session has ended (received `SessionEnd` hook).
     /// Only meaningful for hook-managed sessions.
     public var isSessionEnded: Bool = false
@@ -469,6 +481,10 @@ public extension AgentSession {
     var isVisibleInIsland: Bool {
         if isDemoSession { return true }
         if phase.requiresAttention { return true }
+        // Codex.app sessions stay visible while the desktop app is running.
+        // Checked before isHookManaged because a Codex.app session may also
+        // be hook-managed (when both hook and rediscovery converge on it).
+        if isCodexAppSession { return isProcessAlive }
         if isHookManaged { return !isSessionEnded }
         if isProcessAlive { return true }
         return false
