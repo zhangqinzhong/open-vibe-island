@@ -458,7 +458,11 @@ struct IslandPanelView: View {
     }
 
     private var openedContent: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 8) {
+            if !model.hasAnyInstalledAgent {
+                installHooksHint
+            }
+
             if model.shouldShowSessionBootstrapPlaceholder {
                 sessionBootstrapPlaceholder
             } else if model.islandListSessions.isEmpty {
@@ -470,6 +474,43 @@ struct IslandPanelView: View {
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 0)
+    }
+
+    /// Persistent hint at the top of the expanded island while no agent
+    /// hooks are installed. Decoupled from session presence — process
+    /// discovery routinely surfaces sessions even on a freshly cleaned
+    /// install, so the empty-state branch alone never reaches users who
+    /// already run an agent.
+    private var installHooksHint: some View {
+        Button {
+            model.showOnboarding()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                Text(model.lang.t("island.hint.installHooks"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.accentColor.opacity(0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.accentColor.opacity(0.35), lineWidth: 0.5)
+                    )
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private var sessionBootstrapPlaceholder: some View {

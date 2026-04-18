@@ -4,6 +4,14 @@ import Observation
 import OpenIslandCore
 import SwiftUI
 
+extension Notification.Name {
+    /// Posted by `AppModel.showOnboarding()` to ask `SettingsView` to
+    /// switch to the Setup tab. Lets the empty-state CTAs deliver the
+    /// user to the right place without `SettingsView`'s `@State` having
+    /// to leak into `AppModel`.
+    static let openIslandSelectSetupTab = Notification.Name("openIslandSelectSetupTab")
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -119,6 +127,30 @@ final class AppModel {
     var geminiHookStatusSummary: String { hooks.geminiHookStatusSummary }
     var codexHookStatusTitle: String { hooks.codexHookStatusTitle }
     var codexHookStatusSummary: String { hooks.codexHookStatusSummary }
+
+    /// Mirrors `AgentIntentStore.firstLaunchCompleted`. Onboarding sets this
+    /// to true after the user completes (or explicitly skips) the flow;
+    /// legacy migration also flips it for users upgrading with existing
+    /// hooks.
+    var firstLaunchCompleted: Bool {
+        get { hooks.intentStore.firstLaunchCompleted }
+        set { hooks.intentStore.firstLaunchCompleted = newValue }
+    }
+
+    /// True if at least one managed hook is currently present on disk.
+    /// Drives the "configure agents" empty-state prompts in the island and
+    /// the settings window.
+    var hasAnyInstalledAgent: Bool {
+        hooks.claudeHooksInstalled
+            || hooks.codexHooksInstalled
+            || hooks.cursorHooksInstalled
+            || hooks.qoderHooksInstalled
+            || hooks.qwenCodeHooksInstalled
+            || hooks.factoryHooksInstalled
+            || hooks.codebuddyHooksInstalled
+            || hooks.openCodePluginInstalled
+            || hooks.geminiHooksInstalled
+    }
     func refreshCodexHookStatus() { hooks.refreshCodexHookStatus() }
     func refreshClaudeHookStatus() { hooks.refreshClaudeHookStatus() }
     func refreshOpenCodePluginStatus() { hooks.refreshOpenCodePluginStatus() }
@@ -913,6 +945,15 @@ final class AppModel {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// Opens Settings on the Setup tab so the user can install hooks.
+    /// Used by every "Set up agents" CTA in the empty-state UI. A
+    /// dedicated first-run onboarding window will replace this in a
+    /// later PR; until then this is the canonical entry point.
+    func showOnboarding() {
+        showSettings()
+        NotificationCenter.default.post(name: .openIslandSelectSetupTab, object: nil)
+    }
+
     func showControlCenter() {
         guard let window = NSApp.windows.first(where: { $0.title == "Open Island Debug" }) else {
             NSApp.activate(ignoringOtherApps: true)
@@ -1279,16 +1320,27 @@ final class AppModel {
                 // Wait for all status reads to complete before checking install state.
                 await self.hooks.refreshAllHookStatusAndWait()
 
-                if !self.claudeHooksInstalled { self.installClaudeHooks() }
-                if !self.codexHooksInstalled { self.installCodexHooks() }
-                if !self.qoderHooksInstalled { self.installQoderHooks() }
-                if !self.qwenCodeHooksInstalled { self.installQwenCodeHooks() }
-                if !self.factoryHooksInstalled { self.installFactoryHooks() }
-                if !self.codebuddyHooksInstalled { self.installCodebuddyHooks() }
-                if !self.openCodePluginInstalled { self.installOpenCodePlugin() }
-                if !self.cursorHooksInstalled { self.installCursorHooks() }
-                if !self.geminiHooksInstalled { self.installGeminiHooks() }
-                if !self.claudeUsageInstalled { self.installClaudeUsageBridge() }
+                // Reconcile persisted intent with what is actually on disk. For
+                // legacy users this records existing hooks as `.installed` and
+                // marks first-launch as complete so onboarding does not appear
+                // on upgrade. Must run after status reads and before any
+                // install decision.
+                self.hooks.migrateIntentStoreIfNeeded()
+
+                // Install only hooks the user has not explicitly opted out of.
+                // `shouldAutoInstall` skips `.uninstalled` agents and agents
+                // whose hooks are already present — it is the single checkpoint
+                // that fixes #324.
+                if self.hooks.shouldAutoInstall(.claudeCode) { self.installClaudeHooks() }
+                if self.hooks.shouldAutoInstall(.codex) { self.installCodexHooks() }
+                if self.hooks.shouldAutoInstall(.qoder) { self.installQoderHooks() }
+                if self.hooks.shouldAutoInstall(.qwenCode) { self.installQwenCodeHooks() }
+                if self.hooks.shouldAutoInstall(.factory) { self.installFactoryHooks() }
+                if self.hooks.shouldAutoInstall(.codebuddy) { self.installCodebuddyHooks() }
+                if self.hooks.shouldAutoInstall(.openCode) { self.installOpenCodePlugin() }
+                if self.hooks.shouldAutoInstall(.cursor) { self.installCursorHooks() }
+                if self.hooks.shouldAutoInstall(.gemini) { self.installGeminiHooks() }
+                if self.hooks.shouldAutoInstall(.claudeUsageBridge) { self.installClaudeUsageBridge() }
 
                 // Run health checks after install to detect stale paths, conflicts, etc.
                 try? await Task.sleep(for: .milliseconds(500))

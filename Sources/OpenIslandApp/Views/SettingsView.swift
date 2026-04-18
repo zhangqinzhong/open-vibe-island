@@ -103,6 +103,9 @@ struct SettingsView: View {
         }
         .frame(minWidth: 680, idealWidth: 780, minHeight: 480, idealHeight: 560)
         .preferredColorScheme(.dark)
+        .onReceive(NotificationCenter.default.publisher(for: .openIslandSelectSetupTab)) { _ in
+            selectedTab = .setup
+        }
     }
 
     // MARK: Sidebar
@@ -419,6 +422,10 @@ struct SetupSettingsPane: View {
 
     var body: some View {
         Form {
+            if !model.hasAnyInstalledAgent {
+                emptyStateBanner
+            }
+
             claudeConfigDirectorySection
 
             Section(lang.t("setup.section.hooks")) {
@@ -714,6 +721,30 @@ struct SetupSettingsPane: View {
         model.claudeHooksInstalled && model.codexHooksInstalled && model.openCodePluginInstalled
             && model.qoderHooksInstalled && model.qwenCodeHooksInstalled && model.factoryHooksInstalled && model.codebuddyHooksInstalled
             && model.cursorHooksInstalled && model.geminiHooksInstalled && model.claudeUsageInstalled
+    }
+
+    @ViewBuilder
+    private var emptyStateBanner: some View {
+        Section {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.tint)
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lang.t("setup.banner.noHooks.title"))
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(lang.t("setup.banner.noHooks.message"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer()
+            }
+            .padding(.vertical, 4)
+        }
     }
 
     private var codexHookConfigURL: URL? {
