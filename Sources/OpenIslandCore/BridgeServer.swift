@@ -1101,6 +1101,9 @@ public final class BridgeServer: @unchecked Sendable {
         }
     }
 
+    /// Dispatches a Cursor hook payload to the appropriate handler based on
+    /// the hook event name, managing session lifecycle, metadata, and
+    /// permission directives.
     private func handleCursorHook(_ payload: CursorHookPayload, from clientID: UUID) {
         switch payload.hookEventName {
         case .beforeSubmitPrompt:
@@ -1405,8 +1408,11 @@ public final class BridgeServer: @unchecked Sendable {
         )
     }
 
+    /// Creates a Cursor session if one does not already exist for the given
+    /// conversation, or re-creates it if the previous session was marked as
+    /// ended (e.g. after a staleness timeout).
     private func ensureCursorSessionExists(for payload: CursorHookPayload) {
-        guard !hasSession(id: payload.sessionID) else {
+        if let existing = localState.session(id: payload.sessionID), !existing.isSessionEnded {
             return
         }
 
