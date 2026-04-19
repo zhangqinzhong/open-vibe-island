@@ -209,6 +209,17 @@ struct IslandPanelView: View {
             || targetOverlayScreen?.safeAreaInsets.top ?? 0 > 0
     }
 
+    /// True when the closed island sits on an external (non-notched) display.
+    /// The central black rectangle is otherwise aligned with the physical
+    /// notch, so center content is only useful here.
+    private var isExternalDisplayPlacement: Bool {
+        if let mode = model.overlayPlacementDiagnostics?.mode {
+            return mode == .topBar
+        }
+        // Fallback when diagnostics haven't been populated yet.
+        return (targetOverlayScreen?.safeAreaInsets.top ?? 0) == 0
+    }
+
     private var openedHeaderButtonsWidth: CGFloat {
         (Self.headerControlButtonSize * 2) + Self.headerControlSpacing
     }
@@ -374,6 +385,13 @@ struct IslandPanelView: View {
                     Rectangle()
                         .fill(Color.black)
                         .frame(width: closedNotchWidth - NotchShape.closedTopRadius + (isPopping ? 18 : 0))
+                        .overlay(
+                            CentralActivityLabel(
+                                toolName: closedSpotlightSession?.currentToolName,
+                                preview: closedSpotlightSession?.currentCommandPreviewText,
+                                isVisible: isExternalDisplayPlacement && hasClosedPresence
+                            )
+                        )
                 }
 
                 if hasClosedPresence {
@@ -1935,6 +1953,109 @@ private struct ClosedCountBadge: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 2)
             .background(Color(red: 0.14, green: 0.14, blue: 0.15), in: Capsule())
+    }
+}
+
+// MARK: - Central activity overlay (external-display only)
+
+/// Renders the focus session's current tool call inside the central black
+/// rectangle of the closed island. The notch on built-in displays physically
+/// covers this area, so we gate rendering on `placementMode == .topBar`.
+///
+/// State machine: while a tool is active the label tracks it live. When the
+/// tool clears (PostToolUse fires or metadata drops the field), the last
+/// value lingers for `fadeDelay` then disappears.
+private struct CentralActivityLabel: View {
+    let toolName: String?
+    let preview: String?
+    let isVisible: Bool
+
+    @State private var displayed: DisplayedActivity?
+
+    private static let fadeDelay: Duration = .seconds(2)
+
+    struct DisplayedActivity: Equatable {
+        var tool: String
+        var preview: String?
+    }
+
+    var body: some View {
+        Group {
+            if isVisible, let displayed {
+                HStack(spacing: 4) {
+                    Image(systemName: Self.icon(for: displayed.tool))
+                        .font(.system(size: 9, weight: .semibold))
+                    Text(Self.label(for: displayed))
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 8)
+                .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            }
+        }
+        .animation(.easeOut(duration: 0.22), value: displayed)
+        .onChange(of: trackingKey, initial: true) { _, _ in
+            sync()
+        }
+        .task(id: clearTaskID) {
+            guard toolName == nil, displayed != nil else { return }
+            do {
+                try await Task.sleep(for: Self.fadeDelay)
+                displayed = nil
+            } catch {
+                // cancelled — a new tool arrived, let sync() handle it
+            }
+        }
+    }
+
+    /// Composite key so `.onChange` fires on either tool or preview change.
+    private var trackingKey: String {
+        "\(toolName ?? "")|\(preview ?? "")"
+    }
+
+    /// Key used to (re)start the clear timer. Changes whenever we transition
+    /// between active/idle so `.task(id:)` cancels and restarts cleanly.
+    private var clearTaskID: String {
+        toolName == nil ? "clearing-\(displayed?.tool ?? "")" : "active-\(toolName ?? "")"
+    }
+
+    private func sync() {
+        if let toolName, !toolName.isEmpty {
+            displayed = DisplayedActivity(tool: toolName, preview: preview)
+        }
+    }
+
+    private static func label(for activity: DisplayedActivity) -> String {
+        if let preview = activity.preview?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !preview.isEmpty {
+            return "\(activity.tool) · \(preview)"
+        }
+        return activity.tool
+    }
+
+    private static func icon(for tool: String) -> String {
+        let lower = tool.lowercased()
+        if lower.contains("grep") || lower.contains("search") || lower.contains("glob") {
+            return "magnifyingglass"
+        }
+        if lower.contains("edit") || lower.contains("write") {
+            return "pencil"
+        }
+        if lower.contains("bash") || lower.contains("shell") || lower.contains("exec") || lower.contains("run") {
+            return "terminal"
+        }
+        if lower.contains("read") {
+            return "doc.text"
+        }
+        if lower.contains("web") || lower.contains("fetch") {
+            return "globe"
+        }
+        if lower.contains("task") || lower.contains("agent") || lower.contains("subagent") {
+            return "sparkles"
+        }
+        return "wrench.and.screwdriver"
     }
 }
 
