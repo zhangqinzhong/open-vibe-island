@@ -110,6 +110,7 @@ struct IslandPanelView: View {
 
     @Namespace private var notchNamespace
     @State private var isHovering = false
+    @State private var showingQuitConfirmation = false
 
     private var isOpened: Bool {
         model.notchStatus == .opened
@@ -221,7 +222,7 @@ struct IslandPanelView: View {
     }
 
     private var openedHeaderButtonsWidth: CGFloat {
-        (Self.headerControlButtonSize * 2) + Self.headerControlSpacing
+        (Self.headerControlButtonSize * 3) + (Self.headerControlSpacing * 2)
     }
 
     var body: some View {
@@ -236,6 +237,14 @@ struct IslandPanelView: View {
         }
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
+        .alert(model.lang.t("island.quit.confirmTitle"), isPresented: $showingQuitConfirmation) {
+            Button(model.lang.t("island.quit.confirmAction"), role: .destructive) {
+                model.quitApplication()
+            }
+            Button(model.lang.t("settings.general.cancel"), role: .cancel) {}
+        } message: {
+            Text(model.lang.t("island.quit.confirmMessage"))
+        }
     }
 
     @ViewBuilder
@@ -457,12 +466,21 @@ struct IslandPanelView: View {
             headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
                 model.showSettings()
             }
+
+            headerIconButton(
+                systemName: "power",
+                tint: .white.opacity(0.62),
+                accessibilityLabel: model.lang.t("island.quit.confirmTitle")
+            ) {
+                showingQuitConfirmation = true
+            }
         }
     }
 
     private func headerIconButton(
         systemName: String,
         tint: Color,
+        accessibilityLabel: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
@@ -473,6 +491,7 @@ struct IslandPanelView: View {
                 .background(.white.opacity(0.08), in: Circle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel ?? systemName)
     }
 
     private var openedContent: some View {
