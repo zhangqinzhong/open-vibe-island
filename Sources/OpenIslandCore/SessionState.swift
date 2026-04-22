@@ -9,11 +9,14 @@ public struct SessionState: Equatable, Sendable {
 
     public var sessions: [AgentSession] {
         sessionsByID.values.sorted { lhs, rhs in
-            if lhs.updatedAt == rhs.updatedAt {
-                return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
+            if lhs.updatedAt != rhs.updatedAt {
+                return lhs.updatedAt > rhs.updatedAt
             }
-
-            return lhs.updatedAt > rhs.updatedAt
+            let titleOrder = lhs.title.localizedStandardCompare(rhs.title)
+            if titleOrder != .orderedSame {
+                return titleOrder == .orderedAscending
+            }
+            return lhs.id < rhs.id
         }
     }
 
