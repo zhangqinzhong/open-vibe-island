@@ -222,15 +222,8 @@ final class AppModel {
             guard hasFinishedInit, showDockIcon != oldValue else { return }
             UserDefaults.standard.set(showDockIcon, forKey: Self.showDockIconDefaultsKey)
             NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
-            if !showDockIcon {
-                // macOS does not immediately refresh the Dock when switching to
-                // .accessory at runtime. Briefly activating another app forces
-                // the Dock to drop the icon.
-                NSApp.hide(nil)
-                DispatchQueue.main.async {
-                    NSApp.unhide(nil)
-                }
-            }
+            // Re-activate so the menu bar extra remains visible after the policy change.
+            NSApp.activate(ignoringOtherApps: false)
         }
     }
     var hapticFeedbackEnabled: Bool = false {
@@ -401,8 +394,7 @@ final class AppModel {
 
     /// Number of currently connected iPhone SSE clients.
     var watchConnectedDevices: Int {
-        // Placeholder — endpoint doesn't expose count yet
-        0
+        watchRelay?.endpoint.connectedClientCount ?? 0
     }
 
     private func startWatchRelay() {
@@ -490,7 +482,7 @@ final class AppModel {
         self.terminalJumpAction = terminalJumpAction
         self.isNotificationSessionAlreadyFrontmost = isNotificationSessionAlreadyFrontmost
         UserDefaults.standard.register(defaults: [
-            Self.showDockIconDefaultsKey: true,
+            Self.showDockIconDefaultsKey: false,
             Self.hapticFeedbackEnabledDefaultsKey: false,
             Self.completionReplyEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
