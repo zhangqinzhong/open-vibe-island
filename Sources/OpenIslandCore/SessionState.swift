@@ -441,6 +441,23 @@ public struct SessionState: Equatable, Sendable {
         upsert(session)
     }
 
+    /// Immediately evict sessions whose backing process is not in `aliveSessionIDs`.
+    /// Used by the manual refresh button to bypass the two-poll threshold.
+    public mutating func forceEvictDeadSessions(aliveSessionIDs: Set<String>) {
+        for (id, var session) in sessionsByID {
+            guard !aliveSessionIDs.contains(id) else { continue }
+            guard !session.isDemoSession, !session.phase.requiresAttention else { continue }
+            if session.isHookManaged {
+                session.isSessionEnded = true
+                session.phase = .completed
+            } else {
+                session.isProcessAlive = false
+                session.processNotSeenCount = 99
+            }
+            upsert(session)
+        }
+    }
+
     public mutating func removeInvisibleSessions() -> Bool {
         let before = sessionsByID.count
         sessionsByID = sessionsByID.filter { _, session in

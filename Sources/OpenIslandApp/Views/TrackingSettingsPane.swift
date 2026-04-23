@@ -169,27 +169,25 @@ struct TrackingSettingsPane: View {
         panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
-        // Use begin(completionHandler:) to avoid blocking the main thread,
-        // which caused the settings window to freeze with a black overlay.
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
+        // Run the panel as a standalone window (not a sheet) and wait for it
+        // to fully close before showing the SwiftUI edit sheet. Using
+        // beginSheetModal or begin() and immediately mutating @State while the
+        // panel is still on screen causes AppKit/SwiftUI window focus conflicts
+        // that freeze the settings window.
+        let response = panel.runModal()
+        guard response == .OK, let url = panel.url else { return }
 
-            let bundle = Bundle(url: url)
-            let bundleID = bundle?.bundleIdentifier ?? url.deletingPathExtension().lastPathComponent
-            let appName = bundle?.infoDictionary?["CFBundleName"] as? String
-                ?? url.deletingPathExtension().lastPathComponent
+        let bundle = Bundle(url: url)
+        let bundleID = bundle?.bundleIdentifier ?? url.deletingPathExtension().lastPathComponent
+        let appName = bundle?.infoDictionary?["CFBundleName"] as? String
+            ?? url.deletingPathExtension().lastPathComponent
 
-            let app = CustomTrackedApp(
-                bundleID: bundleID,
-                appName: appName,
-                terminalAppKey: appName
-            )
-            // @State must be mutated on the main thread.
-            DispatchQueue.main.async {
-                self.editingApp = app
-                self.showEditSheet = true
-            }
-        }
+        editingApp = CustomTrackedApp(
+            bundleID: bundleID,
+            appName: appName,
+            terminalAppKey: appName
+        )
+        showEditSheet = true
     }
 
     // MARK: - App icon helper
