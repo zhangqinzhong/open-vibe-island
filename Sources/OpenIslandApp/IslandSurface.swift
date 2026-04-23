@@ -50,7 +50,12 @@ enum IslandSurface: Equatable {
         case .completed:
             return true
         case .running:
-            return false
+            // A .running update can race with a permissionRequest/questionAsked
+            // event: the hook sends PreToolUse (→ .running) immediately before
+            // PermissionRequest (→ .waitingForApproval). Keep the notification
+            // card open if the session still has a pending permission request or
+            // question — the card will self-dismiss once the user acts on it.
+            return session.permissionRequest != nil || session.questionPrompt != nil
         }
     }
 }
