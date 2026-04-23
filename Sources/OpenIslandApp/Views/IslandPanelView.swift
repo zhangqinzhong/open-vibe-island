@@ -111,6 +111,7 @@ struct IslandPanelView: View {
     @Namespace private var notchNamespace
     @State private var isHovering = false
     @State private var showingQuitConfirmation = false
+    @State private var isRefreshing = false
 
     private var isOpened: Bool {
         model.notchStatus == .opened
@@ -456,6 +457,31 @@ struct IslandPanelView: View {
 
     private var openedHeaderButtons: some View {
         HStack(spacing: Self.headerControlSpacing) {
+            // Refresh button
+            Button {
+                guard !isRefreshing else { return }
+                isRefreshing = true
+                model.refreshSessions()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    isRefreshing = false
+                }
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.62))
+                    .frame(width: Self.headerControlButtonSize, height: Self.headerControlButtonSize)
+                    .background(.white.opacity(0.08), in: Circle())
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                    .animation(
+                        isRefreshing
+                            ? .linear(duration: 0.6)
+                            : .default,
+                        value: isRefreshing
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Refresh sessions")
+
             headerIconButton(
                 systemName: model.isSoundMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                 tint: model.isSoundMuted ? .orange.opacity(0.92) : .white.opacity(0.62)
