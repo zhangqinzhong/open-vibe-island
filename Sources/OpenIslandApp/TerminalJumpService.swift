@@ -84,6 +84,11 @@ struct TerminalJumpService {
             aliases: ["kaku"]
         ),
         TerminalAppDescriptor(
+            displayName: "Superset",
+            bundleIdentifier: "com.superset.desktop",
+            aliases: ["superset"]
+        ),
+        TerminalAppDescriptor(
             displayName: "Cursor",
             bundleIdentifier: "com.todesktop.230313mzl4w4u92",
             aliases: ["cursor"]
@@ -390,7 +395,12 @@ struct TerminalJumpService {
                     return "Activated \(descriptor.displayName)."
                 }
             default:
-                break
+                // Generic fallback for apps without dedicated pane-focus logic
+                // (Superset, custom tracked apps, future additions, etc.).
+                if appIsRunning {
+                    try openAction(["-b", resolvedBundleIdentifier ?? descriptor.bundleIdentifier])
+                    return "Activated \(descriptor.displayName)."
+                }
             }
         }
 
@@ -1184,6 +1194,17 @@ struct TerminalJumpService {
             descriptor.displayName.lowercased() == normalized || descriptor.aliases.contains(normalized)
         }) {
             return exact
+        }
+
+        // Check user-configured custom apps before falling back to any installed known app.
+        if let custom = CustomTrackedAppStore.shared.apps.first(where: {
+            $0.terminalAppKey.lowercased() == normalized
+        }) {
+            return TerminalAppDescriptor(
+                displayName: custom.appName,
+                bundleIdentifier: custom.bundleID,
+                aliases: [custom.terminalAppKey.lowercased()]
+            )
         }
 
         return Self.knownApps.first(where: isInstalled(descriptor:))
