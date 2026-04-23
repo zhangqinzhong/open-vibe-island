@@ -179,12 +179,16 @@ struct TrackingSettingsPane: View {
             let appName = bundle?.infoDictionary?["CFBundleName"] as? String
                 ?? url.deletingPathExtension().lastPathComponent
 
-            self.editingApp = CustomTrackedApp(
+            let app = CustomTrackedApp(
                 bundleID: bundleID,
                 appName: appName,
                 terminalAppKey: appName
             )
-            self.showEditSheet = true
+            // @State must be mutated on the main thread.
+            DispatchQueue.main.async {
+                self.editingApp = app
+                self.showEditSheet = true
+            }
         }
     }
 
