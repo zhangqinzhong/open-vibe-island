@@ -602,6 +602,16 @@ public extension CodexHookPayload {
             return "IntelliJ IDEA"
         }
 
+        // User-configured apps.
+        if let bundleID = environment["__CFBundleIdentifier"],
+           let key = CustomTrackedAppStore.shared.terminalAppKey(forBundleID: bundleID) {
+            return key
+        }
+        if let termProgram = environment["TERM_PROGRAM"],
+           let key = CustomTrackedAppStore.shared.terminalAppKey(forBundleID: termProgram) {
+            return key
+        }
+
         return nil
     }
 

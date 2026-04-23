@@ -368,6 +368,24 @@ final class AppModel {
     @ObservationIgnored
     private var hasFinishedInit = false
 
+    // MARK: - Custom Tracked Apps
+
+    var customTrackedApps: [CustomTrackedApp] {
+        get { CustomTrackedAppStore.shared.apps }
+        set { CustomTrackedAppStore.shared.apps = newValue }
+    }
+
+    func addCustomTrackedApp(_ app: CustomTrackedApp) {
+        var apps = customTrackedApps
+        guard !apps.contains(where: { $0.bundleID == app.bundleID }) else { return }
+        apps.append(app)
+        customTrackedApps = apps
+    }
+
+    func removeCustomTrackedApp(bundleID: String) {
+        customTrackedApps.removeAll { $0.bundleID == bundleID }
+    }
+
     // MARK: - Watch Notification
 
     private static let watchNotificationEnabledKey = "watch.notification.enabled"

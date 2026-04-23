@@ -7,6 +7,7 @@ import OpenIslandCore
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
     case setup
+    case tracking
     case display
     case sound
     case appearance
@@ -21,6 +22,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    lang.t("settings.tab.general")
         case .setup:      lang.t("settings.tab.setup")
+        case .tracking:   "Tracking"
         case .appearance: lang.t("settings.tab.appearance")
         case .display:    lang.t("settings.tab.display")
         case .sound:      lang.t("settings.tab.sound")
@@ -35,6 +37,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    "gearshape.fill"
         case .setup:      "arrow.down.circle.fill"
+        case .tracking:   "app.connected.to.app.below.fill"
         case .appearance: "paintbrush.fill"
         case .display:    "textformat.size"
         case .sound:      "speaker.wave.2.fill"
@@ -49,6 +52,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    .gray
         case .setup:      .orange
+        case .tracking:   .indigo
         case .appearance: .purple
         case .display:    .blue
         case .sound:      .green
@@ -61,9 +65,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var section: SettingsSection {
         switch self {
-        case .general, .setup, .display, .sound, .appearance, .watch: .system
-        case .shortcuts, .lab:                                        .advanced
-        case .about:                                                  .app
+        case .general, .setup, .tracking, .display, .sound, .appearance, .watch: .system
+        case .shortcuts, .lab:                                                    .advanced
+        case .about:                                                              .app
         }
     }
 }
@@ -140,6 +144,8 @@ struct SettingsView: View {
                 GeneralSettingsPane(model: model)
             case .setup:
                 SetupSettingsPane(model: model)
+            case .tracking:
+                TrackingSettingsPane(model: model)
             case .appearance:
                 AppearanceSettingsPane(model: model)
             case .display:
