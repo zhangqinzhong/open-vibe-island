@@ -133,6 +133,11 @@ public final class WatchHTTPEndpoint: @unchecked Sendable {
     public var onResolution: WatchResolutionHandler?
     public var activeSessionCountProvider: WatchActiveSessionCountProvider?
 
+    /// Thread-safe count of currently connected SSE clients.
+    public var connectedClientCount: Int {
+        queue.sync { sseConnections.count }
+    }
+
     public init() {
         regeneratePairingCode()
     }

@@ -612,6 +612,21 @@ final class ProcessMonitoringCoordinator {
         var representedProcessKeys: Set<String> = []
         var claimedSessionIDs: Set<String> = []
 
+        // Pass 0: hook-managed sessions without a process sessionID.
+        // When lsof cannot read the transcript path the process arrives with
+        // sessionID == nil. If a live hook session already exists for the same
+        // TTY+CWD, treat the process as represented so we don't create a
+        // duplicate synthetic session alongside the real one.
+        for process in activeProcesses where process.sessionID == nil {
+            guard let matched = uniqueTrackedClaudeSession(
+                for: process,
+                sessions: trackedClaudeSessions.filter { $0.isHookManaged },
+                claimedSessionIDs: claimedSessionIDs
+            ) else { continue }
+            representedProcessKeys.insert(processIdentityKey(process))
+            claimedSessionIDs.insert(matched.id)
+        }
+
         for process in activeProcesses {
             guard let processSessionID = process.sessionID,
                   let matchedSession = trackedClaudeSessions.first(where: {

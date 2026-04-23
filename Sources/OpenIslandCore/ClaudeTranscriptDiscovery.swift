@@ -42,8 +42,10 @@ public final class ClaudeTranscriptDiscovery: @unchecked Sendable {
         var candidates: [Candidate] = []
 
         for case let fileURL as URL in enumerator {
+            // Claude Code places subagent transcripts under .claude/worktrees/agent-*/
+            // rather than a /subagents/ directory, so filter on that pattern instead.
             guard fileURL.pathExtension == "jsonl",
-                  !fileURL.path.contains("/subagents/") else {
+                  !fileURL.path.contains("/.claude/worktrees/agent-") else {
                 continue
             }
 
@@ -152,11 +154,27 @@ public final class ClaudeTranscriptDiscovery: @unchecked Sendable {
             }
         }
 
-        guard let cwd else {
-            return nil
+        // Derive a best-effort working directory from the transcript path when the
+        // JSONL does not contain a "cwd" field (older Claude Code versions omit it).
+        // The project directory is encoded in the path segment between
+        // ~/.claude/projects/ and the session filename, with "/" replaced by "-".
+        let resolvedCWD: String
+        if let cwd {
+            resolvedCWD = cwd
+        } else {
+            // Attempt to decode the encoded directory name from the path component.
+            let encodedDir = fileURL.deletingLastPathComponent().lastPathComponent
+            let decoded = "/" + encodedDir.replacingOccurrences(of: "-", with: "/")
+            // Only use the decoded path if it looks plausible (starts with /Users or /home).
+            if decoded.hasPrefix("/Users/") || decoded.hasPrefix("/home/") || decoded.hasPrefix("/var/") {
+                resolvedCWD = decoded
+            } else {
+                // Fall back to home directory rather than discarding the session.
+                resolvedCWD = FileManager.default.homeDirectoryForCurrentUser.path
+            }
         }
 
-        let workspaceName = WorkspaceNameResolver.workspaceName(for: cwd)
+        let workspaceName = WorkspaceNameResolver.workspaceName(for: resolvedCWD)
         let metadata = ClaudeSessionMetadata(
             transcriptPath: fileURL.path,
             initialUserPrompt: initialUserPrompt,
@@ -183,7 +201,7 @@ public final class ClaudeTranscriptDiscovery: @unchecked Sendable {
                 terminalApp: "Unknown",
                 workspaceName: workspaceName,
                 paneTitle: "Claude \(sessionID.prefix(8))",
-                workingDirectory: cwd
+                workingDirectory: resolvedCWD
             ),
             claudeMetadata: metadata.isEmpty ? nil : metadata
         )

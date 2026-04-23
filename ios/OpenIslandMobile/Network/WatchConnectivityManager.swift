@@ -51,9 +51,9 @@ final class WatchConnectivityManager: NSObject, @unchecked Sendable {
         session.sendMessage(payload, replyHandler: { [weak self] reply in
             Self.logger.debug("Watch replied to message")
             self?.handleIncomingMessage(reply)
-        }, errorHandler: { error in
+        }, errorHandler: { [weak self] error in
             Self.logger.info("sendMessage failed, queuing via transferUserInfo: \(error.localizedDescription)")
-            self.session.transferUserInfo(payload)
+            self?.session.transferUserInfo(payload)
         })
     }
 }
