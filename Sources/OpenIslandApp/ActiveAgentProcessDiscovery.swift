@@ -457,6 +457,11 @@ struct ActiveAgentProcessDiscovery {
             return "RustRover"
         }
 
+        // User-configured apps: match by app name fragment in the process path.
+        if let key = CustomTrackedAppStore.shared.terminalAppKey(matchingCommand: command) {
+            return key
+        }
+
         return nil
     }
 
