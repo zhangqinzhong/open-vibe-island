@@ -446,7 +446,7 @@ public struct SessionState: Equatable, Sendable {
     public mutating func forceEvictDeadSessions(aliveSessionIDs: Set<String>) {
         for (id, var session) in sessionsByID {
             guard !aliveSessionIDs.contains(id) else { continue }
-            guard !session.isDemoSession, !session.phase.requiresAttention else { continue }
+            guard !session.isDemoSession else { continue }
             if session.isHookManaged {
                 session.isSessionEnded = true
                 session.phase = .completed
