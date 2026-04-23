@@ -460,24 +460,22 @@ struct IslandPanelView: View {
             // Refresh button
             Button {
                 guard !isRefreshing else { return }
-                isRefreshing = true
+                withAnimation(.linear(duration: 0.5)) {
+                    isRefreshing = true
+                }
                 model.refreshSessions()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    isRefreshing = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation(.default) {
+                        isRefreshing = false
+                    }
                 }
             } label: {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.62))
+                    .foregroundStyle(.white.opacity(isRefreshing ? 1.0 : 0.62))
                     .frame(width: Self.headerControlButtonSize, height: Self.headerControlButtonSize)
                     .background(.white.opacity(0.08), in: Circle())
                     .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                    .animation(
-                        isRefreshing
-                            ? .linear(duration: 0.6)
-                            : .default,
-                        value: isRefreshing
-                    )
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Refresh sessions")
