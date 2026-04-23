@@ -364,6 +364,8 @@ public extension GeminiHookPayload {
             return "WezTerm"
         case .some("kaku"):
             return "Kaku"
+        case let value? where value.contains("superset"):
+            return "Superset"
         case .some("vscode"):
             return "VS Code"
         case .some("vscode-insiders"):
