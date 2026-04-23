@@ -1181,6 +1181,8 @@ public extension ClaudeHookPayload {
                 return "Kaku"
             case "wezterm":
                 return "WezTerm"
+            case let value where value.contains("superset"):
+                return "Superset"
             case "vscode":
                 // Cursor also sets TERM_PROGRAM=vscode; check its unique
                 // env var first.
