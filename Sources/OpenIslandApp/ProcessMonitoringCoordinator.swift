@@ -312,10 +312,15 @@ final class ProcessMonitoringCoordinator {
         }
 
         // Pass 3: TTY + CWD fallback match.
+        // Exclude hook-managed sessions: they have a stable sessionID and must
+        // only be matched via Pass 1. Allowing CWD-only matching here causes a
+        // dead hook session to be kept alive indefinitely whenever a new process
+        // runs in the same working directory.
+        let nonHookClaudeSessions = trackedClaudeSessions.filter { !$0.isHookManaged }
         for process in claudeProcesses {
             guard let matched = uniqueTrackedClaudeSession(
                 for: process,
-                sessions: trackedClaudeSessions,
+                sessions: nonHookClaudeSessions,
                 claimedSessionIDs: claimedSessionIDs
             ) else { continue }
             aliveIDs.insert(matched.id)
