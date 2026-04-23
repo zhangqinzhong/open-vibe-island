@@ -126,7 +126,12 @@ struct OpenIslandApp: App {
         MenuBarExtra {
             MenuBarContentView(model: appDelegate.model)
         } label: {
-            OpenIslandBrandMark(size: 18, style: .template)
+            // Use a proper NSImage template so macOS automatically renders
+            // the icon in the correct color for both light and dark menu bars.
+            // SwiftUI views rendered via drawingGroup() are rasterized as
+            // plain bitmaps and cannot be marked as template images, which
+            // caused the icon to appear white-on-white in light mode.
+            Image(nsImage: OpenIslandBrandMark.templateNSImage(size: 18))
                 .accessibilityLabel("Open Island")
         }
         .menuBarExtraStyle(.window)

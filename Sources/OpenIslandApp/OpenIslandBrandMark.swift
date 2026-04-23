@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct OpenIslandBrandMark: View {
@@ -26,6 +27,27 @@ struct OpenIslandBrandMark: View {
         row.enumerated().compactMap { columnIndex, character in
             character == "." ? nil : (columnIndex, rowIndex, character)
         }
+    }
+
+    /// Renders the brand mark as an NSImage with template mode enabled so
+    /// macOS automatically inverts it for light/dark menu bar backgrounds.
+    static func templateNSImage(size: CGFloat) -> NSImage {
+        let gridSize = 8
+        let cell = size / CGFloat(gridSize)
+        let image = NSImage(size: NSSize(width: size, height: size), flipped: false) { rect in
+            NSColor.black.setFill()
+            for pixel in Self.pixels {
+                // NSImage draws with flipped Y (origin bottom-left), so invert row.
+                let x = CGFloat(pixel.x) * cell
+                let y = CGFloat(gridSize - 1 - pixel.y) * cell
+                let alpha: CGFloat = pixel.role == "E" ? 0.9 : 1.0
+                NSColor.black.withAlphaComponent(alpha).setFill()
+                NSBezierPath(rect: CGRect(x: x, y: y, width: cell, height: cell)).fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
 
     var body: some View {
