@@ -912,20 +912,16 @@ final class AppModel {
     /// Immediately triggers a process scan and session reconciliation.
     /// Used by the manual refresh button in the island header.
     func refreshSessions() {
-        // Run reconciliation twice so processNotSeenCount reaches the threshold
-        // of 2 in a single user action, immediately evicting sessions whose
-        // processes are gone. The normal 2-second poll needs two separate ticks;
-        // a single reconcile call would appear to do nothing.
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            self.monitoring.reconcileSessionAttachments()
-            // Yield to let the first pass commit to state before the second.
-            try? await Task.sleep(for: .milliseconds(100))
-            self.monitoring.reconcileSessionAttachments()
-            self.synchronizeSelection()
-            self.refreshOverlayPlacementIfVisible()
-            self.lastActionMessage = "Sessions refreshed."
-        }
+        // Scan live processes, then immediately evict any session whose process
+        // is no longer running — bypasses the two-poll threshold used by the
+        // background poller so the result is visible on the first button press.
+        let activeProcesses = ActiveAgentProcessDiscovery().discover()
+        let aliveIDs = monitoring.sessionIDsWithAliveProcesses(activeProcesses: activeProcesses)
+        state.forceEvictDeadSessions(aliveSessionIDs: aliveIDs)
+        state.removeInvisibleSessions()
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
+        lastActionMessage = "Sessions refreshed."
     }
 
     func select(sessionID: String) {
