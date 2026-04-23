@@ -909,6 +909,15 @@ final class AppModel {
         }
     }
 
+    /// Immediately triggers a process scan and session reconciliation.
+    /// Used by the manual refresh button in the island header.
+    func refreshSessions() {
+        monitoring.reconcileSessionAttachments()
+        synchronizeSelection()
+        refreshOverlayPlacementIfVisible()
+        lastActionMessage = "Sessions refreshed."
+    }
+
     func select(sessionID: String) {
         selectedSessionID = sessionID
     }
