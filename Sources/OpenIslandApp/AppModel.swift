@@ -1387,6 +1387,12 @@ final class AppModel {
         monitoring.startMonitoringIfNeeded()
     }
 
+    /// Pause the process-monitoring poller. Call `resumeMonitoring()` immediately after.
+    /// Required before `NSOpenPanel.runModal()` to avoid a deadlock between the poller's
+    /// `DispatchGroup.wait()` and Swift Concurrency's `@MainActor` resumption queue.
+    func pauseMonitoring() { monitoring.pauseMonitoring() }
+    func resumeMonitoring() { monitoring.startMonitoringIfNeeded() }
+
 
     private var sessionBuckets: (primary: [AgentSession], overflow: [AgentSession]) {
         if let cached = _cachedSessionBuckets {
