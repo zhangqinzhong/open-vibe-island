@@ -53,6 +53,15 @@ final class ProcessMonitoringCoordinator {
 
     // MARK: - Monitoring lifecycle
 
+    /// Temporarily stop the polling loop. Call `startMonitoringIfNeeded()` to restart.
+    /// Used before `NSOpenPanel.runModal()` to prevent the poller's
+    /// `DispatchGroup.wait()` from blocking `@MainActor` resumption during
+    /// the nested AppKit event loop, which causes a permanent deadlock.
+    func pauseMonitoring() {
+        sessionAttachmentMonitorTask?.cancel()
+        sessionAttachmentMonitorTask = nil
+    }
+
     func startMonitoringIfNeeded() {
         guard sessionAttachmentMonitorTask == nil else {
             return

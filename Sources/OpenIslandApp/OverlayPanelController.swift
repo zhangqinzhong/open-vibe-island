@@ -830,7 +830,7 @@ final class NotchEventMonitors {
             guard now - sharedLastMove >= throttleInterval else { return }
             sharedLastMove = now
             let location = NSEvent.mouseLocation
-            Task { @MainActor in mouseMoveHandler(location) }
+            DispatchQueue.main.async { mouseMoveHandler(location) }
         }
 
         localMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { event in
@@ -838,18 +838,18 @@ final class NotchEventMonitors {
             guard now - sharedLastMove >= throttleInterval else { return event }
             sharedLastMove = now
             let location = NSEvent.mouseLocation
-            Task { @MainActor in mouseMoveHandler(location) }
+            DispatchQueue.main.async { mouseMoveHandler(location) }
             return event
         }
 
         globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDown) { event in
             let location = NSEvent.mouseLocation
-            Task { @MainActor in mouseDownHandler(location) }
+            DispatchQueue.main.async { mouseDownHandler(location) }
         }
 
         localClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { event in
             let location = NSEvent.mouseLocation
-            Task { @MainActor in mouseDownHandler(location) }
+            DispatchQueue.main.async { mouseDownHandler(location) }
             return event
         }
     }

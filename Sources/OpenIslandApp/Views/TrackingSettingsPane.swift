@@ -7,7 +7,6 @@ struct TrackingSettingsPane: View {
 
     @State private var apps: [CustomTrackedApp] = []
     @State private var editingApp: CustomTrackedApp?
-    @State private var showEditSheet = false
 
     var body: some View {
         ScrollView {
@@ -22,6 +21,15 @@ struct TrackingSettingsPane: View {
         }
         .navigationTitle("Tracking")
         .onAppear { apps = model.customTrackedApps }
+        .sheet(item: $editingApp) { app in
+            EditTrackedAppSheet(app: app) { confirmed in
+                if let confirmed {
+                    model.addCustomTrackedApp(confirmed)
+                    apps = model.customTrackedApps
+                }
+                editingApp = nil
+            }
+        }
     }
 
     // MARK: - Header
@@ -130,18 +138,6 @@ struct TrackingSettingsPane: View {
             .padding(.vertical, 10)
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showEditSheet) {
-            if let app = editingApp {
-                EditTrackedAppSheet(app: app) { confirmed in
-                    if let confirmed {
-                        model.addCustomTrackedApp(confirmed)
-                        apps = model.customTrackedApps
-                    }
-                    showEditSheet = false
-                    editingApp = nil
-                }
-            }
-        }
     }
 
     // MARK: - Hint
@@ -169,10 +165,15 @@ struct TrackingSettingsPane: View {
         panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
-        // runModal() blocks until the panel closes. Defer the SwiftUI state
-        // mutation to the next runloop cycle so AppKit fully tears down the
-        // panel before SwiftUI tries to present the sheet — presenting
-        // immediately causes a focus conflict that freezes the settings window.
+        // Pause the process-monitoring poller before runModal(). The poller uses
+        // Task.detached + DispatchGroup.wait() internally; when its detached task
+        // completes it tries to resume on @MainActor, but runModal()'s nested
+        // AppKit event loop prevents Swift Concurrency from servicing that
+        // resumption, causing a permanent deadlock. Pausing the poller for the
+        // duration of the modal dialog avoids this entirely.
+        model.pauseMonitoring()
+        defer { model.resumeMonitoring() }
+
         let response = panel.runModal()
         guard response == .OK, let url = panel.url else { return }
 
@@ -181,15 +182,12 @@ struct TrackingSettingsPane: View {
         let appName = bundle?.infoDictionary?["CFBundleName"] as? String
             ?? url.deletingPathExtension().lastPathComponent
 
-        let newApp = CustomTrackedApp(
+        // Setting editingApp to non-nil triggers .sheet(item:) automatically.
+        editingApp = CustomTrackedApp(
             bundleID: bundleID,
             appName: appName,
             terminalAppKey: appName
         )
-        DispatchQueue.main.async {
-            editingApp = newApp
-            showEditSheet = true
-        }
     }
 
     // MARK: - App icon helper
