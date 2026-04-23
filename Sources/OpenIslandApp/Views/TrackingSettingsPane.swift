@@ -169,11 +169,10 @@ struct TrackingSettingsPane: View {
         panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
-        // Run the panel as a standalone window (not a sheet) and wait for it
-        // to fully close before showing the SwiftUI edit sheet. Using
-        // beginSheetModal or begin() and immediately mutating @State while the
-        // panel is still on screen causes AppKit/SwiftUI window focus conflicts
-        // that freeze the settings window.
+        // runModal() blocks until the panel closes. Defer the SwiftUI state
+        // mutation to the next runloop cycle so AppKit fully tears down the
+        // panel before SwiftUI tries to present the sheet — presenting
+        // immediately causes a focus conflict that freezes the settings window.
         let response = panel.runModal()
         guard response == .OK, let url = panel.url else { return }
 
@@ -182,12 +181,15 @@ struct TrackingSettingsPane: View {
         let appName = bundle?.infoDictionary?["CFBundleName"] as? String
             ?? url.deletingPathExtension().lastPathComponent
 
-        editingApp = CustomTrackedApp(
+        let newApp = CustomTrackedApp(
             bundleID: bundleID,
             appName: appName,
             terminalAppKey: appName
         )
-        showEditSheet = true
+        DispatchQueue.main.async {
+            editingApp = newApp
+            showEditSheet = true
+        }
     }
 
     // MARK: - App icon helper
