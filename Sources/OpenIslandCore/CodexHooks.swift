@@ -556,6 +556,8 @@ public extension CodexHookPayload {
                 return "WezTerm"
             case "kaku":
                 return "Kaku"
+            case let value where value.contains("superset"):
+                return "Superset"
             case "vscode":
                 return "VS Code"
             case "vscode-insiders":
