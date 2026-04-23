@@ -169,19 +169,23 @@ struct TrackingSettingsPane: View {
         panel.canChooseDirectories = false
         panel.directoryURL = URL(fileURLWithPath: "/Applications")
 
-        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Use begin(completionHandler:) to avoid blocking the main thread,
+        // which caused the settings window to freeze with a black overlay.
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
 
-        let bundle = Bundle(url: url)
-        let bundleID = bundle?.bundleIdentifier ?? url.deletingPathExtension().lastPathComponent
-        let appName = bundle?.infoDictionary?["CFBundleName"] as? String
-            ?? url.deletingPathExtension().lastPathComponent
+            let bundle = Bundle(url: url)
+            let bundleID = bundle?.bundleIdentifier ?? url.deletingPathExtension().lastPathComponent
+            let appName = bundle?.infoDictionary?["CFBundleName"] as? String
+                ?? url.deletingPathExtension().lastPathComponent
 
-        editingApp = CustomTrackedApp(
-            bundleID: bundleID,
-            appName: appName,
-            terminalAppKey: appName
-        )
-        showEditSheet = true
+            self.editingApp = CustomTrackedApp(
+                bundleID: bundleID,
+                appName: appName,
+                terminalAppKey: appName
+            )
+            self.showEditSheet = true
+        }
     }
 
     // MARK: - App icon helper
