@@ -951,6 +951,8 @@ final class ProcessMonitoringCoordinator {
             return "Terminal"
         case "iterm", "iterm2", "iterm.app":
             return "iTerm"
+        case "superset":
+            return "Superset"
         case "cmux":
             return "cmux"
         case "warp", "warpterminal":
