@@ -316,7 +316,12 @@ final class ProcessMonitoringCoordinator {
         // only be matched via Pass 1. Allowing CWD-only matching here causes a
         // dead hook session to be kept alive indefinitely whenever a new process
         // runs in the same working directory.
-        let nonHookClaudeSessions = trackedClaudeSessions.filter { !$0.isHookManaged }
+        // Also exclude completed sessions: a session that already reached .completed
+        // should not be resurrected just because a new process happens to run in
+        // the same CWD — that would prevent the refresh button from ever clearing it.
+        let nonHookClaudeSessions = trackedClaudeSessions.filter {
+            !$0.isHookManaged && $0.phase != .completed
+        }
         for process in claudeProcesses {
             guard let matched = uniqueTrackedClaudeSession(
                 for: process,
