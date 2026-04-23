@@ -385,8 +385,14 @@ struct ActiveAgentProcessDiscovery {
             return "Terminal"
         }
 
-        if lowered.contains("/iterm.app/contents/macos/iterm2") {
+        if lowered.contains("/iterm.app/contents/macos/iterm2")
+            || lowered.contains("/iterm2/itermserver-")
+            || lowered.contains("/iterm2/iterm2-daemon") {
             return "iTerm"
+        }
+
+        if lowered.contains("/superset.app/contents/macos/superset") {
+            return "Superset"
         }
 
         if lowered.contains("/kaku.app/contents/macos/kaku-gui") || lowered.hasSuffix("/kaku-gui") {
