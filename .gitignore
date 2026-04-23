@@ -26,3 +26,4 @@ output/
 *.tmp
 .worktrees/
 .air/
+.superset/
